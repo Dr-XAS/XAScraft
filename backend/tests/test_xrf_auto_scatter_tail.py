@@ -248,9 +248,35 @@ def _refused_default(original, record=None, error=None):
     return extract_fixed
 
 
-def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(long_tail, monkeypatch):
+def _fail_default_fit(monkeypatch, failure):
+    """Make only the default 0.5 fit fail, below _extract_fixed, so the
+    production code itself must classify the refusal."""
+    if failure == 'calibration':
+        calibrate = engine.calibrate
+
+        def stopped(fitter, *args, **kwargs):
+            if fitter.options.scatter_beta == 0.5:
+                kwargs['max_nfev'] = 1
+            return calibrate(fitter, *args, **kwargs)
+        monkeypatch.setattr(engine, 'calibrate', stopped)
+    else:
+        fit_detector = engine.fit_detector
+
+        def shifted(*args):
+            fitted = fit_detector(*args)
+            if args[0].options.scatter_beta == 0.5:
+                fitted['energy'] = fitted['energy'] + 5.0     # the line leaves the window
+            return fitted
+        monkeypatch.setattr(engine, 'fit_detector', shifted)
+
+
+@pytest.mark.parametrize('failure', ['calibration', 'lost_line'])
+def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(
+        long_tail, monkeypatch, failure):
     scan, counts, options, _, _ = long_tail
-    monkeypatch.setattr(engine, '_extract_fixed', _refused_default(engine._extract_fixed))
+    _fail_default_fit(monkeypatch, failure)
+    with pytest.raises(engine.FitRefused):
+        engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}))
     result = engine.extract(scan, counts, options)
     choice = result['metadata']['scatter_tail']
     assert choice['selected_beta'] > 0.5
@@ -260,6 +286,33 @@ def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(l
     assert result['quality']['fit']['checks']['pre_edge_null'] is True
     assert any('default 0.5 peak widths could not be fitted' in text
                for text in result['metadata']['warnings'])
+
+
+def test_a_rescue_needs_detector_elements_that_agree_in_shape(long_tail, monkeypatch):
+    """With no default to compare against, a candidate whose elements disagree
+    must not be taken even when the summed spectrum passes every check."""
+    scan, counts, options, _, _ = long_tail
+    _fail_default_fit(monkeypatch, 'calibration')
+    evidence = engine._tail_evidence
+
+    def disagreeing(result, beta):
+        found = evidence(result, beta)
+        found['detector_agreement'] = dict(detectors=2, checks=dict(shape_agreement=False))
+        return found
+    monkeypatch.setattr(engine, '_tail_evidence', disagreeing)
+    with pytest.raises(engine.FitRefused, match='also tried 2, 4, 8 and 16'):
+        engine.extract(scan, counts, options)
+
+
+def test_an_element_with_no_counts_is_refused_before_any_fit(long_tail, monkeypatch):
+    """Missing counts cannot be repaired by another tail: an input error, named,
+    and no calibration spent on it."""
+    scan, counts, options, _, _ = long_tail
+    calls = []
+    monkeypatch.setattr(engine, 'calibrate', lambda *args, **kwargs: calls.append(1))
+    with pytest.raises(ScientificError, match='element 1 recorded no counts') as error:
+        engine.extract(scan, np.zeros_like(counts), options)
+    assert not isinstance(error.value, engine.FitRefused) and not calls
 
 
 def test_an_input_error_at_the_default_never_starts_a_tail_search(long_tail, monkeypatch):

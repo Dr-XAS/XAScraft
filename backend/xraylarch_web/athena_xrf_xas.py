@@ -1079,7 +1079,7 @@ def solve_amplitudes(basis, counts, *, ridge, free_mask, variance=None):
             try:
                 return nnls(design, target)[0]
             except RuntimeError as exc:
-                raise ScientificError(
+                raise FitRefused(
                     'The constrained XRF amplitude solve did not converge. '
                     'Check the fit window and overlapping matrix lines.') from exc
 
@@ -1903,8 +1903,9 @@ def _extract_after_refusal(scan, counts, options, windows, fit_provider, refusal
     """The default 0.5 could not be fitted at all. An unmodelled scatter tail
     can do that too, so try the longer tails at the full calibration budget:
     with no default extraction there is nothing to scale a budget from or to
-    compare against, so a candidate must pass every check on its own. If none
-    does, the original refusal stands."""
+    compare against, so a candidate must pass every check on its own,
+    including agreement in shape between detector elements. If none does,
+    the original refusal stands."""
     trials = [dict(beta=0.5, eligible=False, error=f'{type(refusal).__name__}: {refusal}')]
     best = result = None
     for beta in TAIL_CANDIDATES:
@@ -1952,7 +1953,11 @@ def _try_tail(scan, counts, options, windows, fit_provider, beta, budget, baseli
         reasons.append('pre-edge evidence unavailable')
     elif evidence['checks']['pre_edge_null'] is not True:
         reasons.append('pre-edge null check did not pass')
-    if baseline is not None:
+    if baseline is None:
+        agreement = evidence['detector_agreement']
+        if agreement is not None and agreement['checks']['shape_agreement'] is not True:
+            reasons.append('detector elements disagree in shape')
+    else:
         if evidence['detector_rms'] > baseline['detector_rms']:
             reasons.append('detector agreement worsened')
         if evidence['calibration_redchi'] > baseline['calibration_redchi']:
@@ -2026,6 +2031,14 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     # straight from the file and have to follow, or every point is paired
     # with another point's spectrum.
     counts = counts[scan['order']]
+    empty = [str(elements[detector] + 1) for detector in range(counts.shape[1])
+             if not np.any(counts[:, detector, :])]
+    if empty:
+        raise ScientificError(
+            f'{options.detector} element{"s" if len(empty) > 1 else ""} {", ".join(empty)} '
+            f'recorded no counts in the fit window (channels {options.channel_range[0]} to '
+            f'{options.channel_range[1]}). Leave {"them" if len(empty) > 1 else "it"} out of '
+            'the extraction.')
 
     total_points, ndet, _ = counts.shape
     lo, hi = options.channel_range
