@@ -1,4 +1,5 @@
 """Regression tests for three EXAFS defects, each with a known answer."""
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +9,7 @@ from larch import Group
 from larch.xafs import (autobk, estimate_noise, feffit, feffit_dataset, feffit_transform,
                         feffpath, path2chi, pre_edge)
 from larch.fitting import guess, param, param_group
+from lmfit import Parameters
 import larch.xafs.sigma2_models as sigma2_models
 
 FEFF_CU = Path(__file__).parents[1] / 'examples' / 'feffit' / 'Feff_Cu'
@@ -55,6 +57,25 @@ def test_reversing_the_path_list_leaves_every_path_its_own_debye_sigma2(python_d
     assert fitted == pytest.approx([theta_true, theta_true], abs=1e-3)
 
 
+def test_copied_parameters_keep_custom_procedures_and_read_the_current_path():
+    """Rebinding must not reinstall Larch's defaults over a model the user
+    replaced, and a user's own procedure must read the path being evaluated,
+    not the one the copied-from interpreter last saw."""
+    params = Parameters()
+    params._asteval('def custom_disorder():\n    return 0.001*reff')
+    paths = [feffpath(str(FEFF_CU / name), sigma2='custom_disorder()', s02=0.9)
+             for name in ('feff0001.dat', 'feff0005.dat')]
+    for path in paths:
+        path.create_path_params(params=params)
+    params._asteval('def sigma2_eins(t, theta):\n    return 0.012345')
+    copied = deepcopy(params)
+    for path in paths:
+        path2chi(path, params=copied)
+        assert path.path_paramvals()['sigma2'] == pytest.approx(0.001 * path.reff, rel=1e-12)
+    assert copied._asteval('sigma2_eins(300, 300)') == 0.012345
+    assert params._asteval.symtable['custom_disorder'].__asteval__ is params._asteval
+
+
 def test_autobk_chi_does_not_depend_on_the_units_of_mu():
     """The endpoint clamps weighed chi in the raw units of mu, so the same
     absorption in other units gave another background: chi(k) changed by 15%
@@ -64,16 +85,21 @@ def test_autobk_chi_does_not_depend_on_the_units_of_mu():
     k = np.sqrt(.2624682917 * np.maximum(relative, 0))
     step = .5 + np.arctan(relative / 1.6) / np.pi
     mu = .2 - 4.5e-5 * relative + step * (1 + .04 * np.sin(4.8 * k) * np.exp(-.01 * k * k) / np.maximum(k, 1))
-    chis = []
+    chis, errors = [], []
     for scale in (.01, 1., 100.):
         group = Group(energy=energy, mu=scale * mu)
         pre_edge(group, e0=6539., pre1=-170., pre2=-40., norm1=100., norm2=880., nnorm=2)
-        autobk(group, e0=6539., rbkg=1., kweight=2, kmax=14., clamp_lo=1, clamp_hi=1)
+        autobk(group, e0=6539., rbkg=1., kweight=2, kmax=14., clamp_lo=1, clamp_hi=1,
+               calc_uncertainties=True)
         chis.append(group.chi)
+        errors.append(group.delta_chi)
         mask = (group.k >= 3) & (group.k <= 10)
     for chi in (chis[0], chis[2]):
         difference = np.linalg.norm(((chi - chis[1]) * group.k**2)[mask])
         assert difference < 1e-9 * np.linalg.norm((chis[1] * group.k**2)[mask])
+    # feffit takes delta_chi as dimensionless, like chi: it was in the units of mu.
+    for error in (errors[0], errors[2]):
+        np.testing.assert_allclose(error, errors[1], rtol=1e-6)
 
 
 def test_estimate_noise_uses_the_window_it_is_given():

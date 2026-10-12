@@ -241,7 +241,8 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
                                  coefs_std=coefs_std, iek0=iek0, iemax=iemax,
                                  ek0=ek0, covar=covar, chisqr=chisqr,
                                  redchi=redchi, init_bkg=init_bkg,
-                                 knots_y=knots_y, kraw=kraw, mu=mu)
+                                 knots_y=knots_y, kraw=kraw, mu=mu,
+                                 edge_step=edge_step)
 
     if  calc_uncertainties and covar is not None:
         autobk_delta_chi(group, err_sigma=err_sigma)
@@ -288,7 +289,9 @@ def autobk_delta_chi(group, err_sigma=1):
     dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*d.redchi)
 
     if not any(np.isnan(dchi)):
-        group.delta_chi = dchi
+        # chi is in edge-step units; its uncertainty must be too. The
+        # background and its uncertainty stay in the units of mu.
+        group.delta_chi = dchi/abs(getattr(d, 'edge_step', 1.0))
         group.delta_bkg = 0.0*d.mu
         group.delta_bkg[d.iek0:d.iek0+len(dbkg)] = dbkg
 
@@ -549,6 +552,6 @@ def autobk_lmfit(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=
         dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*redchi)
 
         if not any(np.isnan(dchi)):
-            group.delta_chi = dchi
+            group.delta_chi = dchi/abs(edge_step)
             group.delta_bkg = 0.0*mu
             group.delta_bkg[iek0:iek0+len(dbkg)] = dbkg

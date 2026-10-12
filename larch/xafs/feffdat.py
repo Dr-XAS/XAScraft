@@ -33,6 +33,8 @@ from larch.utils.strutils import b32hash
 from larch.fitting import group2params, dict2params, isParameter, param_value
 from .xafsutils import ETOK, ktoe, set_xafsGroup, gfmt, gformat
 from .sigma2_models import add_sigma2funcs
+import weakref
+from asteval.astutils import Procedure
 
 SMALL_ENERGY = 1.e-6
 
@@ -286,6 +288,30 @@ class FeffDatFile(Group):
         self.__rmass = None  # reduced mass of path
         self.__geometry = None  # path geometry list [atom, dist, angle]
 
+_REBOUND = weakref.WeakSet()
+
+
+def _rebind_procedures(aeval):
+    """lmfit copies Parameters into a new interpreter but carries the asteval
+    procedures over (sigma2_debye, sigma2_eins, gnxas, any user def), still
+    bound to the old interpreter: they read the path stored there, so every
+    path got the same sigma2. Give this interpreter its own copy of each,
+    keeping custom bodies and aliases and leaving the source untouched."""
+    if aeval in _REBOUND:
+        return
+    copies = {}
+    for name, value in list(aeval.symtable.items()):
+        if isinstance(value, Procedure) and value.__asteval__ is not aeval:
+            if id(value) not in copies:
+                copies[id(value)] = Procedure(
+                    value.name, aeval, doc=value.__doc__, lineno=value.lineno,
+                    body=value.__body__, text=value.__text__, args=value.__argnames__,
+                    kwargs=value.__kwargs__, vararg=value.__vararg__,
+                    varkws=value.__varkws__, is_lambda=value.__is_lambda__)
+            aeval.symtable[name] = copies[id(value)]
+    _REBOUND.add(aeval)
+
+
 class FeffPathGroup(Group):
     def __init__(self, filename=None, label='', feffrun='', s02=None, degen=None,
                  e0=None, ei=None, deltar=None, sigma2=None, third=None,
@@ -492,12 +518,7 @@ class FeffPathGroup(Group):
             self.params = dict2params(self.params)
 
         aeval = self.params._asteval
-        sigma2_debye = aeval.symtable.get('sigma2_debye', None)
-        if getattr(sigma2_debye, '__asteval__', aeval) is not aeval:
-            # lmfit copies Parameters into a new interpreter but carries the
-            # sigma2 procedures over, still bound to the old one: they would read
-            # the path stored there, giving every path the same sigma2. Rebind.
-            add_sigma2funcs(self.params)
+        _rebind_procedures(aeval)
         symtab = aeval.symtable
         symtab['feffpath'] = self._feffdat
         for attr in FEFFDAT_VALUES:
