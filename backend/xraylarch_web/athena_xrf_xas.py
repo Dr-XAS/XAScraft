@@ -1890,10 +1890,11 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
         # claiming a different tail, so a saved group keeps the record too.
         result['metadata']['warnings'].append(
             'Automatic scatter tail: tried 2, 4, 8 and 16 peak widths after the pre-edge '
-            'null check found a positive offset; none passed that check with converged, '
-            'no less consistent detector fits, so the default 0.5 was kept. The extracted '
-            'spectrum may be unreliable. Review the detector spectra and fit settings '
-            'before analysis.')
+            'null check found a positive offset; none met every acceptance criterion '
+            '(that check passing, every detector fit converged, edge checks passing, '
+            'detector agreement and calibration residual no worse), so the default 0.5 was '
+            'kept. The extracted spectrum may be unreliable. Review the detector spectra '
+            'and fit settings before analysis.')
     if best['beta'] != 0.5:
         # A changed tail changes the result, so the user is told.
         null = best['null_test']

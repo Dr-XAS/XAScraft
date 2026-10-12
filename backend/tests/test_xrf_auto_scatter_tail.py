@@ -138,7 +138,7 @@ def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(lon
     tried = result['metadata']['scatter_tail']['candidates'][1:]
     assert [trial['beta'] for trial in tried] == [2.0, 4.0, 8.0, 16.0]
     assert result['quality']['fit']['checks']['pre_edge_null'] is False
-    assert any('none passed that check' in text for text in result['metadata']['warnings'])
+    assert any('none met every acceptance criterion' in text for text in result['metadata']['warnings'])
     assert not any('selected' in text and 'Automatic scatter tail' in text
                    for text in result['metadata']['warnings'])
 
@@ -213,3 +213,23 @@ def test_cached_tail_candidates_cannot_reuse_the_default_fit(long_tail):
         assert None not in tails and tails > {0.5}
     finally:
         runtime.close()
+
+
+def test_a_longer_tail_that_still_fails_the_pre_edge_check_is_not_taken(tail_runtime):
+    """Every longer tail fits and shrinks the pre-edge leak but none clears the
+    check: taking the least bad one moved a held-out edge step further from the
+    truth than the default, so the default must stay, unchanged."""
+    scan, counts, options, _ = synthetic_scan(
+        points=32, detectors=1, calibration_points=3, scatter_beta=8., poisson=False)
+    resolved, windows = engine.resolve_windows(scan, options.model_copy(update={'scatter_beta': None}))
+    fixed = tail_runtime.extract(scan, counts, resolved.model_copy(update={'scatter_beta': 0.5}),
+                                 windows, 'improving-but-failing')
+    result = tail_runtime.extract(scan, counts, resolved, windows, 'improving-but-failing')
+    default, *longer = result['metadata']['scatter_tail']['candidates']
+    assert [row['beta'] for row in longer] == [2.0, 4.0, 8.0, 16.0]
+    # Non-vacuous: each longer tail was fitted and scored better than the default.
+    assert all('error' not in row and row['null_score'] < default['null_score'] for row in longer)
+    assert all(row['checks']['pre_edge_null'] is False and not row['eligible']
+               and 'pre-edge null check did not pass' in row['rejected_reasons'] for row in longer)
+    assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
+    assert result['fit_counts'] == fixed['fit_counts']
