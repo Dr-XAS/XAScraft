@@ -648,6 +648,79 @@ def test_calibration_reports_whether_the_optimizer_finished():
     assert stopped['message']
 
 
+def test_a_failed_refinement_is_not_hidden_by_the_successful_initial_fit(monkeypatch):
+    scan, counts, options, _ = small_scan(detectors=1)
+    lo, hi = options.channel_range
+    fitter = engine.make_fitter(np.arange(lo, hi), scan['energy_ev'] / 1000., options)
+    indices = engine.calibration_indices(len(counts), options.calibration_points)
+    minimize = engine.minimize
+    calls = 0
+
+    def fail_refinement(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        result = minimize(*args, **kwargs)
+        if calls > 1:
+            result.success = False
+            result.message = 'Forced refinement failure'
+        return result
+
+    monkeypatch.setattr(engine, 'minimize', fail_refinement)
+    _, report = engine.calibrate(fitter, counts[:, 0, lo-CHANNELS[0]:hi-CHANNELS[0]], indices)
+    assert calls > 1
+    assert report['success'] is False
+    assert 'Forced refinement failure' in report['message']
+
+
+@pytest.mark.parametrize('failure', ['calibration', 'amplitude'])
+@pytest.mark.parametrize('all_failed', [False, True])
+def test_failed_detector_fits_cannot_silently_return_a_spectrum(monkeypatch, failure, all_failed):
+    scan, counts, options, _ = small_scan(detectors=4, elements=[1, 3])
+    lo, hi = options.channel_range
+    counts = counts[:, [1, 3], lo-CHANNELS[0]:hi-CHANNELS[0]]
+    good = engine.extract(scan, counts, options)
+    assert all(report['success'] for report in good['detector_reports'])
+    assert good['metadata']['warnings'] == []
+    fit_detector = engine.fit_detector
+    calibrate = engine.calibrate
+    solve = engine.Fitter.solve
+    detector = 0
+
+    def failed_calibration(*args):
+        return calibrate(*args, max_nfev=1)
+
+    def failed_amplitude(self, *args, **kwargs):
+        solved = solve(self, *args, **kwargs)
+        if 'variance' not in kwargs:
+            solved['diagnostics']['unconverged_points'] = 1
+        return solved
+
+    def fit_with_failure(*args):
+        nonlocal detector
+        detector += 1
+        with monkeypatch.context() as patch:
+            if detector == 1 or all_failed:
+                if failure == 'calibration':
+                    patch.setattr(engine, 'calibrate', failed_calibration)
+                else:
+                    patch.setattr(engine.Fitter, 'solve', failed_amplitude)
+            return fit_detector(*args)
+
+    monkeypatch.setattr(engine, 'fit_detector', fit_with_failure)
+    if all_failed:
+        with pytest.raises(ScientificError, match='All selected detector elements failed') as error:
+            engine.extract(scan, counts, options)
+        assert 'Detector ge element 2' in str(error.value)
+        assert 'Detector ge element 4' in str(error.value)
+    else:
+        result = engine.extract(scan, counts, options)
+        warning, = result['metadata']['warnings']
+        assert 'Detector ge element 2' in warning
+        assert f'{failure} fit did not converge' in warning
+        assert 'Detector ge element 4' not in warning
+        assert result['detector_parameters'][1] == good['detector_parameters'][1]
+
+
 @pytest.mark.parametrize('mean', [5., 10.])
 @pytest.mark.parametrize('seed', [101, 203, 307, 409])
 def test_poisson_noise_alone_does_not_release_extra_response_parameters(mean, seed):

@@ -157,6 +157,24 @@ def test_a_serpentine_raster_is_unwound_rather_than_mirrored():
     assert result['map']['x'] == sorted(result['map']['x'])
 
 
+def test_a_descending_first_serpentine_map_keeps_intensities_with_coordinates():
+    rows, columns = 3, 5
+    positions = raster_positions(rows, columns, serpentine=True)
+    x = columns - 1 - positions[0][1]
+    y = positions[1][1]
+    counts = np.zeros((rows * columns, 1, CHANNELS))
+    counts[:, 0, PEAK] = 10 * y + x
+    data = cube_file(counts, [('sample_x', x), ('sample_y', y)])
+
+    cube = read(data)
+    assert cube['raster']['serpentine'] is True
+    result = frame(data, cube)
+    truth = 10 * np.arange(rows)[:, None] + np.arange(columns)[None, :]
+    np.testing.assert_array_equal(result['map']['values'], truth)
+    np.testing.assert_array_equal(result['map']['x'], np.arange(columns))
+    np.testing.assert_array_equal(result['map']['y'], np.arange(rows))
+
+
 def test_a_single_map_row_is_offered_as_a_trace_and_not_as_a_one_row_image():
     """One file of a 51-file map holds one row, and the positions in it do
     not raster. Inventing an image from them would present a line profile as

@@ -150,6 +150,37 @@ def test_response_arrays_are_finite(tmp_path, synthetic):
     assert bad == []
 
 
+def test_failed_detector_warning_survives_preview_and_saved_group(tmp_path, synthetic, monkeypatch):
+    data, options = synthetic
+    calibrate = engine.calibrate
+    calls = 0
+
+    def fail_first_detector(*args):
+        nonlocal calls
+        calls += 1
+        return calibrate(*args, **({'max_nfev': 1} if calls == 1 else {}))
+
+    monkeypatch.setattr(engine, 'calibrate', fail_first_detector)
+    # Serial fits: a spawned worker process would not see the patch.
+    settings, _, ident = workspace(tmp_path, xrf_workers=1)
+    with TestClient(create_app(settings)) as client:
+        upload = uploaded(client, ident, data)
+        route = f'/api/athena/projects/{ident}/xrf-xas'
+        preview = client.post(route + '/preview', json=payload(options, upload))
+        assert preview.status_code == 200, preview.text
+        warning, = preview.json()['metadata']['warnings']
+        assert 'Detector ge element 1' in warning
+        assert 'calibration fit did not converge' in warning
+        made = client.post(route + '/make', json=payload(options, upload))
+        assert made.status_code == 200, made.text
+        review = client.post(f'/api/athena/projects/{ident}/quality-report',
+                             json={'version': made.json()['version']})
+        assert review.status_code == 200, review.text
+    group, = made.json()['groups']
+    assert warning in group['source']['warnings']
+    assert warning in review.json()['groups'][0]['warnings']
+
+
 def test_unreadable_scan_is_rejected_with_a_recovery_message(tmp_path, synthetic):
     """Users select the wrong file often. A bare stack trace or a generic
     500 leaves them no idea which file to pick instead."""
