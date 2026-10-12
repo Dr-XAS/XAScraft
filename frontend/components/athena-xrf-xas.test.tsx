@@ -111,13 +111,14 @@ it('renders only the preview that matches the current settings',async()=>{
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
-it('sends the scatter tail length the user set, not the default',async()=>{
+it('sends the scatter tail length the user set, and automatic when the field is empty',async()=>{
   // The tail length is the one shape setting the calibration does not fit, so
   // it reaches the model only if the panel puts it in the request. Dropped on
   // the way, the field looks like a working remedy for a failed pre-edge test
-  // while every fit is still made at Larch's default of 0.5.
+  // while every fit is still made at Larch's default of 0.5; a number sent by
+  // default would also switch off the server's automatic choice for everyone.
   await setup();await click('Fit preview')
-  expect(requests('/preview').at(-1)![1].scatter_beta).toBe(0.5)
+  expect(requests('/preview').at(-1)![1].scatter_beta).toBeNull()
   fireEvent.change(screen.getByLabelText('Scatter tail length (peak widths)'),{target:{value:'8'}});await tick()
   await click('Fit preview')
   expect(requests('/preview').at(-1)![1].scatter_beta).toBe(8)
