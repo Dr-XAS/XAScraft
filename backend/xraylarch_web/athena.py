@@ -2173,7 +2173,7 @@ class AthenaStore:
         return dict(kind='xrf_xas',filename=metadata['display_name'],operation='xrf_xas',
             role=role,extraction=result['metadata'],quality=result['quality'],
             detector_parameters=result['detector_parameters'],source_sha256=digest,
-            warnings=[] if role=='fit' else
+            warnings=list(result['metadata'].get('warnings',[])) if role=='fit' else
                 ['A fixed channel window also collects the scatter peaks as they sweep through it. '
                  'Compare it with the fitted extraction before choosing which one to analyse.'])
 

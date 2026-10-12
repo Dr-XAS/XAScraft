@@ -1584,6 +1584,8 @@ def calibrate(fitter, counts, indices, *, max_nfev=12000):
         basic['peak_step'].max = 0.1
         basic['elastic_step'].max = basic['compton_step'].max = 0.5
 
+    failures = []
+
     def optimize(params, budget):
         # Differentiate in physical characteristic units. A purely relative
         # step collapses near a zero tail/step parameter, while a unit step
@@ -1604,6 +1606,8 @@ def calibrate(fitter, counts, indices, *, max_nfev=12000):
         fitted = minimize(dimensionless_residual, scaled, method='least_squares',
                           jac='3-point', x_scale='jac', ftol=1e-10, xtol=1e-10,
                           gtol=1e-8, max_nfev=budget)
+        if not fitted.success:
+            failures.append(str(getattr(fitted, 'message', '') or 'Optimizer did not converge.'))
         for name, unit in scales.items():
             par = fitted.params[name]
             par.set(value=par.value*unit, min=par.min*unit, max=par.max*unit)
@@ -1672,9 +1676,14 @@ def calibrate(fitter, counts, indices, *, max_nfev=12000):
     # this is a relative calibration statistic, not a goodness of fit.
     redchi = np.sum(((subset - solved['model']) * weights)**2)
     redchi /= max(subset.size - result.nvarys, 1)
+    if evaluations >= max_nfev:
+        failures.append(f'Maximum calibration evaluations reached ({max_nfev}).')
+    # A failed refinement or model comparison must survive fallback to the
+    # intrinsic fit, even when that earlier fit itself converged.
     report = dict(redchi=float(redchi), nfev=evaluations,
-                  success=bool(result.success), ier=int(getattr(result, 'status', 0)),
-                  message=str(getattr(result, 'message', '') or ''),
+                  success=bool(result.success and not failures),
+                  ier=int(getattr(result, 'status', 0)),
+                  message='; '.join(failures) or str(getattr(result, 'message', '') or ''),
                   calibration_subset_only=True,
                   response_model=response_model,
                   model_selection=selection,
@@ -1764,6 +1773,7 @@ def chosen_elements(scan: dict, options: XrfXasOptions) -> list[int]:
 def fit_detector(fitter, spectra, indices, batch_size, preview_index):
     """Independent calibration and full-scan solve for one detector element."""
     values, report = calibrate(fitter, spectra, indices)
+    report['calibration_unconverged_points'] = report['unconverged_points']
     areas = np.empty(len(spectra))
     preview = None
     diagnostics = dict(bounded_points=0, unconverged_points=0, max_optimality=0.0)
@@ -1848,6 +1858,7 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     batch_size = max(1, MAX_BASIS_VALUES // (len(fitter.names) * channels.size))
     edge, edge_ev, line_kev = target_line(options.target, float(energy_ev.min()), float(energy_ev.max()))
     per_detector, parameters, reports, lost = [], [], [], []
+    warnings, failed_elements = [], []
     preview = None
     fits = (fit_provider(fitter, counts, indices, batch_size, preview_index, preview_detector)
             if fit_provider is not None else
@@ -1866,7 +1877,21 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
                 solved = fitter.solve(values, selected, counts[selected, detector, :])
                 preview = detector_preview(solved, preview_index-start)
         parameters.append(values)
-        reports.append(fitted_detector['report'])
+        report = fitted_detector['report']
+        reports.append(report)
+        failures = []
+        if not report['success']:
+            failures.append('calibration fit did not converge: ' + report['message'])
+        unconverged = (report['unconverged_points'] +
+                       report.get('calibration_unconverged_points', 0))
+        if unconverged:
+            failures.append(f'amplitude fit did not converge for {unconverged} point solves')
+        if failures:
+            failed_elements.append(elements[detector])
+            warnings.append(
+                f'Detector {options.detector} element {elements[detector] + 1}: ' +
+                '; '.join(failures).rstrip('.') + '. The extracted spectrum may be unreliable. '
+                'Review the fit settings and retry, or exclude this detector element.')
         # Deadtime is a per-detector, per-point correction and must be applied
         # to that detector's own area before the detectors are summed.
         per_detector.append(areas * deadtime[:, detector])
@@ -1877,6 +1902,10 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
         fitted_axis = fitted_detector['energy']
         if not fitted_axis[0] <= line_kev <= fitted_axis[-1] or not np.any(per_detector[-1] != 0):
             lost.append((elements[detector], values))
+
+    if len(failed_elements) == ndet:
+        raise ScientificError('All selected detector elements failed calibration or amplitude '
+                              'fitting; no extraction is returned. ' + ' '.join(warnings))
 
     if lost:
         axes = {}
@@ -1928,7 +1957,6 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
 
     # Warnings say the curve may not be what was asked for; the panel shows
     # them beside the plots, apart from the notes about how it was made.
-    warnings = []
     if options.e0 is None:
         # A typed e0 places the edge by hand; only Larch's own finds where
         # the curve really rises.
