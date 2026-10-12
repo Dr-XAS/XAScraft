@@ -27,7 +27,7 @@ def spline_eval(kraw, mu, knots, coefs, order, kout):
     return bkg, chi
 
 def _resid(vcoefs, ncoef, kraw, mu, chi_std, knots, order, kout,
-            ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi):
+            ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi, edge_step=1.0):
     global NFEV
     NFEV += 1
     nspl = len(vcoefs)
@@ -36,6 +36,9 @@ def _resid(vcoefs, ncoef, kraw, mu, chi_std, knots, order, kout,
     bkg, chi = spline_eval(kraw, mu, knots, coefs, order, kout)
     if chi_std is not None:
         chi = chi - chi_std
+    # The clamps act on dimensionless chi, not on the arbitrary units of mu;
+    # chi_std keeps its contract (the units of mu) and is subtracted first.
+    chi = chi / edge_step
     out =  realimag(xftf_fast(chi*ftwin, nfft=nfft)[:irbkg])
     if nclamp == 0:
         return out
@@ -193,7 +196,7 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
 
     vcoefs = 1.0*coefs[:nspl]
     userargs = (len(coefs), kraw_, mu_, chi_std, knots, order, kout,
-               ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi)
+               ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi, edge_step)
 
     lsout = leastsq(_resid, vcoefs, userargs, maxfev=2000*(ncoefs+1),
                     gtol=0.0, ftol=1.e-6, xtol=1.e-6, epsfcn=1.e-6,
@@ -238,7 +241,8 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
                                  coefs_std=coefs_std, iek0=iek0, iemax=iemax,
                                  ek0=ek0, covar=covar, chisqr=chisqr,
                                  redchi=redchi, init_bkg=init_bkg,
-                                 knots_y=knots_y, kraw=kraw, mu=mu)
+                                 knots_y=knots_y, kraw=kraw, mu=mu,
+                                 edge_step=edge_step)
 
     if  calc_uncertainties and covar is not None:
         autobk_delta_chi(group, err_sigma=err_sigma)
@@ -285,7 +289,9 @@ def autobk_delta_chi(group, err_sigma=1):
     dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*d.redchi)
 
     if not any(np.isnan(dchi)):
-        group.delta_chi = dchi
+        # chi is in edge-step units; its uncertainty must be too. The
+        # background and its uncertainty stay in the units of mu.
+        group.delta_chi = dchi/abs(getattr(d, 'edge_step', 1.0))
         group.delta_bkg = 0.0*d.mu
         group.delta_bkg[d.iek0:d.iek0+len(dbkg)] = dbkg
 
@@ -294,12 +300,13 @@ def autobk_delta_chi(group, err_sigma=1):
 
 def _lmfit_resid(pars, ncoefs=1, knots=None, order=3, irbkg=1, nfft=2048,
             kraw=None, mu=None, kout=None, ftwin=1, kweight=1, chi_std=None,
-            nclamp=0, clamp_lo=0, clamp_hi=0, **kws):
+            nclamp=0, clamp_lo=0, clamp_hi=0, edge_step=1.0, **kws):
     # coefs = [getattr(pars, FMT_COEF % i) for i in range(ncoefs)]
     coefs = [pars[FMT_COEF % i].value for i in range(ncoefs)]
     bkg, chi = spline_eval(kraw, mu, knots, coefs, order, kout)
     if chi_std is not None:
         chi = chi - chi_std
+    chi = chi / edge_step
     out =  realimag(xftf_fast(chi*ftwin, nfft=nfft)[:irbkg])
     if nclamp == 0:
         return out
@@ -466,6 +473,7 @@ def autobk_lmfit(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=
                                  kraw=kraw[:iemax-iek0+1],
                                  mu=mu[iek0:iemax+1], irbkg=irbkg, kout=kout,
                                  ftwin=ftwin, kweight=kweight,
+                                 edge_step=edge_step,
                                  nfft=nfft, nclamp=nclamp,
                                  clamp_lo=clamp_lo, clamp_hi=clamp_hi))
 
@@ -544,6 +552,6 @@ def autobk_lmfit(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=
         dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*redchi)
 
         if not any(np.isnan(dchi)):
-            group.delta_chi = dchi
+            group.delta_chi = dchi/abs(edge_step)
             group.delta_bkg = 0.0*mu
             group.delta_bkg[iek0:iek0+len(dbkg)] = dbkg

@@ -66,7 +66,7 @@ def estimate_noise(k, chi=None, group=None, rmin=15.0, rmax=30.0,
     rmax_out = min(10*pi, rmax+2)
 
     xftf(k, chi, kmin=kmin, kmax=kmax, rmax_out=rmax_out,
-         kweight=kweight, dk=dk, dk2=dk2, kwindow=kwindow,
+         kweight=kweight, dk=dk, dk2=dk2, window=kwindow,
          nfft=nfft, kstep=kstep, group=tmpgroup)
 
     chir  = tmpgroup.chir

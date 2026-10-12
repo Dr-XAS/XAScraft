@@ -35,8 +35,8 @@ They are numerical weights, not energies, percentages, distances, or fitted
 physical properties.
 
 In this checkout's `larch/xafs/autobk.py`, let `d(k)` be the interpolated
-`μ − μ₀` signal before edge-step normalization, with the supplied standard
-subtracted when present, and let `r` be its low-R Fourier residual vector.
+`μ − μ₀` signal, with the supplied standard subtracted when present, divided
+by the edge step, and let `r` be its low-R Fourier residual vector.
 The least-squares residual appends:
 
 ```text
@@ -97,9 +97,10 @@ The
 describes values around 1 as ordinary and 10–20 as very strong, but its examples
 also use 50 and 200. Current native Larix offers values including 0, 1, 2, 5,
 10, 20, 50, 100, 200, 500, and 1000 (`larch/wxxas/exafs_panel.py`). These are tuning choices,
-not calibrated physical categories. The local algorithm also depends on the
-absolute scale of μ through `scale`, so the same number need not have the same
-effect for differently scaled inputs.
+not calibrated physical categories. Because `d(k)` is in edge-step units, a
+clamp value has the same effect whatever the units of μ; before this checkout
+divided by the edge step, `scale` made it depend on the absolute scale of μ
+(χ(k) changed by 15% when μ was multiplied by 100).
 
 The web defaults above come from `AthenaParameters`; the lower-level `autobk()`
 function retains its own defaults (high weight 1 and 3 clamp points).

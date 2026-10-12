@@ -33,6 +33,7 @@ from larch.utils.strutils import b32hash
 from larch.fitting import group2params, dict2params, isParameter, param_value
 from .xafsutils import ETOK, ktoe, set_xafsGroup, gfmt, gformat
 from .sigma2_models import add_sigma2funcs
+from asteval.astutils import Procedure
 
 SMALL_ENERGY = 1.e-6
 
@@ -286,6 +287,50 @@ class FeffDatFile(Group):
         self.__rmass = None  # reduced mass of path
         self.__geometry = None  # path geometry list [atom, dist, angle]
 
+def _rebind_procedures(aeval):
+    """lmfit copies Parameters into a new interpreter but carries the asteval
+    procedures over (sigma2_debye, sigma2_eins, gnxas, any user def), still
+    bound to the old interpreter: they read the path stored there, so every
+    path got the same sigma2. Give this interpreter its own copy of each,
+    including procedures held in default arguments, lists, tuples and dicts,
+    keeping custom bodies and shared references and leaving the source
+    untouched. Checked on every path evaluation: procedures bound elsewhere
+    can arrive at any time (Parameters.update, a later copy)."""
+    memo = {}
+    for name, value in list(aeval.symtable.items()):
+        rebound = _rebound(value, aeval, memo)
+        if rebound is not value:
+            aeval.symtable[name] = rebound
+
+
+def _rebound(value, aeval, memo):
+    """`value` with every reachable procedure bound to `aeval`; the same
+    object when nothing needed rebinding."""
+    if id(value) in memo:
+        return memo[id(value)]
+    memo[id(value)] = value       # a cycle back to this object keeps it as is
+    new = value
+    if isinstance(value, Procedure):
+        kwargs = value.__kwargs__ or []
+        new_kwargs = [(key, _rebound(default, aeval, memo)) for key, default in kwargs]
+        if value.__asteval__ is not aeval or any(
+                new_default is not default for (_, default), (_, new_default) in zip(kwargs, new_kwargs)):
+            new = Procedure(value.name, aeval, doc=value.__doc__, lineno=value.lineno,
+                            body=value.__body__, text=value.__text__, args=value.__argnames__,
+                            kwargs=new_kwargs, vararg=value.__vararg__,
+                            varkws=value.__varkws__, is_lambda=value.__is_lambda__)
+    elif type(value) in (list, tuple):
+        items = [_rebound(item, aeval, memo) for item in value]
+        if any(new_item is not item for new_item, item in zip(items, value)):
+            new = type(value)(items)
+    elif type(value) is dict:
+        items = {key: _rebound(item, aeval, memo) for key, item in value.items()}
+        if any(items[key] is not item for key, item in value.items()):
+            new = items
+    memo[id(value)] = new
+    return new
+
+
 class FeffPathGroup(Group):
     def __init__(self, filename=None, label='', feffrun='', s02=None, degen=None,
                  e0=None, ei=None, deltar=None, sigma2=None, third=None,
@@ -491,7 +536,9 @@ class FeffPathGroup(Group):
             isinstance(self.params, dict)):
             self.params = dict2params(self.params)
 
-        symtab = self.params._asteval.symtable
+        aeval = self.params._asteval
+        _rebind_procedures(aeval)
+        symtab = aeval.symtable
         symtab['feffpath'] = self._feffdat
         for attr in FEFFDAT_VALUES:
             symtab[attr] = getattr(self._feffdat, attr)
