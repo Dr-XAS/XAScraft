@@ -156,7 +156,17 @@ def test_bad_native_limits_keep_raw_spectra_with_editable_errors(store, field):
     assert g["source"]["native"]["args"][field] == "invalid-limit"
 
 
-def test_real_missing_covariance_does_not_discard_fitted_curves(store):
+def test_missing_background_covariance_does_not_discard_fitted_curves(store, monkeypatch):
+    """Ag phthalocyanine in this project lost its AUTOBK covariance until the
+    endpoint clamps were weighed in edge-step units; no example project loses
+    it now, so the loss is induced, on the same real spectra."""
+    import xraylarch_web.athena_science as science
+    real = science.autobk
+
+    def without_covariance(*args, **kwargs):
+        real(*args, **kwargs)
+        kwargs["group"].autobk_details.covar = None
+    monkeypatch.setattr(science, "autobk", without_covariance)
     path = ROOT / "examples/xafsdata/AthenaProjectFiles/AgL3_CAMD.prj"
     p = store.create()
     restored = store.restore(p["id"], 0, path.read_bytes(), path.name)
@@ -164,6 +174,7 @@ def test_real_missing_covariance_does_not_discard_fitted_curves(store):
     groups = [g for g in restored["groups"] if g["result"]["effective"].get("background_covariance_available") is False]
     assert groups
     assert all(any("covariance is unavailable" in w for w in g["result"]["warnings"]) for g in groups)
+    assert all(g["result"]["effective"].get("exafs") for g in groups)
 
 
 @pytest.mark.parametrize("window,width", [("kaiser", 0), ("kaiser", 12), ("gaussian", 12)])
