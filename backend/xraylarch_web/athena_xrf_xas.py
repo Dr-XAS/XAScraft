@@ -1808,7 +1808,10 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             windows: dict | None = None, *, fit_provider=None) -> dict:
     """Choose a fixed Larch scatter tail using only extraction diagnostics.
 
-    Keep 0.5 without another fit unless its pre-edge null check is False.
+    Keep 0.5 without another fit unless its pre-edge null check is False
+    because of a positive pre-edge offset above its limit: that is the mark an
+    unmodelled scatter tail leaves in the target column. A failure of the drift
+    or noise criteria alone is not that mark and does not start a search.
     Otherwise try 2, 4, 8, 16 (five full extractions at most, no warm starts).
     A candidate must converge on every detector, retain every upward edge,
     pass edge-direction/post-edge checks, and not worsen either detector RMS
@@ -1831,7 +1834,9 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     baseline = _tail_evidence(result, 0.5)
     trials = [baseline]
     best = baseline
-    if baseline['checks']['pre_edge_null'] is False:
+    leak = baseline['null_test'] is not None and \
+        baseline['null_test']['mean_frac_of_jump'] > NULL_MEAN_LIMIT
+    if baseline['checks']['pre_edge_null'] is False and leak:
         for beta in (2.0, 4.0, 8.0, 16.0):
             candidate_options = options.model_copy(update={'scatter_beta': beta})
             try:
@@ -1863,6 +1868,9 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             if evidence['eligible'] and _tail_rank(evidence) < _tail_rank(best):
                 best, result = evidence, candidate
 
+    if best['beta'] != 0.5:
+        # A changed tail changes the result, so the user is told; a kept default is
+        # already reported by the failed pre-edge check and needs no second warning.
         null = best['null_test']
         message = (f'Automatic scatter tail: selected {best["beta"]:g} peak widths '
                    f'after trying 0.5, 2, 4, 8, 16. Pre-edge mean '
