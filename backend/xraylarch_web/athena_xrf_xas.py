@@ -47,8 +47,8 @@ MAX_BASIS_VALUES = 20_000_000
 CALIBRATION_EVALUATIONS = 12000
 
 class FitRefused(ScientificError):
-    """No extraction: the fit failed on every detector element or lost the
-    target line. Unlike an input error, another fit setting may succeed."""
+    """No extraction: the calibration failed on every detector element. An
+    unmodelled scatter tail does that, so another tail may succeed."""
 
 
 DEADTIME_PATTERN = re.compile(r'^(?P<detector>.+)-element(?P<index>\d+)-deadtime_factor$')
@@ -1079,7 +1079,7 @@ def solve_amplitudes(basis, counts, *, ridge, free_mask, variance=None):
             try:
                 return nnls(design, target)[0]
             except RuntimeError as exc:
-                raise FitRefused(
+                raise ScientificError(
                     'The constrained XRF amplitude solve did not converge. '
                     'Check the fit window and overlapping matrix lines.') from exc
 
@@ -1838,7 +1838,8 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     calibration redchi and shorter tail. These are selection criteria, not
     new quality checks or evidence of accuracy above the edge.
 
-    When 0.5 cannot be fitted at all (FitRefused, not an input error), the same
+    When the calibration at 0.5 fails on every element (FitRefused; not an
+    input error, a lost target line or an amplitude-only failure), the same
     candidates are tried at the full budget and one is taken only if it passes
     every check on its own; otherwise the refusal stands.
     """
@@ -1900,8 +1901,8 @@ TAIL_CANDIDATES = (2.0, 4.0, 8.0, 16.0)
 
 
 def _extract_after_refusal(scan, counts, options, windows, fit_provider, refusal):
-    """The default 0.5 could not be fitted at all. An unmodelled scatter tail
-    can do that too, so try the longer tails at the full calibration budget:
+    """The default 0.5 calibration failed on every element. An unmodelled
+    scatter tail can do that, so try the longer tails at the full calibration budget:
     with no default extraction there is nothing to scale a budget from or to
     compare against, so a candidate must pass every check on its own,
     including agreement in shape between detector elements. If none does,
@@ -2115,7 +2116,11 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             lost.append((elements[detector], values))
 
     if len(failed_elements) == ndet:
-        raise FitRefused('All selected detector elements failed calibration or amplitude '
+        # Only a calibration that failed everywhere is the mark of a wrong peak
+        # shape; amplitude-only failures and runaway axes are not searched.
+        refusal = FitRefused if not any(report['success'] for report in reports) \
+            else ScientificError
+        raise refusal('All selected detector elements failed calibration or amplitude '
                               'fitting; no extraction is returned. ' + ' '.join(warnings))
 
     if lost:
@@ -2127,7 +2132,7 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             axes.setdefault(axis, []).append(str(element + 1))
         fitted = '; '.join(f'element{"s" if len(names) > 1 else ""} {", ".join(names)}: {axis}'
                            for axis, names in axes.items())
-        raise FitRefused(
+        raise ScientificError(
             f'The calibration of {len(lost)} of the {ndet} chosen detector elements lost the '
             f'{options.target} line at {line_kev:.3f} keV: it falls outside the fit window '
             f'(channels {lo} to {hi}), or the element contributes nothing to it. Fitted energy '

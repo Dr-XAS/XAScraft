@@ -270,11 +270,10 @@ def _fail_default_fit(monkeypatch, failure):
         monkeypatch.setattr(engine, 'fit_detector', shifted)
 
 
-@pytest.mark.parametrize('failure', ['calibration', 'lost_line'])
 def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(
-        long_tail, monkeypatch, failure):
+        long_tail, monkeypatch):
     scan, counts, options, _, _ = long_tail
-    _fail_default_fit(monkeypatch, failure)
+    _fail_default_fit(monkeypatch, 'calibration')
     with pytest.raises(engine.FitRefused):
         engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}))
     result = engine.extract(scan, counts, options)
@@ -347,3 +346,20 @@ def test_a_refused_explicit_tail_is_not_replaced(long_tail, monkeypatch):
     with pytest.raises(engine.FitRefused):
         engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 8.}))
     assert tried == [8.0]
+
+
+def test_a_lost_target_line_is_refused_without_a_tail_search(long_tail, monkeypatch):
+    """A runaway calibration axis is not the mark of a wrong peak shape: no
+    evidence a longer tail helps, and four more full fits before the same
+    refusal. It stays a plain refusal, as before automatic tails."""
+    scan, counts, options, _, _ = long_tail
+    _fail_default_fit(monkeypatch, 'lost_line')
+    tried, original = [], engine._extract_fixed
+
+    def recorded(scan, counts, request, *args, **kwargs):
+        tried.append(request.scatter_beta)
+        return original(scan, counts, request, *args, **kwargs)
+    monkeypatch.setattr(engine, '_extract_fixed', recorded)
+    with pytest.raises(ScientificError, match='lost the') as error:
+        engine.extract(scan, counts, options)
+    assert tried == [0.5] and not isinstance(error.value, engine.FitRefused)
