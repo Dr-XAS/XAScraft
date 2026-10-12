@@ -46,6 +46,11 @@ MAX_BASIS_VALUES = 20_000_000
 # Stage-A calibration budget in residual evaluations, per detector element.
 CALIBRATION_EVALUATIONS = 12000
 
+class FitRefused(ScientificError):
+    """No extraction: the fit failed on every detector element or lost the
+    target line. Unlike an input error, another fit setting may succeed."""
+
+
 DEADTIME_PATTERN = re.compile(r'^(?P<detector>.+)-element(?P<index>\d+)-deadtime_factor$')
 
 
@@ -1832,10 +1837,19 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     drift|/limit and detrended RMS/limit; break ties by detector RMS,
     calibration redchi and shorter tail. These are selection criteria, not
     new quality checks or evidence of accuracy above the edge.
+
+    When 0.5 cannot be fitted at all (FitRefused, not an input error), the same
+    candidates are tried at the full budget and one is taken only if it passes
+    every check on its own; otherwise the refusal stands.
     """
     automatic = options.scatter_beta is None and options.engine == 'larch'
     fixed = options.model_copy(update={'scatter_beta': 0.5}) if automatic else options
-    result = _extract_fixed(scan, counts, fixed, windows, fit_provider=fit_provider)
+    try:
+        result = _extract_fixed(scan, counts, fixed, windows, fit_provider=fit_provider)
+    except FitRefused as refusal:
+        if not automatic:
+            raise
+        return _extract_after_refusal(scan, counts, options, windows, fit_provider, refusal)
     if not automatic:
         result['metadata']['scatter_tail'] = dict(
             automatic=False, applicable=options.engine == 'larch',
@@ -1851,35 +1865,9 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     if baseline['checks']['pre_edge_null'] is False and leak:
         budget = min(CALIBRATION_EVALUATIONS,
                      2 * max(report['nfev'] for report in result['detector_reports']))
-        for beta in (2.0, 4.0, 8.0, 16.0):
-            candidate_options = options.model_copy(update={'scatter_beta': beta})
-            try:
-                candidate = _extract_fixed(scan, counts, candidate_options, windows,
-                                           fit_provider=fit_provider, max_nfev=budget)
-            except (ScientificError, np.linalg.LinAlgError, ValueError, FloatingPointError) as exc:
-                # A candidate that cannot be solved is rejected and recorded; it must not
-                # discard the default extraction or a candidate already accepted.
-                trials.append(dict(beta=beta, eligible=False,
-                                   error=f'{type(exc).__name__}: {exc}'))
-                continue
-            evidence = _tail_evidence(candidate, beta)
-            reasons = []
-            if not evidence['fits_converged']:
-                reasons.append('detector fit did not converge')
-            if evidence['elements_without_edge']:
-                reasons.append('detector without an upward edge')
-            if not (evidence['checks']['edge_direction']
-                    and evidence['checks']['post_edge_positive'] is True):
-                reasons.append('edge-direction or post-edge check did not pass')
-            if evidence['null_score'] is None:
-                reasons.append('pre-edge evidence unavailable')
-            elif evidence['checks']['pre_edge_null'] is not True:
-                reasons.append('pre-edge null check did not pass')
-            if evidence['detector_rms'] > baseline['detector_rms']:
-                reasons.append('detector agreement worsened')
-            if evidence['calibration_redchi'] > baseline['calibration_redchi']:
-                reasons.append('calibration residual worsened')
-            evidence.update(eligible=not reasons, rejected_reasons=reasons)
+        for beta in TAIL_CANDIDATES:
+            evidence, candidate = _try_tail(scan, counts, options, windows, fit_provider,
+                                            beta, budget, baseline)
             trials.append(evidence)
             if evidence['eligible'] and _tail_rank(evidence) < _tail_rank(best):
                 best, result = evidence, candidate
@@ -1897,20 +1885,88 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             'and fit settings before analysis.')
     if best['beta'] != 0.5:
         # A changed tail changes the result, so the user is told.
-        null = best['null_test']
-        message = (f'Automatic scatter tail: selected {best["beta"]:g} peak widths '
-                   f'after trying 0.5, 2, 4, 8, 16. Pre-edge mean '
-                   f'{null["mean_frac_of_jump"]:.4g}, drift over scan '
-                   f'{null["drift_over_scan_frac_of_jump"]:.4g}, detrended RMS '
-                   f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump. The pre-edge '
-                   'null check passes; this does not establish accuracy above the edge.')
-        result['metadata']['warnings'].append(message)
+        result['metadata']['warnings'].append(
+            f'Automatic scatter tail: selected {best["beta"]:g} peak widths after trying '
+            f'0.5, 2, 4, 8, 16. {_null_summary(best)}')
 
     result['metadata']['request']['scatter_beta'] = None
     result['metadata']['scatter_tail'] = dict(
         automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials,
         candidate_calibration_evaluations=budget if searched else None)
     return result
+
+
+TAIL_CANDIDATES = (2.0, 4.0, 8.0, 16.0)
+
+
+def _extract_after_refusal(scan, counts, options, windows, fit_provider, refusal):
+    """The default 0.5 could not be fitted at all. An unmodelled scatter tail
+    can do that too, so try the longer tails at the full calibration budget:
+    with no default extraction there is nothing to scale a budget from or to
+    compare against, so a candidate must pass every check on its own. If none
+    does, the original refusal stands."""
+    trials = [dict(beta=0.5, eligible=False, error=f'{type(refusal).__name__}: {refusal}')]
+    best = result = None
+    for beta in TAIL_CANDIDATES:
+        evidence, candidate = _try_tail(scan, counts, options, windows, fit_provider,
+                                        beta, None, None)
+        trials.append(evidence)
+        if evidence['eligible'] and (best is None or _tail_rank(evidence) < _tail_rank(best)):
+            best, result = evidence, candidate
+    if best is None:
+        raise FitRefused(f'{refusal} The automatic scatter tail also tried 2, 4, 8 and 16 peak '
+                         'widths; none gave converged fits that pass every quality check.') \
+            from refusal
+    result['metadata']['warnings'].append(
+        f'Automatic scatter tail: the default 0.5 peak widths could not be fitted, so '
+        f'{best["beta"]:g} peak widths was selected after trying 2, 4, 8, 16. '
+        f'{_null_summary(best)}')
+    result['metadata']['request']['scatter_beta'] = None
+    result['metadata']['scatter_tail'] = dict(
+        automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials,
+        candidate_calibration_evaluations=None)
+    return result
+
+
+def _try_tail(scan, counts, options, windows, fit_provider, beta, budget, baseline):
+    """One candidate extraction at a fixed tail and the evidence it is judged
+    on. With a baseline, a candidate must also be no worse than it."""
+    candidate_options = options.model_copy(update={'scatter_beta': beta})
+    try:
+        candidate = _extract_fixed(scan, counts, candidate_options, windows,
+                                   fit_provider=fit_provider, max_nfev=budget)
+    except (ScientificError, np.linalg.LinAlgError, ValueError, FloatingPointError) as exc:
+        # A candidate that cannot be solved is rejected and recorded; it must not
+        # discard the default extraction or a candidate already accepted.
+        return dict(beta=beta, eligible=False, error=f'{type(exc).__name__}: {exc}'), None
+    evidence = _tail_evidence(candidate, beta)
+    reasons = []
+    if not evidence['fits_converged']:
+        reasons.append('detector fit did not converge')
+    if evidence['elements_without_edge']:
+        reasons.append('detector without an upward edge')
+    if not (evidence['checks']['edge_direction']
+            and evidence['checks']['post_edge_positive'] is True):
+        reasons.append('edge-direction or post-edge check did not pass')
+    if evidence['null_score'] is None:
+        reasons.append('pre-edge evidence unavailable')
+    elif evidence['checks']['pre_edge_null'] is not True:
+        reasons.append('pre-edge null check did not pass')
+    if baseline is not None:
+        if evidence['detector_rms'] > baseline['detector_rms']:
+            reasons.append('detector agreement worsened')
+        if evidence['calibration_redchi'] > baseline['calibration_redchi']:
+            reasons.append('calibration residual worsened')
+    evidence.update(eligible=not reasons, rejected_reasons=reasons)
+    return evidence, candidate
+
+
+def _null_summary(evidence):
+    null = evidence['null_test']
+    return (f'Pre-edge mean {null["mean_frac_of_jump"]:.4g}, drift over scan '
+            f'{null["drift_over_scan_frac_of_jump"]:.4g}, detrended RMS '
+            f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump. The pre-edge null '
+            'check passes; this does not establish accuracy above the edge.')
 
 
 def _tail_evidence(result, beta):
@@ -2046,7 +2102,7 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             lost.append((elements[detector], values))
 
     if len(failed_elements) == ndet:
-        raise ScientificError('All selected detector elements failed calibration or amplitude '
+        raise FitRefused('All selected detector elements failed calibration or amplitude '
                               'fitting; no extraction is returned. ' + ' '.join(warnings))
 
     if lost:
@@ -2058,7 +2114,7 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             axes.setdefault(axis, []).append(str(element + 1))
         fitted = '; '.join(f'element{"s" if len(names) > 1 else ""} {", ".join(names)}: {axis}'
                            for axis, names in axes.items())
-        raise ScientificError(
+        raise FitRefused(
             f'The calibration of {len(lost)} of the {ndet} chosen detector elements lost the '
             f'{options.target} line at {line_kev:.3f} keV: it falls outside the fit window '
             f'(channels {lo} to {hi}), or the element contributes nothing to it. Fitted energy '

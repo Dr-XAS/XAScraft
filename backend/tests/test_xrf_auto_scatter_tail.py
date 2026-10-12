@@ -233,3 +233,64 @@ def test_a_longer_tail_that_still_fails_the_pre_edge_check_is_not_taken(tail_run
                and 'pre-edge null check did not pass' in row['rejected_reasons'] for row in longer)
     assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
     assert result['fit_counts'] == fixed['fit_counts']
+
+
+def _refused_default(original, record=None, error=None):
+    """Stand in for _extract_fixed: the default 0.5 is refused (by `error`, a
+    fit failure unless given), longer tails run for real unless refused too."""
+    def extract_fixed(scan, counts, request, *args, **kwargs):
+        if record is not None:
+            record.append(request.scatter_beta)
+        if request.scatter_beta == 0.5 or error is not None and request.scatter_beta in error:
+            raise (error or {}).get(request.scatter_beta, engine.FitRefused(
+                'All selected detector elements failed calibration or amplitude fitting.'))
+        return original(scan, counts, request, *args, **kwargs)
+    return extract_fixed
+
+
+def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    monkeypatch.setattr(engine, '_extract_fixed', _refused_default(engine._extract_fixed))
+    result = engine.extract(scan, counts, options)
+    choice = result['metadata']['scatter_tail']
+    assert choice['selected_beta'] > 0.5
+    assert 'FitRefused' in choice['candidates'][0]['error']
+    selected = next(row for row in choice['candidates'] if row['beta'] == choice['selected_beta'])
+    assert selected['eligible'] and selected['checks']['pre_edge_null'] is True
+    assert result['quality']['fit']['checks']['pre_edge_null'] is True
+    assert any('default 0.5 peak widths could not be fitted' in text
+               for text in result['metadata']['warnings'])
+
+
+def test_an_input_error_at_the_default_never_starts_a_tail_search(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    missing = ScientificError('The scan has no channel named i0.')
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, {0.5: missing}))
+    with pytest.raises(ScientificError, match='no channel named') as error:
+        engine.extract(scan, counts, options)
+    assert tried == [0.5] and not isinstance(error.value, engine.FitRefused)
+
+
+def test_a_refusal_stands_when_no_longer_tail_can_be_fitted(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    refused = {beta: engine.FitRefused('All selected detector elements failed calibration.')
+               for beta in (0.5, 2.0, 4.0, 8.0, 16.0)}
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, refused))
+    with pytest.raises(engine.FitRefused, match='also tried 2, 4, 8 and 16'):
+        engine.extract(scan, counts, options)
+    assert tried == [0.5, 2.0, 4.0, 8.0, 16.0]
+
+
+def test_a_refused_explicit_tail_is_not_replaced(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    refused = {8.0: engine.FitRefused('All selected detector elements failed calibration.')}
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, refused))
+    with pytest.raises(engine.FitRefused):
+        engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 8.}))
+    assert tried == [8.0]
