@@ -76,6 +76,31 @@ def test_copied_parameters_keep_custom_procedures_and_read_the_current_path():
     assert params._asteval.symtable['custom_disorder'].__asteval__ is params._asteval
 
 
+def test_procedures_reached_later_or_indirectly_read_the_current_path():
+    """Procedures re-imported after a first evaluation (Parameters.update), or
+    held in a default argument or a container, still read the path stored in
+    the interpreter they came from."""
+    params = Parameters()
+    params._asteval('def f():\n    return 0.001*reff')
+    params._asteval('def by_default(fun=f):\n    return fun()')
+    params._asteval('held = [f]')
+    params._asteval('def by_list():\n    return held[0]()')
+    paths = {expression: [feffpath(str(FEFF_CU / name), sigma2=expression, s02=0.9)
+                          for name in ('feff0001.dat', 'feff0005.dat')]
+             for expression in ('by_default()', 'by_list()', 'f()')}
+    for group in paths.values():
+        for path in group:
+            path.create_path_params(params=params)
+    copied = deepcopy(params)
+    for expression, group in paths.items():
+        for path in group:
+            path2chi(path, params=copied)
+        copied.update(params)             # brings the source-bound procedures back
+        for path in group:
+            path2chi(path, params=copied)
+            assert path.path_paramvals()['sigma2'] == pytest.approx(0.001 * path.reff, rel=1e-12)
+
+
 def test_autobk_chi_does_not_depend_on_the_units_of_mu():
     """The endpoint clamps weighed chi in the raw units of mu, so the same
     absorption in other units gave another background: chi(k) changed by 15%
