@@ -84,7 +84,7 @@ it('an invalid draft hides the old calibrated plot and blocks making a group',as
   render(<Harness/>);await tick();await upload();await click('Estimate initial coefficients')
   fireEvent.change(screen.getByLabelText('Linear coefficient'),{target:{value:''}});await tick()
   expect(screen.getAllByTestId('plot')).toHaveLength(1)
-  expect(screen.getByRole('button',{name:'Make calibrated data group'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Make calibrated data'})).toBeDisabled()
   expect(screen.getByRole('alert')).toHaveTextContent('Enter finite coefficients')
   fireEvent.change(screen.getByLabelText('Linear coefficient'),{target:{value:'.29'}})
   fireEvent.change(screen.getByLabelText('Pixel polynomial degree'),{target:{value:'2.5'}});await tick()
@@ -96,7 +96,7 @@ it('accepts manual calibration without a standard but disables fitting',async()=
   render(<Harness initial={initial}/>);await tick();await upload()
   fireEvent.change(screen.getByLabelText('Offset coefficient'),{target:{value:'8952'}});await tick()
   expect(requests('/preview').at(-1)![1].standard_id).toBeNull()
-  expect(screen.getByRole('button',{name:'Make calibrated data group'})).toBeEnabled()
+  expect(screen.getByRole('button',{name:'Make calibrated data'})).toBeEnabled()
   expect(screen.getByRole('button',{name:'Estimate initial coefficients'})).toBeDisabled()
 })
 
@@ -118,15 +118,15 @@ it('locks controls during creation, keeps a failed request retryable and adopts 
   render(<Harness/>);await tick();await upload();await click('Estimate initial coefficients')
   let fail!:(e:Error)=>void
   api.mockImplementation((url,body,method)=>url.endsWith('/make')?new Promise((_,reject)=>{fail=reject}):handler(url,body,method))
-  fireEvent.click(screen.getByRole('button',{name:'Make calibrated data group'}));await tick()
+  fireEvent.click(screen.getByRole('button',{name:'Make calibrated data'}));await tick()
   expect(screen.getByLabelText('Offset coefficient')).toBeDisabled()
-  expect(busy).toHaveBeenLastCalledWith('Making calibrated data group')
+  expect(busy).toHaveBeenLastCalledWith('Making calibrated data')
   await act(async()=>fail(new Error('disk full')))
   expect(screen.getByRole('alert')).toHaveTextContent('disk full')
   expect(saved).not.toHaveBeenCalled()
   const next={...differenceProject(),version:8}
   api.mockImplementation((url,body,method)=>url.endsWith('/make')?Promise.resolve(next):handler(url,body,method))
-  await tick();await click('Make calibrated data group')
+  await tick();await click('Make calibrated data')
   expect(saved).toHaveBeenCalledWith(next)
   expect(requests('/preview').at(-1)![1].version).toBe(8)
   expect(busy).toHaveBeenLastCalledWith('')
@@ -138,7 +138,7 @@ it('imports and exports native calibration without requiring a pixel file',async
   expect(api.mock.calls.find(c=>c[0].includes('/import?'))![0]).toBe('/preferences/dispersive/import?version=0')
   expect(screen.getByLabelText('Offset coefficient')).toHaveValue(8952)
   expect(screen.getByRole('link',{name:'Export saved calibration'})).toHaveAttribute('href','/api/backend/api/athena/preferences/dispersive/file')
-  expect(screen.getByRole('button',{name:'Make calibrated data group'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Make calibrated data'})).toBeDisabled()
 })
 
 it('a delayed initial preference lookup cannot replace a newer explicit load',async()=>{

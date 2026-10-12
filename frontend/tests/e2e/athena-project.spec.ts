@@ -19,12 +19,12 @@ for (const example of examples) {
     await page.getByRole("button", { name: "Import data", exact: true }).click()
     await page.getByLabel("Choose data files", { exact: true }).setInputFiles(example.file)
     const dialog = page.getByRole("dialog", { name: "Open a project" })
-    await expect(dialog.getByRole("button", { name: "Import all groups", exact: true })).toBeEnabled()
+    await expect(dialog.getByRole("button", { name: "Import all data", exact: true })).toBeEnabled()
     await dialog.getByLabel("Preview signal").selectOption("norm")
     await expect(dialog.locator(".js-line").first()).toBeVisible()
     await expect(dialog.getByRole("alert")).toHaveCount(0)
     const restored = page.waitForResponse(r => r.url().endsWith("/restore-upload"))
-    await dialog.getByRole("button", { name: "Import all groups", exact: true }).click()
+    await dialog.getByRole("button", { name: "Import all data", exact: true }).click()
     const response = await restored
     expect(response.ok()).toBeTruthy()
     const original = await response.json()
@@ -42,9 +42,9 @@ for (const example of examples) {
     await downloaded.saveAs(saved)
     await page.getByRole("button", { name: "Open project", exact: true }).click()
     await page.getByLabel("Open project file", { exact: true }).setInputFiles(saved)
-    await expect(dialog.getByRole("button", { name: "Import all groups", exact: true })).toBeEnabled()
+    await expect(dialog.getByRole("button", { name: "Import all data", exact: true })).toBeEnabled()
     const roundtrip = page.waitForResponse(r => r.url().endsWith("/restore-upload"))
-    await dialog.getByRole("button", { name: "Import all groups", exact: true }).click()
+    await dialog.getByRole("button", { name: "Import all data", exact: true }).click()
     const reread = await (await roundtrip).json()
     expect(reread.groups).toHaveLength(example.count * 2)
     for (let i = 0; i < example.count; i++) {
@@ -54,7 +54,7 @@ for (const example of examples) {
       expect(reread.groups[example.count + i].result.arrays).toEqual(original.groups[i].result.arrays)
     }
     await page.reload()
-    await expect(page.getByRole("heading", { name: new RegExp(`^Data groups ${example.count * 2}\\b`) })).toBeVisible()
+    await expect(page.getByRole("heading", { name: new RegExp(`^Data ${example.count * 2}\\b`) })).toBeVisible()
   })
 }
 
@@ -69,8 +69,8 @@ test("mixed raw/project/raw batch keeps order through both import panels", async
   await page.getByRole("radio", { name: "No, review each file", exact: true }).check()
   await page.getByRole("button", { name: "Import spectrum", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "Open a project" })
-  await expect(dialog.getByRole("button", { name: "Import all groups", exact: true })).toBeEnabled()
-  await dialog.getByRole("button", { name: "Import all groups", exact: true }).click()
+  await expect(dialog.getByRole("button", { name: "Import all data", exact: true })).toBeEnabled()
+  await dialog.getByRole("button", { name: "Import all data", exact: true }).click()
   await expect(page.getByRole("button", { name: "Import spectrum", exact: true })).toBeEnabled()
   const accepted = page.waitForResponse(r => r.url().endsWith("/import"))
   await page.getByRole("button", { name: "Import spectrum", exact: true }).click()
@@ -78,5 +78,5 @@ test("mixed raw/project/raw batch keeps order through both import panels", async
   expect(project.groups.map((g: { label: string }) => g.label)).toEqual([
     "cu_10k.xmu", "cu010k.dat", "cu050k.dat", "cu150k.dat", "cu_50k.xmu",
   ])
-  await expect(page.getByRole("heading", { name: /^Data groups 5\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 5\b/ })).toBeVisible()
 })

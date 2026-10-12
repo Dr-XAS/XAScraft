@@ -313,10 +313,10 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
     })
   }
   async function make() {
-    await task('Making the fluorescence XAS group',async()=>{
+    await task('Making the fluorescence XAS data',async()=>{
       onSaved(await athenaApi<AthenaProject>(`/projects/${project.id}/xrf-xas/make`,
         {...body,point_stride:1,include_window_sum:withWindow}))
-      setNotice('Created the fluorescence XAS group from every scan point. Undo removes it.')
+      setNotice('Created the fluorescence XAS data from every scan point. Undo removes it.')
     })
   }
 
@@ -460,7 +460,7 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
           <label className="ath-field"><span>Scatter tail length (peak widths) <SectionHelp label="Scatter tail length (peak widths)">Set the fixed low-energy scatter-tail length relative to peak width. This is held during calibration; use the residual and pre-edge quality checks to judge changes.</SectionHelp></span><input type="number" step="any" min={0} max={20} disabled={mapstorch} value={form.scatter_beta} onChange={e=>edit('scatter_beta',e.target.value)} /></label>
           <label className="ath-field"><span>Calibration scan points <SectionHelp label="Calibration scan points">Number of representative scan points used to calibrate each detector element. More points provide more spectral evidence but cost more computation.</SectionHelp></span><input type="number" step={1} min={2} max={32} value={form.calibration_points} onChange={e=>edit('calibration_points',e.target.value)} /></label>
           <label className="ath-field"><span>Continuum background <SectionHelp label="Continuum background">Fit a smooth continuum together with fluorescence lines, or omit it when justified. The continuum is not subtracted from counts before the line fit.</SectionHelp></span><select value={background} onChange={e=>setBackground(e.target.value)}><option value="smooth">Fitted with the lines</option><option value="none">None</option></select></label>
-          <label className="ath-field"><span>Preview point stride <SectionHelp label="Preview point stride">Draw every nth scan point in the extracted-XAS preview. All scan points are still fitted and saved when you make a group.</SectionHelp></span><input type="number" step={1} min={1} max={64} value={form.point_stride} onChange={e=>edit('point_stride',e.target.value)} /></label>
+          <label className="ath-field"><span>Preview point stride <SectionHelp label="Preview point stride">Draw every nth scan point in the extracted-XAS preview. All scan points are still fitted and saved when you make a data item.</SectionHelp></span><input type="number" step={1} min={1} max={64} value={form.point_stride} onChange={e=>edit('point_stride',e.target.value)} /></label>
         </div><p className="ath-hint">Offset, slope and angle are starting values only: the calibration fits them, with the peak widths and tails, on the calibration points. Offset and slope also place the automatic windows; left empty, they are read from the file: from fluorescence lines of known energy, in the beamline&apos;s own line windows or turning on at the scan&apos;s edge, and from the elastic peak, which sits at the known incident energy at every point. The scatter tail length is the exception — it is held where you set it, because fitting it lets the scatter peaks and the scattering angle trade against each other. Raise it above its default of 0.5 if the pre-edge baseline below is outside its limits and the model falls away faster than the data on the low side of the elastic peak. The continuum is fitted alongside the lines as a set of smooth falling shapes, never subtracted first, so the counts keep the noise the fit assumes they have.{mapstorch?' Under MapsTorch the crystal thickness and the scatter tail length do not enter the model, and the crystal only decides whether the missing escape peaks are mentioned.':''}</p></details>
         <details><summary>Normalization</summary><div className="ath-fields">{field('e0','any','Auto')}{(['pre1','pre2','norm1','norm2'] as const).map(name=>field(name,'any'))}{field('nnorm',1)}</div></details>
         <div className="ath-fields">
@@ -469,12 +469,12 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
         </div>
         <div className={styles.actions}>
           <button disabled={!valid} onClick={()=>{void refit()}}>Fit preview</button>
-          <button className="ath-primary" disabled={!current} onClick={()=>{void make()}}>Make fluorescence XAS group</button>
+          <button className="ath-primary" disabled={!current} onClick={()=>{void make()}}>Make fluorescence XAS data</button>
         </div>
         {/* A disabled button says why next to itself, not only at the foot of the plots. */}
         {!valid&&problem&&<p className="ath-hint" role="note" aria-label="Why the fit cannot run">{problem}</p>}
-        <label className="ath-check"><input type="checkbox" checked={withWindow} onChange={e=>setWithWindow(e.target.checked)} />Also export the plain window sum for comparison <SectionHelp label="Also export the plain window sum for comparison">Create a separate group from counts summed in the comparison window using the same detector elements and I₀ correction. Compare it with the fitted extraction to assess line overlap.</SectionHelp></label>
-        <p className="ath-hint">Every scan point is fitted; the preview displays {value('point_stride')>1?`one in ${value('point_stride')}`:'every point'}. Make group reuses matching detector fits from the preview and saves every point. Changed fitting settings, a changed scan, cache eviction or a server restart require a new fit.</p>
+        <label className="ath-check"><input type="checkbox" checked={withWindow} onChange={e=>setWithWindow(e.target.checked)} />Also export the plain window sum for comparison <SectionHelp label="Also export the plain window sum for comparison">Create a separate data item from counts summed in the comparison window using the same detector elements and I₀ correction. Compare it with the fitted extraction to assess line overlap.</SectionHelp></label>
+        <p className="ath-hint">Every scan point is fitted; the preview displays {value('point_stride')>1?`one in ${value('point_stride')}`:'every point'}. Make fluorescence XAS data reuses matching detector fits from the preview and saves every point. Changed fitting settings, a changed scan, cache eviction or a server restart require a new fit.</p>
         <details><summary>Scan file</summary><AthenaDownloadButton path={`/projects/${project.id}/uploads/${inspection.upload_id}/file`}>Download original scan file</AthenaDownloadButton></details>
       </>}
     </fieldset>
@@ -504,7 +504,7 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
           <Figure label="Window sum preview" traces={windowTraces} xlabel="Incident energy (eV)" ylabel={yieldLabel} revision={`${revision}:roi`}
             range={windowRange} shapes={marks(current?.quality.roi.e0)} annotations={notes(current?.quality.roi.e0)} /></div>
       </div>
-      {current?.metadata.mu_units==='edge_step'&&<p className="ath-hint">Both yields are divided by their own full-scan edge step before export. This changes units only: the pre-edge baseline is not subtracted, and negative values are preserved. The raw yield edge steps below are saved with the groups so the original scale remains recoverable.</p>}
+      {current?.metadata.mu_units==='edge_step'&&<p className="ath-hint">Both yields are divided by their own full-scan edge step before export. This changes units only: the pre-edge baseline is not subtracted, and negative values are preserved. The raw yield edge steps below are saved with the data so the original scale remains recoverable.</p>}
       <p className="ath-hint">Each curve is a fluorescence yield, which stands in for μ(E) only while the emitted intensity stays proportional to absorption — a thin or dilute sample, a steady detector response, and the same exposure at every point. In a thick or concentrated sample self-absorption flattens the edge and damps the oscillations, and the curve wants Larch&apos;s self-absorption correction before anyone reads an amplitude off it.</p>
       <p className="ath-hint">A spectral fit is not automatically better than a well-placed window sum. Compare both, inspect the residuals and pre-edge baseline, and use an independent reference where available; passing the diagnostics does not establish EXAFS accuracy.</p>
       {current?.metadata.engine==='larch'&&<p className="ath-hint">Matrix K-beta/K-alpha ratios use tabulated atomic branching with detector attenuation. Differential sample absorption can invalidate this prior; the spectral fit does not estimate that correction.</p>}

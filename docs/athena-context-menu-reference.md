@@ -10,8 +10,8 @@ right-click surface; it is **not full desktop parity**.
 
 ## How to use the web controls
 
-Right-click the group list or a processing label, or use its visible **⋯**
-actions button. The group menu acts on the **currently selected group**, even
+Right-click the data list or a processing label, or use its visible **⋯**
+actions button. The data menu acts on the **current data**, even
 when another row was right-clicked. A disabled first row names the current
 target. This follows the native selection rule rather than silently changing
 the active group. Normal text and number inputs retain their browser editing
@@ -155,12 +155,30 @@ undo/redo or parameter changes.
 | `context_parameters`, BLA mode | `{mode:"pixel_ratio", field:"importance"|"multiplier"}` uses each selected group's explicit `source.xdi_metadata.attributes.bla.pixel_ratio`, with `beamline_metadata` fallback. Missing/invalid ratios and frozen groups are skipped and reported. |
 | Existing `copy_parameters` / `reset_parameters` | Now accept a nonempty, distinct `parameters:[...]` list, mutually exclusive with `parameter` or `section`. Both endpoints of a range are validated/staged in one operation. |
 | Existing `metadata` command | Accepts finite, nonnegative numeric `importance`. Booleans, numeric strings and frozen-group importance edits are rejected. Current importance overrides retained native metadata in reports and native PRJ export. |
+| Existing `duplicate` command | Optional `response_mode:"duplicate"` returns project metadata, `kind:"duplicate"`, `base_version`, the complete `group_order`, and only newly created full entries in `groups`. `last_operation.created_group_ids` identifies the copies. The client merges only into the matching project revision and retains existing spectral objects and plot caches. Default replies and `?view=summary` retain their existing formats; an idempotent replay returns the full current project. |
 
 Processing changes preserve the web's existing frozen/reference/background
 dependency guards, which are stricter than several native menu handlers.
 Validation or scientific-processing failure rolls back the entire operation.
 Deleting groups continues to use the existing explicit group-removal command;
 freeze is not a general prohibition against requested removal.
+
+Duplication copies the saved arrays without running normalization, AUTOBK or
+Fourier transforms. Unchanged data avoid a whole-project deep copy and a full
+response transfer. The new spectrum remains independently editable; persisted
+projects and Undo snapshots still contain all data, so disk work continues to
+grow with project size.
+
+A local comparison using copies of the bundled Cu foil and five alternating
+HTTP runs from the same starting project measured these medians. These numbers
+cover TestClient request handling, serialization and persistence, not browser
+rendering or network latency.
+
+| Existing spectra | Original full response | Compact duplicate | Response bytes, original → compact |
+| --- | --- | --- | --- |
+| 5 | 79.9 ms | 50.9 ms | 958,637 → 160,761 |
+| 20 | 291.5 ms | 172.6 ms | 3,353,053 → 161,312 |
+| 50 | 715.5 ms | 401.1 ms | 8,141,923 → 162,452 |
 
 ## Validation evidence and remaining boundaries
 
@@ -228,8 +246,9 @@ Explicit remaining differences:
 - The three extra native peak functions and all native step-family swaps are
   unavailable. A menu for supported shapes is not an implementation of the
   missing models or of complete native PeakFit parameter/name behavior.
-- Existing web duplicate appends a `· copy` group, clears its links and unfreezes
-  it; native Group.pm inserts a `Copy N of…` clone after the source. Close project
+- **Duplicate current data** inserts a `· copy` spectrum after its source in the
+  same folder, clears its reference link and unfreezes it. Native Group.pm uses
+  the name `Copy N of…`. Close project
   creates an empty project with `POST /api/athena/projects` and switches to it,
   preserving the previous saved project and its groups. It does not issue a
   delete command or reproduce desktop window destruction and its save-prompt

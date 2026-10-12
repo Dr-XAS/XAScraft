@@ -466,8 +466,8 @@ function FittingEditor({ projectId, projectName, version, group, groups, pending
     setNotice("")
     try {
       const count = onCopyTransform(draft.transform, field)
-      setNotice(count ? `Applied ${field ? transformLabels[field] : "fit range & transform"} to ${count} marked group${count === 1 ? "" : "s"}.`
-        : "Marked groups already have these settings.")
+      setNotice(count ? `Applied ${field ? transformLabels[field] : "fit range & transform"} to ${count} marked data item${count === 1 ? "" : "s"}.`
+        : "Marked data already have these settings.")
     } catch (error) { setError(errorText(error)) }
   }
   function editParameter(id: string, field: keyof ParameterDraft, value: string) {
@@ -827,9 +827,9 @@ function FittingEditor({ projectId, projectName, version, group, groups, pending
       ]} />}
     {transformMenu && <AthenaContextMenu label="Fit range & transform actions" anchor={transformMenu.anchor} returnFocus={transformMenu.trigger} onClose={() => setTransformMenu(null)}
       items={[
-        ...(transformMenu.field ? [{ id: "field", label: `Apply ${transformLabels[transformMenu.field]} to marked groups`,
+        ...(transformMenu.field ? [{ id: "field", label: `Apply ${transformLabels[transformMenu.field]} to marked data`,
           disabled: disabled || !projectId || !group || !groups?.some(item => item.marked && item.id !== group.id), onSelect: () => applyTransform(transformMenu.field) }] : []),
-        { id: "transform", label: "Apply fit range & transform to marked groups", separatorBefore: !!transformMenu.field,
+        { id: "transform", label: "Apply fit range & transform to marked data", separatorBefore: !!transformMenu.field,
           disabled: disabled || !projectId || !group || !groups?.some(item => item.marked && item.id !== group.id), onSelect: () => applyTransform() },
       ]} />}
     {!!persisted?.history.length && <FittingSection title="Saved fit history" icon={History} summary={`${persisted.history.length}/10`} disabled={disabled}

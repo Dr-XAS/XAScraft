@@ -119,7 +119,7 @@ test('exports a curve that passes through every point the reader was shown',asyn
   const result=await fit(page,panel)
 
   const making=page.waitForResponse(r=>r.url().endsWith('/xrf-xas/make'))
-  await panel.getByRole('button',{name:'Make fluorescence XAS group',exact:true}).click()
+  await panel.getByRole('button',{name:'Make fluorescence XAS data',exact:true}).click()
   const response=await making;expect(response.ok(),await response.text()).toBe(true)
   const project=await response.json()
   const fitted=project.groups.find((g:{label:string})=>g.label.endsWith('Mn fluorescence'))
@@ -139,9 +139,9 @@ test('exports a curve that passes through every point the reader was shown',asyn
   expect(far(at(fitted.mu),result.fit_over_i0)).toBe(0)
   expect(far(at(summed.mu),result.roi_over_i0)).toBe(0)
   expect(fitted.processing_error).toBeNull()
-  await expect(panel.getByRole('status')).toContainText('Created the fluorescence XAS group')
+  await expect(panel.getByRole('status')).toContainText('Created the fluorescence XAS data')
   await panel.getByRole('button',{name:'Close dialog',exact:true}).click()
-  await expect(page.getByRole('heading',{name:/Data groups\s*2\b/})).toBeVisible()
+  await expect(page.getByRole('heading',{name:/Data\s*2\b/})).toBeVisible()
   expect(errors).toEqual([])
 })
 

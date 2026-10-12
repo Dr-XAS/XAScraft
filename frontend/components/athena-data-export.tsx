@@ -92,8 +92,8 @@ export function AthenaDataExport({ project, groupId, close, onBusyChange }: {
   }
   return <section className={styles.export} aria-label="Data export controls">
     <div className="ath-fields">
-      <label className="ath-field"><span>Export groups <SectionHelp label="Export groups"><p>The first marked group supplies the axis for one table. Energy data are linearly interpolated; any extrapolation is listed below. k/R/q grids must match.</p><p>The ZIP contains one column file per marked group, retaining each group’s grid. Duplicate labels receive distinct filenames.</p></SectionHelp></span><select value={scope} disabled={downloading} onChange={e => chooseScope(e.target.value)}>
-        <option value="current">Current group</option><option value="marked">Marked groups · one table</option><option value="each">Each marked group · ZIP</option>
+      <label className="ath-field"><span>Export data <SectionHelp label="Export data"><p>The first marked data item supplies the axis for one table. Energy data are linearly interpolated; any extrapolation is listed below. k/R/q grids must match.</p><p>The ZIP contains one column file per marked data item, retaining each data item’s grid. Duplicate labels receive distinct filenames.</p></SectionHelp></span><select value={scope} disabled={downloading} onChange={e => chooseScope(e.target.value)}>
+        <option value="current">Current data</option><option value="marked">Marked data · one table</option><option value="each">Each marked data item · ZIP</option>
       </select></label>
       <label className="ath-field"><span>Data form <SectionHelp label="Export contents">Exports use processed parameters and include acquisition metadata, saved XDI comments and processing settings. Main-pane edits process automatically; wait for processing to finish before exporting.</SectionHelp></span><select value={form} disabled={downloading} onChange={e => setForm(e.target.value)}>
         {forms.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -103,12 +103,12 @@ export function AthenaDataExport({ project, groupId, close, onBusyChange }: {
       </select></label>}
       {supportsWeight && weight === 'kw' && sharedWeight && <label className="ath-field"><span>Arbitrary output k weight <SectionHelp label="Arbitrary output k weight">Enter a shared exponent from 0 through 3, including fractional values, for the exported k-weighted χ(k). The saved transform weight stays unchanged.</SectionHelp></span><input type="number" min="0" max="3" step="any" value={arbitrary} disabled={downloading} onChange={e => setArbitrary(e.target.value)} /></label>}
     </div>
-    {supportsWeight && weight === 'kw' && <><label className="ath-check"><input type="checkbox" checked={sharedWeight} disabled={downloading} onChange={e => setSharedWeight(e.target.checked)} />Use a shared output weight <SectionHelp label="Output weight">By default, each group uses its saved arbitrary weight, or its applied FT weight if no separate value was imported.</SectionHelp></label></>}
-    {supportsMultipliers && <label className="ath-check"><input type="checkbox" checked={multipliers} disabled={downloading} onChange={e => setMultipliers(e.target.checked)} />Apply each group's plot multiplier <SectionHelp label="Apply each group's plot multiplier">Multiply exported μ(E) or derivative values by each group’s display multiplier. Leave off to export values without display scaling.</SectionHelp></label>}
-    <p>{selected.length} group{selected.length === 1 ? '' : 's'} selected{scope !== 'current' && ' in project list order'}: {selected.map(g => g.label).join(', ') || 'none'}</p>
+    {supportsWeight && weight === 'kw' && <><label className="ath-check"><input type="checkbox" checked={sharedWeight} disabled={downloading} onChange={e => setSharedWeight(e.target.checked)} />Use a shared output weight <SectionHelp label="Output weight">By default, each data item uses its saved arbitrary weight, or its applied FT weight if no separate value was imported.</SectionHelp></label></>}
+    {supportsMultipliers && <label className="ath-check"><input type="checkbox" checked={multipliers} disabled={downloading} onChange={e => setMultipliers(e.target.checked)} />Apply each data item's plot multiplier <SectionHelp label="Apply each data item's plot multiplier">Multiply exported μ(E) or derivative values by each data item’s display multiplier. Leave off to export values without display scaling.</SectionHelp></label>}
+    <p>{selected.length} data item{selected.length === 1 ? '' : 's'} selected{scope !== 'current' && ' in project list order'}: {selected.map(g => g.label).join(', ') || 'none'}</p>
 
     {badWeight && <p role="alert">Enter a finite output weight from 0 through 3.</p>}
-    {!selected.length && <p role="status">Mark at least one group before exporting.</p>}
+    {!selected.length && <p role="status">Mark at least one data item before exporting.</p>}
     {loading && <p role="status">Preparing output columns…</p>}
     {error && <p role="alert" className="ath-error">{error}</p>}
     {preview?.signature === signature && preview.data.files.map(file => <article key={file.filename} className={styles.file}>

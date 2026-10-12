@@ -37,7 +37,7 @@ export function AthenaReimportColumns({ project, group, onApplied, onBusyChange,
     void athenaApi<ReimportInspection>(`/projects/${project.id}/groups/${group.id}/columns`, undefined, "GET", controller.signal)
       .then(value => {
         if (!current) return
-        if (value.reimport_group_id !== group.id) throw new Error("The original columns do not belong to this group. Reload the columns and try again.")
+        if (value.reimport_group_id !== group.id) throw new Error("The original columns do not belong to this data. Reload the columns and try again.")
         const saved = value.current_mapping
         setInspection(value)
         setMapping(normalizeImportInversion({ ...saved, denominator: saved.denominator ?? "", reference_numerator: "", reference_denominator: "",
@@ -64,7 +64,7 @@ export function AthenaReimportColumns({ project, group, onApplied, onBusyChange,
   }
 
   return <>
-    <p>Rebuild <strong>{group.label}</strong> · resets processing <SectionHelp label="Rebuild from columns">Rebuild from stored columns and reset processing settings. The group name, position, and reference links are kept. Undo restores the previous spectrum.</SectionHelp></p>
+    <p>Rebuild <strong>{group.label}</strong> · resets processing <SectionHelp label="Rebuild from columns">Rebuild from stored columns and reset processing settings. The data name, position, and reference links are kept. Undo restores the previous spectrum.</SectionHelp></p>
     {error && <p className="ath-error" role="alert">{error}</p>}
     {loading ? <><p role="status">Loading original columns…</p><button type="button" onClick={close}>Cancel</button></>
       : inspection && mapping ? <>

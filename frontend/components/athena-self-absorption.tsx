@@ -131,14 +131,14 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
 
   async function save() {
     if (!current || disabled || saving.current || committed.current !== key) return
-    saving.current = true; setBusy('Saving corrected group'); setError('')
+    saving.current = true; setBusy('Saving corrected data'); setError('')
     try {
       const next = await athenaApi<AthenaProject>(`/projects/${project.id}/command`,
         { version: current.version, action: 'self_absorption', group_ids: [activeId], options: current.options })
-      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the corrected group.')
+      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the corrected data.')
       saved(next); close()
     } catch (reason) {
-      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the corrected group. Preview again.')
+      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the corrected data. Preview again.')
     } finally { saving.current = false; setBusy('') }
   }
 
@@ -160,7 +160,7 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
     <p>Fluorescence self-absorption flattens a spectrum because the sample re-absorbs its own emission. Correct it either with Larch’s thick-sample approximation or, for a sample too thin for that, with the Booth finite-thickness slab model. Give the composition, geometry and, for the slab, the thickness and density.</p>
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
-        <label className="ath-field"><span>Source group <SectionHelp label="Source group">Choose a processed fluorescence absorption group. The correction uses its saved normalized spectrum and creates a new group when accepted.</SectionHelp></span><select aria-label="Source group" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
+        <label className="ath-field"><span>Source data <SectionHelp label="Source data">Choose processed fluorescence absorption data. The correction uses its saved normalized spectrum and creates new data when accepted.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
         <label className="ath-field"><span>Correction <SectionHelp label="Correction">Use the thick-sample approximation for a sufficiently thick sample, or the Booth slab model with explicit thickness and density for finite thickness.</SectionHelp></span><select aria-label="Correction" value={draft.algorithm} onChange={e => setDraft(d => ({ ...d, algorithm: e.target.value as Algorithm }))}><option value="fluo">Thick sample (Larch FLUO)</option><option value="booth">Finite thickness (Booth slab)</option></select></label>
         {([['formula', 'Sample formula', 'Fe2O3'], ['element', 'Absorbing element', 'Fe'], ['edge', 'Absorption edge', 'K']] as const).map(([field, label, placeholder]) =>
           <label className="ath-field" key={field}><span>{label} <SectionHelp label={label}>{({formula: "Enter the complete chemical composition, including the matrix, for example Fe2O3. Tabulated attenuation depends on the whole sample composition.", element: "Enter the absorbing element’s chemical symbol. It must occur in the sample formula.", edge: "Enter the absorption edge code, such as K or L3, corresponding to the measured spectrum."})[field]}</SectionHelp></span><input value={draft[field]} placeholder={placeholder} onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))} /></label>)}
@@ -171,7 +171,7 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
           <label className="ath-field"><span>Density (g/cm³){needsSlab ? '' : ' — optional'} <SectionHelp label="Sample density">Mass density in g/cm³, including packing fraction where appropriate. Required for finite-thickness correction; in the thick-sample model it only sets the reported probing depth.</SectionHelp></span><input type="number" min="0" step="any" value={draft.density} onChange={e => setDraft(d => ({ ...d, density: e.target.value }))} /></label>
         </div>
         <p className="ath-hint">Angles are measured from the sample surface. Only the product of density and thickness enters the physics, so either may carry a packing fraction for a pressed pellet. Under the thick-sample correction the density changes nothing; it only reports the depth the signal came from.</p>
-        <p className="ath-hint">Attenuation is taken from tabulated values just below and above the edge and at the fluorescence line, as Larch does. The correction starts from the group&apos;s own normalized curve — its E₀, pre-edge and post-edge ranges and polynomial degree, shown under the plot. Saving makes a new group holding the corrected normalized spectrum, stored as already-normalized data and not renormalized; it is not a corrected raw fluorescence yield.</p>
+        <p className="ath-hint">Attenuation is taken from tabulated values just below and above the edge and at the fluorescence line, as Larch does. The correction starts from the data&apos;s own normalized curve — its E₀, pre-edge and post-edge ranges and polynomial degree, shown under the plot. Saving makes new data holding the corrected normalized spectrum, stored as already-normalized data and not renormalized; it is not a corrected raw fluorescence yield.</p>
       </fieldset>
       <section className={styles.results} aria-label="Self-absorption preview results">
         <div className={styles.views}>
@@ -192,18 +192,18 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
               text: `sample thickness ${slab} µm`, showarrow: false }],
             uirevision: `${project.id}:${activeId}:${view}` }}
           config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'], toImageButtonOptions: { format: 'svg', filename: 'craft-self-absorption' } }}
-          style={{ width: '100%', height: '100%' }} useResizeHandler /> : <p>No curve is available for this group.</p>}</div>
+          style={{ width: '100%', height: '100%' }} useResizeHandler /> : <p>No curve is available for this data.</p>}</div>
         {!eligible ? <p role="status">Choose a processed absorption spectrum.</p>
           : !composed ? <p role="status">Enter the sample formula, absorbing element and edge.</p>
           : !anglesValid ? <p role="status">Enter incident and exit angles between 0.1 and 90 degrees from the sample surface.</p>
           : !extrasValid ? <p role="status">Thickness and density must be positive.</p>
           : needsSlab && (thickness === undefined || density === undefined) ? <p role="status">The finite-thickness correction needs both the thickness and the density.</p>
           : <p role="status">{loading ? 'Calculating the correction…' : current ? `Preview at project revision ${current.version}` : 'Waiting for a current preview…'}</p>}
-        {normalization && <p className="ath-hint">Normalization from the group: E₀ {normalization.e0.toFixed(1)} eV, pre-edge {normalization.pre1.toFixed(0)} to {normalization.pre2.toFixed(0)} eV, post-edge {normalization.norm1.toFixed(0)} to {normalization.norm2.toFixed(0)} eV, polynomial degree {normalization.nnorm}{normalization.step != null ? `, edge step fixed at ${normalization.step.toPrecision(4)}` : ''}{normalization.nvict ? `, pre-edge energy exponent ${normalization.nvict}` : ''}. “Measured” is that normalized curve.</p>}
+        {normalization && <p className="ath-hint">Normalization from the data: E₀ {normalization.e0.toFixed(1)} eV, pre-edge {normalization.pre1.toFixed(0)} to {normalization.pre2.toFixed(0)} eV, post-edge {normalization.norm1.toFixed(0)} to {normalization.norm2.toFixed(0)} eV, polynomial degree {normalization.nnorm}{normalization.step != null ? `, edge step fixed at ${normalization.step.toPrecision(4)}` : ''}{normalization.nvict ? `, pre-edge energy exponent ${normalization.nvict}` : ''}. “Measured” is that normalized curve.</p>}
         {result && <p className="ath-hint">{applicability(result, draft.algorithm)}</p>}
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close correction tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make group from corrected data</button></div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close correction tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save corrected data</button></div>
   </div>
 }

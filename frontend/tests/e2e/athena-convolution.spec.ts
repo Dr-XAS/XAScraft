@@ -37,10 +37,10 @@ async function configure(page: Page, dialog: Locator, options: ConvolutionPrevie
   await dialog.getByRole('combobox', {name: 'Line shape', exact: true}).selectOption(options.form)
   await dialog.getByLabel(options.form === 'gaussian' ? 'Gaussian σ · eV' : 'Lorentzian HWHM · eV', {exact: true}).fill(String(options.width))
   await dialog.getByLabel('Noise σ · fraction of edge step', {exact: true}).fill(String(options.noise))
-  await expect(dialog.getByRole('button', {name: 'Make modified group', exact: true})).toBeEnabled()
+  await expect(dialog.getByRole('button', {name: 'Make modified data', exact: true})).toBeEnabled()
   const waiting=page.waitForResponse(r=>r.url().endsWith('/convolve/preview'))
   await dialog.getByRole('button',{name:'Plot data and modified',exact:true}).click()
-  const response=await waiting;expect(response.ok()).toBe(true);await expect(dialog.getByRole('button',{name:'Make modified group',exact:true})).toBeEnabled()
+  const response=await waiting;expect(response.ok()).toBe(true);await expect(dialog.getByRole('button',{name:'Make modified data',exact:true})).toBeEnabled()
   return await response.json() as ConvolutionPreview
 }
 
@@ -52,7 +52,7 @@ test('measured Cu live import, convolution/noise comparisons, exact save, undo a
     {form:'gaussian',width:0,noise:0}, {form:'gaussian',width:1,noise:0},
     {form:'gaussian',width:0,noise:.01}, {form:'lorentzian',width:1.5,noise:.02},
   ] as ConvolutionPreview['options'][]) {
-    const dialog=await open(page);await dialog.getByLabel('Source group',{exact:true}).selectOption(initial.groups[0].id)
+    const dialog=await open(page);await dialog.getByLabel('Source data',{exact:true}).selectOption(initial.groups[0].id)
     const preview=await configure(page,dialog,options),row=preview.results[0]
     for(const space of ['E','k','R'] as const) {
       await dialog.getByRole('button',{name:space==='E'?'Plot in energy':`Plot in ${space}`,exact:true}).click()
@@ -65,7 +65,7 @@ test('measured Cu live import, convolution/noise comparisons, exact save, undo a
       expect(row.details.noise_sigma).toBeGreaterThan(0)
     }
     const waiting=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='convolve')
-    await dialog.getByRole('button',{name:'Make modified group',exact:true}).click()
+    await dialog.getByRole('button',{name:'Make modified data',exact:true}).click()
     const response=await waiting;expect(response.ok()).toBe(true);latest=await response.json()
     expect(latest.groups[0]).toEqual(initial.groups[0]);expect(latest.groups[1].mu).toEqual(row.modified_mu)
     expect(latest.groups[1].energy).toEqual(row.modified_energy)
@@ -73,14 +73,14 @@ test('measured Cu live import, convolution/noise comparisons, exact save, undo a
     await expect(dialog).toHaveCount(0)
   }
   expect(latest.groups).toHaveLength(5)
-  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data groups 4\b/ })).toBeVisible()
-  await page.getByRole('button',{name:'Redo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data groups 5\b/ })).toBeVisible()
+  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data 4\b/ })).toBeVisible()
+  await page.getByRole('button',{name:'Redo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data 5\b/ })).toBeVisible()
   const downloading=page.waitForEvent('download');await page.getByRole("button", { name: "File", exact: true }).click(); await page.getByRole("button", { name: "Save Craft project (.prj)", exact: true }).click(); await confirmProjectSave(page)
   const path=info.outputPath('Cu-convolution-native.prj');await(await downloading).saveAs(path)
   writeFileSync(path,gunzipSync(readFileSync(path)).toString('utf8').split('\n').filter(l=>!l.startsWith('# Athena-Web ')).join('\n'))
   await page.getByRole('button',{name:'File',exact:true}).click();await page.getByRole('button',{name:'Open project…',exact:true}).click()
   await page.getByLabel('Open project file',{exact:true}).setInputFiles(path)
-  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all groups',exact:true}).click()
+  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all data',exact:true}).click()
   const response=await restoring;expect(response.ok()).toBe(true);const restored=(await response.json()).groups.slice(-5)
   for(const [i,g] of latest.groups.entries()) {
     expect(restored[i].energy).toEqual(g.energy);expect(restored[i].mu).toEqual(g.mu)
@@ -105,17 +105,17 @@ test('mobile fresh-noise preview, retained controls and stale-save recovery',asy
   const changed=await other.request.post(path+'/command',{data:{version:initial.version,action:'metadata',group_ids:[initial.groups[0].id],options:{notes:'Concurrent edit'}}})
   expect(changed.ok()).toBe(true)
   const waiting=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='convolve')
-  await dialog.getByRole('button',{name:'Make modified group',exact:true}).click();expect((await waiting).status()).toBe(409)
+  await dialog.getByRole('button',{name:'Make modified data',exact:true}).click();expect((await waiting).status()).toBe(409)
   await expect(dialog.getByRole('alert')).toBeVisible();await expect(dialog.getByLabel('Gaussian σ · eV',{exact:true})).toHaveValue('1')
   expect((await(await other.request.get(path)).json()).groups).toHaveLength(1)
   await dialog.getByRole('button',{name:'Close convolution tool',exact:true}).click();dialog=await open(page)
   await expect(dialog.getByLabel('Noise σ · fraction of edge step',{exact:true})).toHaveValue('0.01')
   await dialog.getByRole('button',{name:'Close convolution tool',exact:true}).click();await page.reload()
   dialog=await open(page);const reviewed=await configure(page,dialog,{form:'lorentzian',width:1,noise:.01})
-  await dialog.getByRole('button',{name:'Make modified group',exact:true}).scrollIntoViewIfNeeded()
+  await dialog.getByRole('button',{name:'Make modified data',exact:true}).scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath('convolution-mobile-actions.png'),animations:'disabled'})
   const saved=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='convolve')
-  await dialog.getByRole('button',{name:'Make modified group',exact:true}).click();const response=await saved;expect(response.ok()).toBe(true)
+  await dialog.getByRole('button',{name:'Make modified data',exact:true}).click();const response=await saved;expect(response.ok()).toBe(true)
   const p=await response.json();expect(p.groups[1].mu).toEqual(reviewed.results[0].modified_mu);expect(p.groups[0].mu).toEqual(initial.groups[0].mu)
   await other.close()
 })

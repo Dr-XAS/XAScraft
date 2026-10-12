@@ -58,12 +58,12 @@ test("measured spectrum survives processing, project reopen, and raw/EXAFS expor
   // A fresh project avoids passing by redisplaying the original in-memory group.
   await page.getByRole("button", { name: "File", exact: true }).click()
   await page.getByRole("button", { name: "New project", exact: true }).click()
-  await expect(page.getByRole("heading", { name: /^Data groups 0\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 0\b/ })).toBeVisible()
   await page.getByRole("button", { name: "Open project", exact: true }).click()
   await page.getByLabel("Open project file", { exact: true }).setInputFiles(savedPath)
   const restoring = page.waitForResponse(response => response.url().endsWith("/restore-upload"))
   await page.getByRole("dialog", { name: "Open a project" })
-    .getByRole("button", { name: "Import all groups", exact: true }).click()
+    .getByRole("button", { name: "Import all data", exact: true }).click()
   const restoreResponse = await restoring
   expect(restoreResponse.ok()).toBe(true)
   const reopened = await restoreResponse.json() as AthenaProject
@@ -77,7 +77,7 @@ test("measured spectrum survives processing, project reopen, and raw/EXAFS expor
   expect(after.result?.arrays).toEqual(before.result?.arrays)
 
   await page.reload()
-  await expect(page.getByRole("heading", { name: /^Data groups 1\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 1\b/ })).toBeVisible()
   await expect(page.getByRole("spinbutton", { name: "Rbkg Å", exact: true })).toHaveValue("1.2")
   const persistedResponse = await page.request.get(`/api/backend/api/athena/projects/${reopened.id}`)
   expect(persistedResponse.ok()).toBe(true)

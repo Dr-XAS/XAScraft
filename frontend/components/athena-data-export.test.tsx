@@ -30,15 +30,15 @@ it('previews the current applied revision and exact server columns and header', 
 
 it('supports all marked forms, legal multiplier choices, separate files and arbitrary weights', async () => {
   api.mockResolvedValue(data); render(<AthenaDataExport {...props()} />); await ready()
-  fireEvent.change(screen.getByLabelText('Export groups'), { target: { value: 'marked' } })
+  fireEvent.change(screen.getByLabelText('Export data'), { target: { value: 'marked' } })
   await waitFor(() => expect(api).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ scope: 'marked' }), 'POST', expect.any(AbortSignal)))
   expect(screen.getByLabelText('Data form').querySelectorAll('option')).toHaveLength(19)
   expect(api.mock.calls.at(-1)?.[1]).not.toHaveProperty('group_id')
-  fireEvent.click(screen.getByLabelText("Apply each group's plot multiplier"))
+  fireEvent.click(screen.getByLabelText("Apply each data item's plot multiplier"))
   await waitFor(() => expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ with_multipliers: true }))
   fireEvent.change(screen.getByLabelText('Data form'), { target: { value: 'norm' } })
   await waitFor(() => expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ form: 'norm', with_multipliers: false }))
-  fireEvent.change(screen.getByLabelText('Export groups'), { target: { value: 'each' } })
+  fireEvent.change(screen.getByLabelText('Export data'), { target: { value: 'each' } })
   fireEvent.change(screen.getByLabelText('Data form'), { target: { value: 'chi' } })
   fireEvent.change(screen.getByLabelText('Output k weight'), { target: { value: 'kw' } })
   fireEvent.click(screen.getByLabelText('Use a shared output weight'))

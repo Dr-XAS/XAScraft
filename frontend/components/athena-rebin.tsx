@@ -66,7 +66,7 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
       })
       saved(next)
       const operation = next.last_operation
-      setNotice(`Created ${operation?.rebin_results?.length ?? next.groups.length - project.groups.length} rebinned groups. `
+      setNotice(`Created ${operation?.rebin_results?.length ?? next.groups.length - project.groups.length} rebinned data. `
         + Object.values(operation?.skipped_reasons ?? {}).join(' '))
     } catch (e) { setError(e instanceof Error ? e.message : 'Rebinning failed.') }
     finally { savingRef.current = false; setSaving(false); setBusy('') }
@@ -78,7 +78,7 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
   }))) ?? []
   return <div className="ath-modal-body">
     <div className={styles.layout}><fieldset disabled={saving} className={styles.controls}>
-      <label className="ath-field"><span>Rebin source group <SectionHelp label="Rebin source">Uses saved processing parameters. Main-inspector edits process automatically; wait for processing to finish before using this tool. Frozen sources can be used to create new groups.</SectionHelp></span><select value={activeId} onChange={e => selectGroup(e.target.value)}>
+      <label className="ath-field"><span>Rebin source data <SectionHelp label="Rebin source">Uses saved processing parameters. Main-inspector edits process automatically; wait for processing to finish before using this tool. Frozen sources can be used to create new data items.</SectionHelp></span><select value={activeId} onChange={e => selectGroup(e.target.value)}>
         {project.groups.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
       </select></label>
       <p>Edge energy: {active?.parameters.e0 ?? active?.result?.effective.e0 ?? 'Unavailable'} eV</p>
@@ -89,12 +89,12 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
         <input type="number" min={name === 'width' ? 1 : ['pre', 'xanes', 'exafs'].includes(name) ? 0 : undefined} max={name === 'width' ? 11 : undefined} step={name === 'width' ? 1 : 'any'} value={grid[name]}
           onChange={e => setGrid({ ...grid, [name]: e.target.value === '' ? '' : Number(e.target.value) })} />
       </label>)}</div>
-      <label className="ath-check"><input type="checkbox" checked={previewMarked} onChange={e => setPreviewMarked(e.target.checked)} />Preview marked groups ({marked.length}) <SectionHelp label="Rebin batch">New groups follow their sources and start unmarked. χ(k) and already-rebinned groups are skipped in a marked batch. Undo restores the entire batch.</SectionHelp></label>
+      <label className="ath-check"><input type="checkbox" checked={previewMarked} onChange={e => setPreviewMarked(e.target.checked)} />Preview marked data ({marked.length}) <SectionHelp label="Rebin batch">New data follow their sources and start unmarked. χ(k) and already-rebinned data are skipped in a marked batch. Undo restores the entire batch.</SectionHelp></label>
       <div className={styles.actions}>
         <button disabled={!!problem || !groupIds.length} onClick={() => { setSpace('E'); setRetry(n => n + 1) }}>Plot data and rebinned data</button>
         <button disabled={!!problem || !groupIds.length} onClick={() => { setSpace('k'); setRetry(n => n + 1) }}>Plot data and rebinned data in k</button>
-        <button className="ath-primary" disabled={!!problem || !active || !!unavailable} onClick={() => { void make(false) }}>Make rebinned data group</button>
-        <button disabled={!!problem || !marked.length} onClick={() => { void make(true) }}>Rebin marked data and make groups</button>
+        <button className="ath-primary" disabled={!!problem || !active || !!unavailable} onClick={() => { void make(false) }}>Make rebinned data</button>
+        <button disabled={!!problem || !marked.length} onClick={() => { void make(true) }}>Rebin marked data</button>
       </div>
       {defaultsControls}
     </fieldset><section className={styles.preview} aria-label="Rebin preview">
@@ -110,7 +110,7 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
           })) : [],
         }} config={{ responsive: true, displaylogo: false, toImageButtonOptions: { format: 'svg', filename: 'craft-rebin' } }}
           style={{ width: '100%', height: '100%' }} useResizeHandler />
-          : <p>{previewError ? 'Correct the grid or choose another source.' : !groupIds.length ? 'Select a source group.' : value ? 'No k-space curves are available. The energy preview is still available.' : 'Updating preview…'}</p>}
+          : <p>{previewError ? 'Correct the grid or choose another source.' : !groupIds.length ? 'Select source data.' : value ? 'No k-space curves are available. The energy preview is still available.' : 'Updating preview…'}</p>}
       </div>
       {previewError && <p className="ath-error" role="alert">{previewError}</p>}
       {value?.results.map(r => <div key={r.source_group_id}><p>{r.label}: {r.details.source_points.toLocaleString()} → {r.details.output_points.toLocaleString()} points · kernel {r.details.width}</p>

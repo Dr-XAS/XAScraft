@@ -36,6 +36,9 @@ Athena `.prj` imports retain the native format name. The Xraylarch, Demeter,
 and Dr. XAS team credit line remains unchanged.
 
 The `Athena` branch adds a browser implementation of Athena's XAS workflows.
+Spectrum controls use **Data**: **Duplicate current data** creates an independent
+copy beside the current spectrum. **Folder groups** organize spectra in the data
+list. Native Athena files and API field names retain their `group` terminology.
 **Save project** defaults to the complete web project (`.json`), with a file-name
 confirmation before download. Native Athena (`.prj`) exports remain in **File**.
 Enable **Show instruction** at the top right to display inline information icons;
@@ -229,7 +232,7 @@ EXAFS processing is automatic for new absorption imports. Short near-edge scans
 retain their normalized spectrum and explain why EXAFS was not calculated;
 longer scans calculate the background and Fourier transforms when supported.
 **Input already normalized** still preserves supplied normalized values.
-Use **Group → Processing settings…** after import to turn EXAFS on or off manually.
+Use **Data → Processing settings…** after import to turn EXAFS on or off manually.
 
 The current group's element and absorption edge are shown automatically, using
 saved file metadata when available or inference from E₀. No manual identity
@@ -244,7 +247,7 @@ shows both the next-batch setting and the current batch's fixed policy; changing
 the setting leaves the current batch, existing spectra, and restored projects
 unchanged.
 
-Use **Group → Change data type** to correct current, marked, or all energy
+Use **Data → Change data type** to correct current, marked, or all energy
 groups after import. The type button next to Freeze also supports Athena's
 Ctrl+Alt-click μ(E)/XANES toggle, preserving the normalized-input flag. Legacy
 project records explicitly typed as detector signals display their counts
@@ -356,7 +359,7 @@ shift while each group's E₀ remains fixed. Native `.prj` files preserve the
 rounded uncertainty. See the [alignment reference](docs/athena-alignment-reference.md)
 for executed original-template comparisons and remaining parity limits.
 
-**Process → Merge marked groups** previews μ(E), normalized μ(E) or χ(k),
+**Process → Merge marked data** previews μ(E), normalized μ(E) or χ(k),
 with importance, edge-step or native noise weights and short-scan exclusion.
 Review the contributing scans, standard deviation and linked-reference merge
 before saving. The result stays open for comparison; Undo/Redo and native
@@ -417,7 +420,7 @@ you compare all detector channels and the uncorrected reference. See the
 [reader contract and verification limits](docs/athena-bl8ar-spec-long-reference.md).
 
 BL8, MRCAT MX, X11A EDC and XDAC imports capture acquisition metadata. Review
-it beside the live column plot or in **Group → Group information**. **File →
+it beside the live column plot or in **Data → Data information**. **File →
 Beamline identification…** controls automatic recognition. The measured legacy
 X11A copper foil now imports all 612 observations, including a notice that its
 header declares 611. See the [metadata contract](docs/athena-beamline-metadata-reference.md)
@@ -427,7 +430,7 @@ retain these fields without the web sidecar. See the
 [XDI exchange contract](docs/athena-xdi-reference.md) for measured Cu/Fe examples,
 identity precedence, independent native execution and remaining history/export work.
 
-**Group → File metadata…** shows XDI versions, expandable field families and
+**Data → File metadata…** shows XDI versions, expandable field families and
 required/recommended fields. Validate individual fields or all fields with
 Larch, and save XDI comments independently of group notes. Comments support
 frozen groups, Undo/Redo and native `.prj` exchange. See the
@@ -448,7 +451,7 @@ metadata, saved comments and applied processing settings. See the
 [column-export contract](docs/athena-data-export-reference.md) for weighting,
 grid handling, measured tests and remaining native comparisons.
 
-**Edit → Excel report on all / marked groups…** previews the parameter report
+**Edit → Excel report on all / marked data…** previews the parameter report
 by section and downloads a native `.xls` workbook with all 28 parameter
 columns. Group order, frozen groups, numeric precision and background-standard
 names are retained. Notes identify unused settings and missing values. See

@@ -14,7 +14,7 @@ const project = { id:'p', version:4, groups:[{id:'a',label:'Cu',marked:true},{id
 const positions = Array.from({length:32},(_,i)=>i).filter(i=>![5,19,25,29].includes(i))
 function report(scope='all') {
   return {project_id:'p',version:4,scope,filename:`craft-parameters-${scope}.xls`,
-    columns:positions.map(index=>({index,key:`c${index}`,label:index===0?'Group':`Field ${index}`,unit:'',section:index<6?'identity':'background'})),
+    columns:positions.map(index=>({index,key:`c${index}`,label:index===0?'Data':`Field ${index}`,unit:'',section:index<6?'identity':'background'})),
     sections:['identity','background','forward','reverse','plotting'].map(key=>({key,label:key})),
     rows:project.groups.filter(g=>scope==='all'||g.marked).map(g=>({group_id:g.id,label:g.label,values:Array.from({length:32},(_,i)=>i===0?g.label:i),notes:['Applied settings']}))}
 }
@@ -29,14 +29,14 @@ it('previews saved revision, selects marked scope and changes preview section wi
   fireEvent.change(screen.getByLabelText('Preview section'),{target:{value:'background'}})
   expect(screen.getAllByRole('columnheader')).toHaveLength(24)
   expect(api).toHaveBeenCalledTimes(1)
-  fireEvent.change(screen.getByLabelText('Report groups'),{target:{value:'marked'}});await ready()
+  fireEvent.change(screen.getByLabelText('Report data'),{target:{value:'marked'}});await ready()
   expect(screen.queryByRole('cell',{name:'Fe'})).not.toBeInTheDocument()
   expect(api.mock.calls.at(-1)?.[1]).toEqual({version:4,scope:'marked'})
 })
 
 it('handles empty marks without requesting or downloading an empty workbook',async()=>{
   render(<AthenaParameterReport {...props()} initialScope="marked" project={{...project,groups:project.groups.map(g=>({...g,marked:false}))}}/>)
-  expect(screen.getByRole('status')).toHaveTextContent('Mark at least one group')
+  expect(screen.getByRole('status')).toHaveTextContent('Mark at least one data item')
   expect(api).not.toHaveBeenCalled()
   expect(screen.getByRole('button',{name:'Download Excel report'})).toBeDisabled()
 })
@@ -48,11 +48,11 @@ it('rejects the wrong group order and supports retry without losing scope',async
   fireEvent.click(screen.getByRole('button',{name:'Retry preview'}));await ready()
 })
 
-it('ignores a late all-groups preview after selecting marked groups',async()=>{
+it('ignores a late all-groups preview after selecting marked data',async()=>{
   let first!:(v:unknown)=>void
   api.mockImplementationOnce(()=>new Promise(resolve=>{first=resolve})).mockResolvedValueOnce(report('marked'))
   render(<AthenaParameterReport {...props()}/>)
-  fireEvent.change(screen.getByLabelText('Report groups'),{target:{value:'marked'}});await ready()
+  fireEvent.change(screen.getByLabelText('Report data'),{target:{value:'marked'}});await ready()
   await act(async()=>{first(report())})
   expect(screen.queryByRole('cell',{name:'Fe'})).not.toBeInTheDocument()
 })
@@ -64,7 +64,7 @@ it('keeps choices on a revision conflict and does not save a stale report',async
   fireEvent.click(screen.getByRole('button',{name:'Download Excel report'}))
   expect(await screen.findByRole('alert')).toHaveTextContent(/changed|elsewhere/i)
   expect(fetcher).toHaveBeenCalledWith('/api/backend/api/athena/projects/p/parameter-report', expect.any(Object))
-  expect(screen.getByLabelText('Report groups')).toHaveValue('all')
+  expect(screen.getByLabelText('Report data')).toHaveValue('all')
 })
 
 it.each([

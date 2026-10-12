@@ -29,7 +29,7 @@ for(const [file,how] of [['AsScorodite.prj','e'],['Fe.prj','n'],['bal3ybco.prj',
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/')
   const path=fileURLToPath(new URL(`../../../examples/xafsdata/AthenaProjectFiles/${file}`,import.meta.url))
   await page.getByRole('button',{name:'Import data',exact:true}).click();await page.getByLabel('Choose data files',{exact:true}).setInputFiles(path)
-  const importing=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all groups',exact:true}).click()
+  const importing=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all data',exact:true}).click()
   const response=await importing;expect(response.ok()).toBe(true);const initial=await response.json() as AthenaProject
   const g=initial.groups.find(g=>(g.source.native as {args:{is_merge:string}})?.args?.is_merge===how&&(g.source.raw_arrays as {stddev:number[]})?.stddev?.length===g.energy.length)!
   expect(g).toBeTruthy();await page.locator('.ath-group-select').filter({hasText:g.label}).first().click()
@@ -56,7 +56,7 @@ for(const [file,how] of [['AsScorodite.prj','e'],['Fe.prj','n'],['bal3ybco.prj',
   const download=page.waitForEvent('download');await page.getByRole("button", { name: "File", exact: true }).click(); await page.getByRole("button", { name: "Save Craft project (.prj)", exact: true }).click(); await confirmProjectSave(page);const savedPath=info.outputPath('saved-native.prj');await(await download).saveAs(savedPath)
   writeFileSync(savedPath,gunzipSync(readFileSync(savedPath)).toString().split('\n').filter(l=>!l.startsWith('# Athena-Web ')).join('\n'))
   await page.getByRole('button',{name:'File',exact:true}).click();await page.getByRole('button',{name:'Open project…',exact:true}).click();await page.getByLabel('Open project file',{exact:true}).setInputFiles(savedPath)
-  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all groups',exact:true}).click();const restoredResponse=await restoring;expect(restoredResponse.ok()).toBe(true)
+  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all data',exact:true}).click();const restoredResponse=await restoring;expect(restoredResponse.ok()).toBe(true)
   const restored=await restoredResponse.json() as AthenaProject,newGroup=restored.groups[initial.groups.length+initial.groups.findIndex(x=>x.id===g.id)]
   await page.locator('.ath-group-select').filter({hasText:newGroup.label}).last().click();dialog=await open(page);const roundtrip=await review(page,dialog)
   for(const [i,curve] of roundtrip.result.curves.entries()){

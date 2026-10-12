@@ -54,7 +54,7 @@ function plot() { return plotted.mock.calls.at(-1)![0] }
 async function preview(response = differencePreview()) {
   api.mockResolvedValueOnce(response)
   fireEvent.click(button("Preview difference"))
-  await waitFor(() => expect(button("Save difference groups")).toBeEnabled())
+  await waitFor(() => expect(button("Save difference data")).toBeEnabled())
   return response
 }
 function deferred<T>() {
@@ -73,7 +73,7 @@ describe("Athena Difference dialog", () => {
     const { onSaved, onBusyChange, close } = setup(project)
     expect(api).not.toHaveBeenCalled()
     expect(button("Preview difference")).toBeDisabled()
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     expect(screen.getByRole("combobox", { name: "Difference form" })).toHaveValue("norm")
     expect(screen.getByRole("spinbutton", { name: "STANDARD multiplier" })).toHaveValue(1)
     expect(screen.getByRole("textbox", { name: "Name template" })).toHaveValue("diff %d - %s")
@@ -81,7 +81,7 @@ describe("Athena Difference dialog", () => {
     expect(screen.getByRole("checkbox", { name: "Integrate difference" })).toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" })).toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Invert difference spectrum" })).not.toBeChecked()
-    expect(screen.getByRole("checkbox", { name: "Allow difference group to be renormalized" })).not.toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "Allow difference data to be renormalized" })).not.toBeChecked()
     select("STANDARD", "standard")
     const response = await preview()
     expect(api.mock.calls).toEqual([[`/projects/${project.id}/difference/preview`, { version: 7, action: "difference", group_ids: ["data"], options: differenceOptions }]])
@@ -97,7 +97,7 @@ describe("Athena Difference dialog", () => {
     const { project, onSaved, close, onBusyChange } = setup()
     select("STANDARD", "standard")
     select("Difference form", form)
-    expect(screen.getByRole("checkbox", { name: "Allow difference group to be renormalized" })).toHaveProperty("checked", form === "xmu")
+    expect(screen.getByRole("checkbox", { name: "Allow difference data to be renormalized" })).toHaveProperty("checked", form === "xmu")
     number(/^STANDARD multiplier$/, 1.75)
     number(/^Integration minimum/, -12)
     number(/^Integration maximum/, 24)
@@ -111,10 +111,10 @@ describe("Athena Difference dialog", () => {
     expect(screen.getByRole("table")).toHaveTextContent(response.results[0].label)
     const saved = differenceSaved(project, response)
     api.mockResolvedValueOnce(saved)
-    fireEvent.click(button("Save difference groups"))
+    fireEvent.click(button("Save difference data"))
     await waitFor(() => expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved))
     expect(api.mock.calls[1]).toEqual([`/projects/${project.id}/command`, { version: response.version, action: "difference", group_ids: ["data"], options: response.options }])
-    expect(onBusyChange.mock.calls).toEqual([["Saving difference groups"], [""]])
+    expect(onBusyChange.mock.calls).toEqual([["Saving difference data"], [""]])
     expect(close).toHaveBeenCalledOnce()
   })
 
@@ -135,7 +135,7 @@ describe("Athena Difference dialog", () => {
     expect(plot().labels).toEqual({ other: "Other scan", standard: "STANDARD foil", data: "DATA foil" })
     expect(api).toHaveBeenCalledTimes(1)
     api.mockResolvedValueOnce(differenceSaved(project, response))
-    fireEvent.click(button("Save difference groups"))
+    fireEvent.click(button("Save difference data"))
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce())
     expect(api.mock.calls[1][1]).toEqual(api.mock.calls[0][1])
   })
@@ -190,7 +190,7 @@ describe("Athena Difference dialog", () => {
     api.mockRejectedValueOnce(new Error("Cannot integrate DATA foil over this range"))
     fireEvent.click(button("Preview difference"))
     expect(await screen.findByRole("alert")).toHaveTextContent("Cannot integrate DATA foil")
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     await preview(differencePreview(undefined, undefined, { multiplier: 2 }))
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
     expect(api.mock.calls[2]).toEqual(api.mock.calls[1])
@@ -205,7 +205,7 @@ describe("Athena Difference dialog", () => {
     await act(async () => { if (outcome === "success") old.resolve(differencePreview()); else old.reject(new Error("Obsolete error")) })
     expect(plot().preview).toEqual(fresh)
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
-    expect(button("Save difference groups")).toBeEnabled()
+    expect(button("Save difference data")).toBeEnabled()
   })
 
   it.each(["target", "standard", "version", "marks"] as const)("hides a preview and blocks save after a %s change", async change => {
@@ -218,8 +218,8 @@ describe("Athena Difference dialog", () => {
     if (change === "version") changeProject({ ...project, version: 8 })
     if (change === "marks") changeProject({ ...project, groups: project.groups.map(group => ({ ...group, marked: group.id === "other" })) })
     expect(screen.queryByTestId("difference-plot")).not.toBeInTheDocument()
-    expect(button("Save difference groups")).toBeDisabled()
-    fireEvent.click(button("Save difference groups"))
+    expect(button("Save difference data")).toBeDisabled()
+    fireEvent.click(button("Save difference data"))
     expect(api).toHaveBeenCalledTimes(1)
   })
 
@@ -230,7 +230,7 @@ describe("Athena Difference dialog", () => {
     Object.assign(response.options, { [key]: typeof original === "boolean" ? !original : typeof original === "number" ? original + 1 : "wrong" })
     api.mockResolvedValueOnce(response); fireEvent.click(button("Preview difference"))
     expect(await screen.findByRole("alert")).toHaveTextContent("does not match")
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     expect(screen.queryByTestId("difference-plot")).not.toBeInTheDocument()
   })
 
@@ -239,7 +239,7 @@ describe("Athena Difference dialog", () => {
     for (const response of [differencePreview(undefined, ["other"]), { ...differencePreview(), version: 6 }]) {
       api.mockResolvedValueOnce(response); fireEvent.click(button("Preview difference"))
       await screen.findByRole("alert")
-      expect(button("Save difference groups")).toBeDisabled()
+      expect(button("Save difference data")).toBeDisabled()
     }
   })
 
@@ -248,7 +248,7 @@ describe("Athena Difference dialog", () => {
     select("STANDARD", "standard")
     const response = await preview()
     const pending = deferred<AthenaProject>()
-    api.mockReturnValueOnce(pending.promise); fireEvent.click(button("Save difference groups"))
+    api.mockReturnValueOnce(pending.promise); fireEvent.click(button("Save difference data"))
     expect(screen.getByRole("combobox", { name: "Current DATA" })).toBeDisabled()
     expect(screen.getByRole("combobox", { name: "STANDARD" })).toBeDisabled()
     expect(button("Cancel")).toBeDisabled()
@@ -259,8 +259,8 @@ describe("Athena Difference dialog", () => {
     await act(async () => pending.reject(new Error("Temporary save failure")))
     expect(screen.getByRole("alert")).toHaveTextContent("Temporary save failure")
     expect(onSaved).not.toHaveBeenCalled()
-    expect(button("Save difference groups")).toBeEnabled()
-    api.mockResolvedValueOnce(differenceSaved(project, response)); fireEvent.click(button("Save difference groups"))
+    expect(button("Save difference data")).toBeEnabled()
+    api.mockResolvedValueOnce(differenceSaved(project, response)); fireEvent.click(button("Save difference data"))
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce())
     expect(api.mock.calls[2]).toEqual(api.mock.calls[1])
   })
@@ -269,9 +269,9 @@ describe("Athena Difference dialog", () => {
     const { project, onSaved, changeProject } = setup()
     select("STANDARD", "standard"); await preview()
     api.mockRejectedValueOnce(new ApiRequestError({ code: "stale_version", message: "Project revision changed", fields: [], recovery: "Reload" }, 409))
-    fireEvent.click(button("Save difference groups"))
+    fireEvent.click(button("Save difference data"))
     expect(await screen.findByRole("alert")).toHaveTextContent("Reload the project")
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     expect(onSaved).not.toHaveBeenCalled()
     const next = { ...project, version: 8 }
     changeProject(next)
@@ -283,18 +283,18 @@ describe("Athena Difference dialog", () => {
     const { project, changeProject, onSaved } = setup()
     select("STANDARD", "standard"); await preview()
     changeProject({ ...project, version: 8 }, false)
-    fireEvent.click(button("Save difference groups"))
+    fireEvent.click(button("Save difference data"))
     expect(screen.getByRole("alert")).toHaveTextContent("project changed after this preview")
     expect(api).toHaveBeenCalledTimes(1)
     const next = { ...project, version: 8 }
     changeProject(next); const response = await preview(differencePreview(next))
     const pending = deferred<AthenaProject>()
-    api.mockReturnValueOnce(pending.promise); fireEvent.click(button("Save difference groups"))
+    api.mockReturnValueOnce(pending.promise); fireEvent.click(button("Save difference data"))
     changeProject({ ...next, id: "another-project" }, false)
     await act(async () => pending.resolve(differenceSaved(next, response)))
     expect(onSaved).not.toHaveBeenCalled()
     expect(screen.getByRole("alert")).toHaveTextContent("workspace changed while saving")
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
   })
 
   it("picks absolute energy relative to the returned E₀ without recalculation and rejects old/nonfinite callbacks", async () => {
@@ -306,7 +306,7 @@ describe("Athena Difference dialog", () => {
     expect(screen.getByRole("spinbutton", { name: /^Integration minimum/ })).toHaveValue(-20)
     fireEvent.click(button("Click plotted energy 8984.5"))
     expect(screen.getByRole("spinbutton", { name: /^Integration minimum/ })).toHaveValue(5.5)
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     expect(api).toHaveBeenCalledTimes(1)
     await preview(differencePreview(undefined, undefined, { xmin: 5.5 }))
     fireEvent.click(button("Pick integration minimum"))
@@ -347,7 +347,7 @@ describe("Athena Difference dialog", () => {
     expect(screen.getByText(/2 points linearly extrapolated/)).toBeVisible()
     expect(screen.getByText(/Insufficient EXAFS range/)).toHaveTextContent("energy difference can still be saved")
     expect(screen.getByRole("table")).toHaveTextContent("-0.2500000")
-    api.mockResolvedValueOnce(differenceSaved(project, response)); fireEvent.click(button("Save difference groups"))
+    api.mockResolvedValueOnce(differenceSaved(project, response)); fireEvent.click(button("Save difference data"))
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce())
     expect(api.mock.calls[1][1]).toEqual(api.mock.calls[0][1])
   })
@@ -366,13 +366,13 @@ describe("Athena Difference dialog", () => {
     expect(button("Download energy CSV")).toBeEnabled()
     expect(screen.queryByRole("button", { name: "Download preview CSV" })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" }))
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     const hidden = { ...response, options: { ...response.options, plot_inputs: false } }
     await preview(hidden)
     expect(api.mock.calls[1][1]).toEqual({ version: 7, action: "difference", group_ids: ["data"], options: hidden.options })
     expect(plot().preview.options.plot_inputs).toBe(false)
     const saved = differenceSaved(project, hidden)
-    api.mockResolvedValueOnce(saved); fireEvent.click(button("Save difference groups"))
+    api.mockResolvedValueOnce(saved); fireEvent.click(button("Save difference data"))
     await waitFor(() => expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved))
   })
 
@@ -388,7 +388,7 @@ describe("Athena Difference dialog", () => {
     }
     await preview(response)
     expect(screen.getAllByText(/No STANDARD k grid/)).toHaveLength(1)
-    expect(button("Save difference groups")).toBeEnabled()
+    expect(button("Save difference data")).toBeEnabled()
   })
 
   it.each(["role", "data-id", "standard-id", "duplicate-role", "array-length", "nonfinite", "weight", "label", "error", "E-space-mixing"] as const)("rejects invalid input k %s without exposing or saving mixed preview data", async kind => {
@@ -409,7 +409,7 @@ describe("Athena Difference dialog", () => {
     api.mockResolvedValueOnce(response); fireEvent.click(button("Preview difference"))
     expect(await screen.findByRole("alert")).toHaveTextContent("incomplete or mismatched spectra")
     expect(screen.queryByTestId("difference-plot")).not.toBeInTheDocument()
-    expect(button("Save difference groups")).toBeDisabled()
+    expect(button("Save difference data")).toBeDisabled()
     expect(api).toHaveBeenCalledTimes(1)
   })
 
@@ -425,7 +425,7 @@ describe("Athena Difference dialog", () => {
     expect(notices).toHaveLength(1)
     expect(notices[0]).toHaveTextContent(warningKind === "backend" ? backendWarning : "integration did not converge after 6 iterations")
     if (warningKind === "unrelated") expect(screen.getByText(/2 points linearly extrapolated/)).toBeVisible()
-    expect(button("Save difference groups")).toBeEnabled()
+    expect(button("Save difference data")).toBeEnabled()
     expect(api).toHaveBeenCalledTimes(1)
   })
 

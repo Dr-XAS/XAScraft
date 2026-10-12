@@ -5,8 +5,8 @@ const sourceLabel = "Cu₂O · room temperature"
 const firstLabel = "Cu foil · 10 K"
 const secondLabel = "Cu foil · 50 K"
 const unmarkedLabel = "Cu foil · 300 K"
-const sectionAction = "Apply fit range & transform to marked groups"
-const fieldAction = "Apply k min (Å⁻¹) to marked groups"
+const sectionAction = "Apply fit range & transform to marked data"
+const fieldAction = "Apply k min (Å⁻¹) to marked data"
 
 // Consume browser responses without putting spectral arrays in assertion output.
 async function models(response: Response) {
@@ -21,7 +21,7 @@ async function select(page: Page, label: string) {
   await page.getByRole("tab", { name: "EXAFS fitting", exact: true }).click()
 }
 
-test("right-click copies live transform settings only to marked groups and restores them after reload", async ({ page }, info) => {
+test("right-click copies live transform settings only to marked data and restores them after reload", async ({ page }, info) => {
   test.setTimeout(180_000)
   page.setDefaultTimeout(30_000)
   const errors: string[] = []

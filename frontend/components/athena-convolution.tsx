@@ -84,10 +84,10 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
 
   async function save() {
     if (!current || disabled || saving.current || committed.current !== key) return
-    saving.current = true; setBusy('Saving modified group'); setError('')
+    saving.current = true; setBusy('Saving modified data'); setError('')
     try {
       const next = await athenaApi<AthenaProject>(`/projects/${project.id}/command`, { version: current.version, action: 'convolve', group_ids: [activeId], options: current.options })
-      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the modified group.')
+      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the modified data.')
       const added = next.groups?.filter(g => !project.groups.some(old => old.id === g.id)), expected = current.results[0]
       if (next.id !== project.id || next.version !== current.version + 1 || added?.length !== 1
         || added[0].source.parent !== activeId || added[0].mu.length !== expected.modified_mu.length
@@ -95,7 +95,7 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
         || added[0].mu.some((v, i) => v !== expected.modified_mu[i]) || added[0].energy.some((v, i) => v !== expected.modified_energy[i])) throw new Error('The saved convolution result could not be confirmed. Reload the project before trying again.')
       saved(next); close()
     } catch (reason) {
-      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the modified group. Preview again.')
+      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the modified data. Preview again.')
     } finally { saving.current = false; setBusy('') }
   }
   const arrays = group?.result?.arrays ?? {}, result = current?.results[0]
@@ -106,7 +106,7 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
   return <div className={`ath-modal-body ${convolutionStyles.body}`}>
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
-        <label className="ath-field"><span>Source group <SectionHelp label="Convolution and noise">Compare the original with Gaussian or Lorentzian broadening, artificial noise, or both. Zero width leaves the spectrum unbroadened; zero noise adds no randomness. Saving keeps the exact noise realization shown in the preview.</SectionHelp></span><select aria-label="Source group" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
+        <label className="ath-field"><span>Source data <SectionHelp label="Convolution and noise">Compare the original with Gaussian or Lorentzian broadening, artificial noise, or both. Zero width leaves the spectrum unbroadened; zero noise adds no randomness. Saving keeps the exact noise realization shown in the preview.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
         <label className="ath-field"><span>Line shape <SectionHelp label="Noise preview">Plot again to draw a fresh noise realization. Changing E/k/R views keeps the same data. Frozen sources remain available for comparison and copying.<br /><br />{chi ? 'χ(k) accepts noise only; energy broadening is disabled.' : 'Gaussian width is its standard deviation; Lorentzian width is half the full width at half maximum. Noise has a normal distribution scaled by the edge step after broadening.'}</SectionHelp></span><select value={draft.form} disabled={disabled || chi} onChange={e => setDraft(d => ({...d, form: e.target.value as Options['form']}))}>
           <option value="gaussian">Gaussian</option><option value="lorentzian">Lorentzian</option>
         </select></label>
@@ -132,6 +132,6 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${convolutionStyles.actions}`}><button disabled={disabled} onClick={close}>Close convolution tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and modified</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make modified group</button></div>
+    <div className={`ath-modal-actions ${convolutionStyles.actions}`}><button disabled={disabled} onClick={close}>Close convolution tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and modified</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make modified data</button></div>
   </div>
 }

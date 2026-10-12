@@ -21,8 +21,8 @@ function ComparisonCard({ group, project, inspect }: { group: ComparisonGroup; p
         <div><dt>Additional fitted energy shift</dt><dd>{group.energy_shift ? `${number(group.energy_shift.value)} eV` : 'Unavailable'}</dd>
           {group.energy_shift ? <p>Fit standard error: {number(group.energy_shift.stderr)}{group.energy_shift.stderr !== null ? ' eV' : ''}. Fit interval: {interval(group.energy_shift.range, 'eV')}. This shift has not been applied.</p> : <p>{group.unavailable.energy_shift}</p>}
         </div>
-        <div><dt>E₀ difference (group − reference)</dt><dd>{number(group.e0_difference)}{group.e0_difference !== null ? ' eV' : ''}</dd>{group.unavailable.e0_difference && <p>{group.unavailable.e0_difference}</p>}</div>
-        <div><dt>Edge step ratio (group / reference)</dt><dd>{number(group.edge_step_ratio)}</dd>{group.unavailable.edge_step_ratio && <p>{group.unavailable.edge_step_ratio}</p>}</div>
+        <div><dt>E₀ difference (data − reference)</dt><dd>{number(group.e0_difference)}{group.e0_difference !== null ? ' eV' : ''}</dd>{group.unavailable.e0_difference && <p>{group.unavailable.e0_difference}</p>}</div>
+        <div><dt>Edge step ratio (data / reference)</dt><dd>{number(group.edge_step_ratio)}</dd>{group.unavailable.edge_step_ratio && <p>{group.unavailable.edge_step_ratio}</p>}</div>
         <div><dt>Largest normalized XANES difference</dt><dd>{group.xanes ? number(group.xanes.max_difference) : 'Unavailable'}</dd>
           {group.xanes ? <p>Evaluated over {interval(group.xanes.range, 'eV')} (upper bound excluded), using {group.xanes.points} reference points on the current energy axes.</p> : <p>{group.unavailable.xanes}</p>}
         </div>
@@ -30,13 +30,13 @@ function ComparisonCard({ group, project, inspect }: { group: ComparisonGroup; p
       </dl>
       <h4>χ(k) amplitude ratios</h4>
       {group.chi_amplitude ? <>
-        <p>Group / reference RMS amplitude at reference k weight {number(group.chi_amplitude.kweight)}, over {interval(group.chi_amplitude.range, 'Å⁻¹')}.</p>
+        <p>Data / reference RMS amplitude at reference k weight {number(group.chi_amplitude.kweight)}, over {interval(group.chi_amplitude.range, 'Å⁻¹')}.</p>
         <dl className={styles.bins} aria-label={`Chi amplitude ratios for ${label}`}>
           {group.chi_amplitude.bins.map((bin, index) => <div key={index}><dt>{interval(bin.k, 'Å⁻¹')}</dt><dd>{number(bin.ratio)}</dd></div>)}
         </dl>
         <p>A ratio below 1 means lower weighted RMS amplitude in this window. Noise and processing choices also affect this ratio.</p>
       </> : <p>{group.unavailable.chi_amplitude}</p>}
-      {group.duplicate_inputs.length > 0 && <><h4>Identical input arrays</h4><ul>{group.duplicate_inputs.map(duplicate => <li key={duplicate.id}>{comparisonGroupLabel(project, duplicate.id)}</li>)}</ul><p>Matches include groups outside the comparison scope. Check their provenance before treating them as independent measurements.</p></>}
+      {group.duplicate_inputs.length > 0 && <><h4>Identical input arrays</h4><ul>{group.duplicate_inputs.map(duplicate => <li key={duplicate.id}>{comparisonGroupLabel(project, duplicate.id)}</li>)}</ul><p>Matches include data outside the comparison scope. Check their provenance before treating them as independent measurements.</p></>}
       {group.notes.length > 0 && <ul>{group.notes.map((note, index) => <li key={index}>{note}</li>)}</ul>}
       <button type="button" onClick={() => inspect(group.id)}>View spectrum</button>
     </div>
@@ -58,8 +58,8 @@ export function AthenaComparisonReport({ project, activeId, close, inspect, relo
   const reference = project.groups.find(group => group.id === referenceId)
   const targets = comparisonTargets(project, referenceId, scope)
   const reason = !reference ? 'Choose a comparison reference from this project.' : !targets.length
-    ? scope === 'marked' ? 'No other marked groups. Mark another group or choose All groups.' : 'Import another spectrum to compare with this reference.'
-    : targets.length > 100 ? 'Compare at most 100 target groups at once. Mark a smaller batch.' : ''
+    ? scope === 'marked' ? 'No other marked data. Mark another data item or choose All data.' : 'Import another spectrum to compare with this reference.'
+    : targets.length > 100 ? 'Compare at most 100 target data items at once. Mark a smaller batch.' : ''
   const signature = JSON.stringify({ projectId: project.id, name: project.name, version: project.version, referenceId, scope,
     groups: project.groups.map(group => [group.id, group.label, group.marked, group.data_type]) })
   useEffect(() => {
@@ -111,26 +111,26 @@ export function AthenaComparisonReport({ project, activeId, close, inspect, relo
     finally { if (token === serial.current) setReloading(false) }
   }
   return <section className={styles.comparison} aria-label="Spectrum comparison controls" aria-busy={loading || reloading}>
-    <p>Compare saved spectra against one reference on their current axes. The fitted shift is measured without changing any group; chemical differences can also affect it.</p>
+    <p>Compare saved spectra against one reference on their current axes. The fitted shift is measured without changing any data; chemical differences can also affect it.</p>
     <div className={styles.controls}>
       <label className="ath-field"><span>Comparison reference</span><select value={reference ? referenceId : ''} disabled={reloading} onChange={event => setReferenceId(event.target.value)}>
         {!reference && <option value="">Choose a reference</option>}{project.groups.map(group => <option key={group.id} value={group.id}>{comparisonGroupLabel(project, group.id)}</option>)}
       </select></label>
-      <label className="ath-field"><span>Comparison groups</span><select value={scope} disabled={reloading} onChange={event => setScope(event.target.value as ComparisonScope)}><option value="marked">Marked groups</option><option value="all">All groups</option></select></label>
+      <label className="ath-field"><span>Comparison data</span><select value={scope} disabled={reloading} onChange={event => setScope(event.target.value as ComparisonScope)}><option value="marked">Marked data</option><option value="all">All data</option></select></label>
     </div>
-    <p>The comparison reference is excluded from the target groups. Choosing it here does not change linked references.</p>
+    <p>The comparison reference is excluded from the target data. Choosing it here does not change linked references.</p>
     {reason && <p role="status">{reason}</p>}
     {loading && <p role="status">Comparing saved spectra…</p>}
     {error && <p role="alert" className="ath-error">{error}</p>}
     {report && <>
-      <p className={styles.revision}>{report.project_name} · Revision {report.version} · {report.groups.length} {report.scope === 'marked' ? 'marked' : 'target'} groups</p>
+      <p className={styles.revision}>{report.project_name} · Revision {report.version} · {report.groups.length} {report.scope === 'marked' ? 'marked' : 'target'} data items</p>
       <section className={styles.reference} aria-label="Comparison reference summary"><h3>Compared with {comparisonGroupLabel(project, report.reference.id)}</h3>
         <p>{report.reference.data_type} · {report.reference.points.toLocaleString()} points · {interval(report.reference.range, report.reference.axis === 'energy' ? 'eV' : 'Å⁻¹')}</p>
         <p>E₀: {number(report.reference.e0)}{report.reference.e0 !== null ? ' eV' : ''} · Edge step: {number(report.reference.edge_step)} · Maximum available k: {number(report.reference.available_kmax)}{report.reference.available_kmax !== null ? ' Å⁻¹' : ''}</p>
         {report.reference.processing_error && <p className="ath-error">{report.reference.processing_error}</p>}
       </section>
       {report.notes.length > 0 && <details className={styles.notes}><summary>How to read this comparison</summary><ul>{report.notes.map((note, index) => <li key={index}>{note}</li>)}</ul></details>}
-      <p>Open a group to inspect its numerical comparison and the intervals used.</p>
+      <p>Open a data item to inspect its numerical comparison and the intervals used.</p>
       <div className={styles.groups}>{report.groups.map(group => <ComparisonCard key={`${signature}:${group.id}`} group={group} project={project} inspect={inspect} />)}</div>
     </>}
     {notice && <p role="status">{notice}</p>}

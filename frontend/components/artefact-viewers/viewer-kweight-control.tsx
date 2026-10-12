@@ -21,7 +21,7 @@ export function ViewerKWeightControl({ label, value, savedWeight, onChange, disa
   disabled?: boolean
 }) {
   const displayed = value ?? savedWeight ?? ""
-  return <label className={styles.control} title="k-weight for this viewer. Choosing the saved weight follows the spectrum’s saved settings."><span>k-weight<SectionHelp label={label}>Multiply χ(k) by k raised to this power before plotting or transforming. Larger weights emphasize high-k oscillations and noise. Choosing the saved weight follows the saved setting; Per spectrum retains each group’s weight. This viewer choice does not change processing or fit parameters.</SectionHelp></span>
+  return <label className={styles.control} title="k-weight for this viewer. Choosing the saved weight follows the spectrum’s saved settings."><span>k-weight<SectionHelp label={label}>Multiply χ(k) by k raised to this power before plotting or transforming. Larger weights emphasize high-k oscillations and noise. Choosing the saved weight follows the saved setting; Per spectrum retains each data item’s weight. This viewer choice does not change processing or fit parameters.</SectionHelp></span>
     <select aria-label={label} value={displayed} disabled={disabled} onChange={event => {
       const next = event.target.value === "" ? null : Number(event.target.value)
       if (next !== null && (!Number.isFinite(next) || next < 0 || next > 3)) return

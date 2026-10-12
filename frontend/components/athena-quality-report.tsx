@@ -30,7 +30,7 @@ function GroupReview({ group, inspect }: { group: QualityReportGroup; inspect: (
         <strong>{adjustment.parameter}</strong>: {number(adjustment.requested)} → {number(adjustment.effective)}{adjustment.unit ? ` ${adjustment.unit}` : ''}
       </li>)}</ul></div>}
       {group.duplicate_inputs.length > 0 && <div><h4>Identical input arrays</h4><ul>{group.duplicate_inputs.map(duplicate => <li key={duplicate.id}>{duplicate.label}</li>)}</ul>
-        <p>Matches include groups outside this review scope. Check their provenance before treating them as independent measurements.</p>
+        <p>Matches include data outside this review scope. Check their provenance before treating them as independent measurements.</p>
       </div>}
       <dl className={styles.values}>
         <div><dt>{group.axis === 'energy' ? 'Energy range (shift applied)' : 'k range'}</dt><dd>{group.range ? `${number(group.range[0])} to ${number(group.range[1])} ${group.axis === 'energy' ? 'eV' : 'Å⁻¹'}` : 'Unavailable'}</dd></div>
@@ -125,26 +125,26 @@ export function AthenaQualityReport({ project, close, inspect, reloadProject }: 
   return <section className={styles.review} aria-label="Spectrum review controls" aria-busy={loading || reloading}>
     <p>Review the saved processing results before comparing, merging or fitting spectra. This review makes no changes to the project.</p>
     <div className={styles.controls}>
-      <label className="ath-field"><span>Review groups</span><select value={scope} disabled={reloading} onChange={event => setScope(event.target.value as QualityReportScope)}>
-        <option value="all">All groups</option><option value="marked">Marked groups</option>
+      <label className="ath-field"><span>Review data</span><select value={scope} disabled={reloading} onChange={event => setScope(event.target.value as QualityReportScope)}>
+        <option value="all">All data</option><option value="marked">Marked data</option>
       </select></label>
-      <label className="ath-check"><input type="checkbox" checked={findingsOnly} onChange={event => setFindingsOnly(event.target.checked)} />Only groups with findings</label>
+      <label className="ath-check"><input type="checkbox" checked={findingsOnly} onChange={event => setFindingsOnly(event.target.checked)} />Only data with findings</label>
     </div>
     {loading && <p role="status">Reviewing saved spectra…</p>}
     {error && <p className="ath-error" role="alert">{error}</p>}
     {report && <>
-      <p className={styles.revision}>{report.project_name} · Revision {report.version} · {report.scope === 'all' ? 'All groups' : 'Marked groups'}</p>
+      <p className={styles.revision}>{report.project_name} · Revision {report.version} · {report.scope === 'all' ? 'All data' : 'Marked data'}</p>
       <dl className={styles.counts} aria-label="Spectrum review summary">
         {([
-          ['Groups', report.counts.groups], ['Processed', report.counts.processed], ['Failed', report.counts.failed],
+          ['Data', report.counts.groups], ['Processed', report.counts.processed], ['Failed', report.counts.failed],
           ['Unprocessed', report.counts.unprocessed], ['With warnings', report.counts.with_warnings],
           ['With adjusted parameters', report.counts.with_adjustments], ['With identical inputs', report.counts.with_duplicate_inputs],
         ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
       </dl>
       {report.notes.length > 0 && <ul className={styles.notes}>{report.notes.map((note, index) => <li key={index}>{note}</li>)}</ul>}
-      {!report.groups.length && <p role="status">{scope === 'marked' ? 'No marked groups. Mark groups in the project or choose All groups.' : 'This project has no groups to review.'}</p>}
-      {report.groups.length > 0 && <p>{groups.length} of {report.counts.groups} groups shown. Open a group for details.</p>}
-      {!!report.groups.length && !groups.length && <p role="status">No groups have findings in this saved snapshot. Inspect the spectra before drawing scientific conclusions.</p>}
+      {!report.groups.length && <p role="status">{scope === 'marked' ? 'No marked data. Mark data in the project or choose All data.' : 'This project has no data to review.'}</p>}
+      {report.groups.length > 0 && <p>{groups.length} of {report.counts.groups} data items shown. Open a data item for details.</p>}
+      {!!report.groups.length && !groups.length && <p role="status">No data have findings in this saved snapshot. Inspect the spectra before drawing scientific conclusions.</p>}
       <div className={styles.groups}>{groups.map(group => <GroupReview key={`${signature}:${group.id}`} group={group} inspect={inspect} />)}</div>
     </>}
     {notice && <p role="status">{notice}</p>}
@@ -154,6 +154,6 @@ export function AthenaQualityReport({ project, close, inspect, reloadProject }: 
       <button type="button" onClick={close}>Close review</button>
       <button type="button" className="ath-primary" disabled={loading || !report} onClick={download}>Download review JSON</button>
     </div>
-    <p className={styles.exportNote}>The JSON download contains every group in the reviewed scope, including groups hidden by the findings filter.</p>
+    <p className={styles.exportNote}>The JSON download contains every data item in the reviewed scope, including data hidden by the findings filter.</p>
   </section>
 }

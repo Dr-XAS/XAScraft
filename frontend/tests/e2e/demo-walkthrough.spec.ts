@@ -135,10 +135,10 @@ async function openProject(page: Page, file: string) {
   await dialog.getByLabel('Open project file', { exact: true }).setInputFiles(file)
   // Reading the project and building its preview is a round trip over every
   // group in the file, which is slow for the 28-spectrum glasses project.
-  await expect(dialog.getByRole('button', { name: 'Import all groups', exact: true }))
+  await expect(dialog.getByRole('button', { name: 'Import all data', exact: true }))
     .toBeEnabled({ timeout: 120000 })
   const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'), { timeout: 180000 })
-  await dialog.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Import all data', exact: true }).click()
   const project = await (await restored).json()
   await expect(dialog).toHaveCount(0, { timeout: 60000 })
   return project as { groups: { id: string; label: string }[] }
@@ -247,7 +247,7 @@ test.describe('demo walkthrough', () => {
     for (const [file, expected] of synthetic) await walk(file, expected, false)
     expect(problems).toEqual([])
     expect([...new Set(seen)].sort()).toHaveLength(10)
-    await expect(page.getByRole('heading', { name: new RegExp(`^Data groups ${seen.length + references}\\b`) })).toBeVisible()
+    await expect(page.getByRole('heading', { name: new RegExp(`^Data ${seen.length + references}\\b`) })).toBeVisible()
     await page.screenshot({ path: shot('w1-3-ten-facilities-loaded'), fullPage: false })
     expect(errors).toEqual([])
   })
@@ -313,16 +313,16 @@ test.describe('demo walkthrough', () => {
     await panel.screenshot({ path: shot('w2-2-xrf-extraction') })
 
     const making = page.waitForResponse(r => r.url().endsWith('/xrf-xas/make'))
-    await panel.getByRole('button', { name: 'Make fluorescence XAS group', exact: true }).click()
+    await panel.getByRole('button', { name: 'Make fluorescence XAS data', exact: true }).click()
     expect((await making).ok()).toBe(true)
-    await expect(panel.getByRole('status')).toContainText('Created the fluorescence XAS group')
+    await expect(panel.getByRole('status')).toContainText('Created the fluorescence XAS data')
     await panel.getByRole('button', { name: 'Close dialog', exact: true }).click()
     // Two groups arrive, not one: the edge pulled out of the fitted target
     // amplitude, and beside it the plain sum over the comparison window that a
     // beamline would normally record. Keeping both lets a reader compare the
     // two side by side, so assert both are there by name, and then make the
     // fitted one current before correcting it.
-    await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
     const fitted = page.getByRole('button', { name: /^synthetic\.h5 · Mn fluorescence μ\(E\)/ })
     await expect(page.getByRole('button', { name: /· window sum μ\(E\)/ })).toBeVisible()
     await fitted.click()

@@ -24,7 +24,7 @@ function preview(overrides:Partial<SelfAbsorptionPreview['results'][0]>={}, opti
       reference_sampled_fraction:null,thickness_over_attenuation_length:null,
       details:{algorithm:'fluo',alpha:1.4,fluorescence_energy:6403,edge_energy:7112},...overrides}]}
 }
-const saveButton = () => screen.getByRole('button',{name:'Make group from corrected data'})
+const saveButton = () => screen.getByRole('button',{name:'Save corrected data'})
 const handoff = () => plot.mock.calls.at(-1)![0]
 async function ready(){await waitFor(()=>expect(saveButton()).toBeEnabled(),{timeout:2000})}
 function compose(){for (const [label,value] of [['Sample formula','Fe2O3'],['Absorbing element','Fe']] as const)
@@ -88,7 +88,7 @@ it('describes a finite slab by its own share of the signal and draws its thickne
   field(DENSITY,'5.2');field(THICKNESS,'3');await ready()
   expect(screen.getByText(/63% of this slab's own signal comes from its top 1\.81 µm/)).toBeInTheDocument()
   expect(screen.queryByText(/63% of the detected signal comes from shallower/)).not.toBeInTheDocument()
-  expect(screen.getByText(/Normalization from the group: E₀ 7112\.4 eV, pre-edge -150 to -30 eV, post-edge 100 to 600 eV, polynomial degree 2/)).toBeInTheDocument()
+  expect(screen.getByText(/Normalization from the data: E₀ 7112\.4 eV, pre-edge -150 to -30 eV, post-edge 100 to 600 eV, polynomial degree 2/)).toBeInTheDocument()
   expect(handoff().data.map(t=>t.name)).toEqual(['Measured','Corrected · Booth slab 3 µm'])
   fireEvent.click(screen.getByRole('button',{name:'Probing depth'}))
   expect(handoff().layout?.shapes).toEqual([expect.objectContaining({type:'line',y0:3,y1:3})])

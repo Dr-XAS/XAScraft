@@ -85,7 +85,7 @@ Cu4 Cu 0.5 0.5 0 1
     })
     const dialog = page.getByRole("dialog", { name: "Open a project" })
     const restored = page.waitForResponse(response => response.url().endsWith("/restore-upload"))
-    await dialog.getByRole("button", { name: "Import all groups", exact: true }).click()
+    await dialog.getByRole("button", { name: "Import all data", exact: true }).click()
     const restoredResponse = await restored
     expect(restoredResponse.ok()).toBe(true)
     // Opening a project adds to the workspace, whose copper example already

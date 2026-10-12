@@ -93,11 +93,11 @@ test("real Cu2O model and fit survive reload, PRJ exchange and input changes", a
   await (await downloading).saveAs(path)
   await page.getByRole("button", { name: "File", exact: true }).click()
   await page.getByRole("button", { name: "New project", exact: true }).click()
-  await expect(page.getByRole("heading", { name: /^Data groups 0\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 0\b/ })).toBeVisible()
   await page.getByRole("button", { name: "Open project", exact: true }).click()
   await page.getByLabel("Open project file", { exact: true }).setInputFiles(path)
   const restoring = page.waitForResponse(response => response.url().endsWith("/restore-upload"))
-  await page.getByRole("dialog", { name: "Open a project" }).getByRole("button", { name: "Import all groups", exact: true }).click()
+  await page.getByRole("dialog", { name: "Open a project" }).getByRole("button", { name: "Import all data", exact: true }).click()
   const restoredResponse = await restoring
   expect(restoredResponse.ok()).toBe(true)
   const restored = await restoredResponse.json() as AthenaProject

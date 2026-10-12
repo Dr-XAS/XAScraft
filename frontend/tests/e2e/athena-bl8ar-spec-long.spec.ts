@@ -43,7 +43,7 @@ async function restore(page: Page, path: string) {
   await page.getByRole('button', { name: 'Open project', exact: true }).click()
   await page.getByLabel('Open project file', { exact: true }).setInputFiles(path)
   const restoring = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-  await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await page.getByRole('button', { name: 'Import all data', exact: true }).click()
   const response = await restoring; expect(response.ok()).toBe(true)
   return response.json()
 }
@@ -103,7 +103,7 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   expect((await nextInspection).ok()).toBe(true)
   await expect(approve).not.toBeChecked()
   await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
-  await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
   await expect(approve).toBeEnabled(); await approve.check()
   const again = page.waitForResponse(r => r.url().endsWith('/import'))
   await dialog.getByRole('button', { name: 'Import spectrum', exact: true }).click()

@@ -17,7 +17,7 @@ export type AthenaSpecialPlotKind = "i0sig" | "normderiv" | "k123" | "r123" | "q
 export const athenaSpecialPlotLabels: Record<AthenaSpecialPlotKind, string> = {
   i0sig: "Data + I₀ + signal", normderiv: "Normalized μ(E) + derivative", k123: "k-space · weights 1, 2, 3",
   r123: "R-space · weights 1, 2, 3", quad: "Quad plot", i0: "Marked I₀", e00: "Marked E − E₀",
-  normscaled: "Marked normalized data × edge step", biquad: "Bi-quad plot · two marked groups",
+  normscaled: "Marked normalized data × edge step", biquad: "Bi-quad plot · two marked data items",
 }
 
 type Props = {
@@ -100,8 +100,8 @@ export function AthenaSpecialPlot({ kind, groups, active, projectId, version, en
     } finally { setExporting(false) }
   }
 
-  if (!ids.length) return <p role="status">{marked ? 'Mark groups to use this plot shortcut.' : 'Select a current group to use this plot shortcut.'}</p>
-  if (kind === 'biquad' && ids.length !== 2) return <p role="status">Mark exactly two groups for Craft’s bi-quad plot.</p>
+  if (!ids.length) return <p role="status">{marked ? 'Mark data to use this plot shortcut.' : 'Select current data to use this plot shortcut.'}</p>
+  if (kind === 'biquad' && ids.length !== 2) return <p role="status">Mark exactly two data items for Craft’s bi-quad plot.</p>
   if (!projectId || version === undefined) return <p role="status">Open a saved project to prepare this diagnostic plot.</p>
   if (quad) return <AthenaDiagnosticPlot key={kind} initialView={kind} project={{ id: projectId, version, groups }} groupId={active?.id ?? ids[0]} selectGroup={selectGroup ?? (() => {})} />
   const r = current?.result

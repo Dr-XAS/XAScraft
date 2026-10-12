@@ -71,7 +71,7 @@ export function rebinUnavailable(group: AthenaGroup): string | null {
   if (group.data_type === 'chi') return 'Three-region rebinning requires energy data, not χ(k).'
   const native = group.source.native as { args?: { rebinned?: unknown } } | undefined
   if (group.source.rebin || group.source.operation === 'rebin' || ['1', 'true'].includes(String(native?.args?.rebinned).toLowerCase())) {
-    return 'This group is already rebinned. Choose its original source to change the grid.'
+    return 'This data is already rebinned. Choose its original source to change the grid.'
   }
   return null
 }

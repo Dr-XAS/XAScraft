@@ -104,8 +104,8 @@ describe("integration mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "File" }))
     expect(screen.queryByRole("button", { name: /new project/i })).not.toBeInTheDocument()
     expect(screen.getByRole("link", { name: /return to dr\.xas/i })).toHaveAttribute("href", "/projects/native")
-    expect(screen.getByRole("link", { name: /import 2 selected groups into dr\.xas/i })).toHaveAttribute("href", "/projects/native")
-    expect(screen.getByRole("link", { name: /import 2 selected groups into dr\.xas/i })).not.toHaveAttribute("aria-disabled", "true")
+    expect(screen.getByRole("link", { name: /import 2 selected data items into dr\.xas/i })).toHaveAttribute("href", "/projects/native")
+    expect(screen.getByRole("link", { name: /import 2 selected data items into dr\.xas/i })).not.toHaveAttribute("aria-disabled", "true")
   })
 
   it("allows a specific command action without requiring the generic command operation", async () => {
@@ -119,7 +119,7 @@ describe("integration mode", () => {
     api.mockImplementation(async path => path === "/projects/integrated-project" ? projectFixture({ id: "integrated-project", version: 7 }) : Promise.reject(new Error(`unexpected ${path}`)))
     render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "export"], returnTo: "/projects/native" }} />)
     await waitForIntegratedProject()
-    const importLink = screen.getByRole("link", { name: /import 2 selected groups into dr\.xas/i })
+    const importLink = screen.getByRole("link", { name: /import 2 selected data items into dr\.xas/i })
     importLink.addEventListener("click", event => event.preventDefault(), { once: true })
     fireEvent.click(importLink)
     expect(JSON.parse(sessionStorage.getItem("xraylarch.integration.return-selection.v1")!)).toEqual({
@@ -138,7 +138,7 @@ describe("integration mode", () => {
       : Promise.reject(new Error(`unexpected ${path}`)))
     render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "export"], returnTo: "/projects/native" }} />)
     await waitForIntegratedProject()
-    const importLink = screen.getByRole("link", { name: /import 2 selected groups into dr\.xas/i })
+    const importLink = screen.getByRole("link", { name: /import 2 selected data items into dr\.xas/i })
     importLink.addEventListener("click", event => event.preventDefault(), { once: true })
     fireEvent.click(importLink)
     expect(JSON.parse(sessionStorage.getItem("xraylarch.integration.return-selection.v1")!).groups)
@@ -174,7 +174,7 @@ describe("integration mode", () => {
     render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "copy_parameters"] }} />)
     await waitForIntegratedProject()
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Processing parameters' }))
-    expect(screen.getByRole('menuitem', { name: 'Set marked groups to current processing parameters' })).toBeEnabled()
+    expect(screen.getByRole('menuitem', { name: 'Set marked data to current processing parameters' })).toBeEnabled()
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     fireEvent.click(screen.getByRole("button", { name: /copy \/ reset parameters/i }))
     const dialog = screen.getByRole("dialog", { name: /copy \/ reset parameters/i })
@@ -186,7 +186,7 @@ describe("integration mode", () => {
     api.mockImplementation(async path => path === "/projects/integrated-project" ? projectFixture({ id: "integrated-project" }) : Promise.reject(new Error(`unexpected ${path}`)))
     const { rerender } = render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "xdi_comments"] }} />)
     await waitForIntegratedProject()
-    fireEvent.click(screen.getByRole("button", { name: "Group" }))
+    fireEvent.click(screen.getByRole("button", { name: "Data" }))
     expect(screen.getByRole("button", { name: /file metadata/i })).toBeDisabled()
 
     rerender(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "read_group", "xdi_comments"] }} />)
@@ -201,28 +201,28 @@ describe("integration mode", () => {
     expect(screen.getByRole("checkbox", { name: "Mark Foil scan" })).toBeDisabled()
     expect(screen.queryByRole("button", { name: /edit absorber and edge/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /plot shortcuts/i })).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /edit group information/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /edit data information/i })).toBeDisabled()
     fireEvent.click(screen.getByRole("button", { name: "Edit" }))
     expect(within(screen.getByRole("navigation", { name: /main menu/i })).getByRole("button", { name: "Undo" })).toBeDisabled()
     expect(within(screen.getByRole("navigation", { name: /main menu/i })).getByRole("button", { name: "Redo" })).toBeDisabled()
-    expect(screen.getByRole("button", { name: /excel report on all groups/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /excel report on all data/i })).toBeDisabled()
     fireEvent.click(screen.getByRole("button", { name: "Process" }))
     expect(screen.getByRole("button", { name: /plot shortcuts/i })).toBeDisabled()
     expect(screen.getByRole("button", { name: /diagnostic plots/i })).toBeDisabled()
     expect(screen.queryByRole("button", { name: "Energy" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /select e₀/i })).toBeDisabled()
-    fireEvent.click(screen.getByRole("button", { name: "Group" }))
-    expect(screen.getByRole("button", { name: /mark \/ freeze groups/i })).toBeDisabled()
+    fireEvent.click(screen.getByRole("button", { name: "Data" }))
+    expect(screen.getByRole("button", { name: /mark \/ freeze data/i })).toBeDisabled()
     expect(screen.getByRole("button", { name: /processing settings…/i })).toBeDisabled()
     expect(screen.queryByRole("button", { name: /edit absorber and edge/i })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /file metadata/i })).toBeDisabled()
-    expect(screen.getByRole("button", { name: /duplicate current group/i })).toBeDisabled()
-    expect(screen.getByRole("button", { name: /remove current group/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /duplicate current data/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /remove current data/i })).toBeDisabled()
     fireEvent.click(screen.getByRole("button", { name: "File" }))
     expect(screen.getByRole("button", { name: /export column data/i })).toBeDisabled()
     fireEvent.click(screen.getByRole("button", { name: "Process" }))
     expect(screen.getByRole("button", { name: /smooth data/i })).toBeDisabled()
-    expect(screen.getByRole("link", { name: /import 0 selected groups into dr\.xas/i })).toHaveAttribute("aria-disabled", "true")
+    expect(screen.getByRole("link", { name: /import 0 selected data items into dr\.xas/i })).toHaveAttribute("aria-disabled", "true")
   })
 
   it("gates reordering, bulk marking, exports, and fitting on the controls master added", async () => {
@@ -230,7 +230,7 @@ describe("integration mode", () => {
     const { rerender } = render(<AthenaWorkbench session={integrationSession} />)
     await waitForIntegratedProject()
     expect(screen.getByRole("button", { name: "Reorder Foil scan" })).toBeDisabled()
-    expect(screen.getByRole("checkbox", { name: "Mark all groups" })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: "Mark all data" })).toBeDisabled()
     fireEvent.click(within(screen.getByRole("region", { name: "Single spectrum viewer" })).getByRole("tab", { name: /EXAFS/ }))
     expect(screen.getByRole("combobox", { name: "Single spectrum k-weight" })).toBeDisabled()
     expect(screen.queryByRole("button", { name: /^Save project$/ })).not.toBeInTheDocument()
@@ -242,7 +242,7 @@ describe("integration mode", () => {
 
     rerender(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "reorder", "metadata", "plot", "export"] }} />)
     expect(screen.getByRole("button", { name: "Reorder Foil scan" })).toBeEnabled()
-    expect(screen.getByRole("checkbox", { name: "Mark all groups" })).toBeEnabled()
+    expect(screen.getByRole("checkbox", { name: "Mark all data" })).toBeEnabled()
     expect(screen.getByRole("combobox", { name: "Single spectrum k-weight" })).toBeEnabled()
     expect(screen.getByRole("button", { name: /^Save project$/ })).toBeEnabled()
     expect(screen.getByRole("button", { name: "CSV" })).toBeEnabled()
@@ -434,7 +434,7 @@ function selectGroup(label: string) {
 }
 
 function openGroupMenu() {
-  fireEvent.click(within(screen.getByRole("navigation", { name: /main menu/i })).getByRole("button", { name: "Group" }))
+  fireEvent.click(within(screen.getByRole("navigation", { name: /main menu/i })).getByRole("button", { name: "Data" }))
 }
 
 function editNumber(label: RegExp, value: number | "", container: HTMLElement = document.body) {
@@ -451,7 +451,7 @@ async function openParameterDialog(scope = "all", target = "marked") {
   fireEvent.click(screen.getByRole("button", { name: /^Copy \/ reset parameters/i }))
   const dialog = await screen.findByRole("dialog", { name: /^Copy \/ reset parameters/i })
   fireEvent.change(within(dialog).getByRole("combobox", { name: "Parameters to change" }), { target: { value: scope } })
-  fireEvent.change(within(dialog).getByRole("combobox", { name: "Destination groups" }), { target: { value: target } })
+  fireEvent.change(within(dialog).getByRole("combobox", { name: "Destination data" }), { target: { value: target } })
   return dialog
 }
 
@@ -579,8 +579,8 @@ function armPick(label: string) {
 
 async function openGroupControls() {
   openGroupMenu()
-  fireEvent.click(screen.getByRole("button", { name: /Mark \/ freeze groups/ }))
-  return screen.findByRole("dialog", { name: "Mark / freeze groups" })
+  fireEvent.click(screen.getByRole("button", { name: /Mark \/ freeze data/ }))
+  return screen.findByRole("dialog", { name: "Mark / freeze data" })
 }
 
 async function openE0Dialog() {
@@ -946,7 +946,7 @@ describe('AthenaWorkbench spectrum comparison', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Compare spectra' })
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Download comparison JSON' })).toBeEnabled())
     expect(within(dialog).getByLabelText('Comparison reference')).toHaveValue('foil')
-    expect(within(dialog).getByLabelText('Comparison groups')).toHaveValue('marked')
+    expect(within(dialog).getByLabelText('Comparison data')).toHaveValue('marked')
     const summary = within(dialog).getByText('Sample scan', { selector: 'summary strong' }).closest('summary')!
     fireEvent.click(summary)
     fireEvent.click(within(summary.closest('details')!).getByRole('button', { name: 'View spectrum' }))
@@ -1015,8 +1015,8 @@ describe("AthenaWorkbench menu command search", () => {
 
     const removed = { ...project, version: project.version + 1, groups: [], undo: ["undo-7.json"] }
     api.mockResolvedValueOnce(removed)
-    fireEvent.click(within(navigation).getByRole("button", { name: "Group" }))
-    fireEvent.click(within(navigation).getByRole("button", { name: "Remove current group" }))
+    fireEvent.click(within(navigation).getByRole("button", { name: "Data" }))
+    fireEvent.click(within(navigation).getByRole("button", { name: "Remove current data" }))
     await waitForCommand(project.id, { version: project.version, action: "delete", group_ids: ["foil"], options: {} })
     expect(listedGroupIds()).toEqual([])
 
@@ -1255,7 +1255,7 @@ describe("AthenaWorkbench data group reordering", () => {
     expect(screen.queryByRole("button", { name: "Move group down" })).not.toBeInTheDocument()
     expect(within(screen.getByRole("list")).getAllByRole("button", { name: /^Reorder / })).toHaveLength(project.groups.length)
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "scan" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "scan" } })
     const rows = screen.getAllByRole("listitem")
     expect(rows.map(row => row.dataset.groupId)).toEqual(["foil", "sample"])
     rows.forEach((row, index) => vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
@@ -1333,7 +1333,7 @@ describe("AthenaWorkbench data group reordering", () => {
     const handle = screen.getByRole("button", { name: "Reorder Foil scan" })
     handle.focus()
     fireEvent.keyDown(handle, { key: "ArrowDown" })
-    const searchbox = screen.getByRole("textbox", { name: "Search groups" })
+    const searchbox = screen.getByRole("textbox", { name: "Search data" })
     searchbox.focus()
 
     await act(async () => response.resolve(reorderedProject(project, ["sample", "foil", "oxide", "unused"])))
@@ -1581,7 +1581,7 @@ describe("AthenaWorkbench data group folders", () => {
 
   it("creates a project-backed folder from marked spectra and collapses it without changing the active plot", async () => {
     const project = await openSaved()
-    fireEvent.click(screen.getByRole("button", { name: /^Group$/ }))
+    fireEvent.click(screen.getByRole("button", { name: /^Data$/ }))
     fireEvent.click(screen.getByRole("button", { name: "Group spectra…" }))
     const dialog = screen.getByRole("dialog", { name: "Group spectra" })
     expect(within(dialog).getByRole("checkbox", { name: /Sample scan/ })).toBeChecked()
@@ -1616,7 +1616,7 @@ describe("AthenaWorkbench data group folders", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Expand Reference data group" })).toHaveAttribute("aria-expanded", "false"))
     expect(screen.queryByRole("button", { name: /^Sample scan/ })).toBeNull()
 
-    const search = screen.getByRole("textbox", { name: "Search groups" })
+    const search = screen.getByRole("textbox", { name: "Search data" })
     fireEvent.change(search, { target: { value: "sample" } })
     const searchDisclosure = screen.getByRole("button", { name: "Reference data group expanded for search" })
     expect(searchDisclosure).toHaveAttribute("aria-expanded", "true")
@@ -1865,7 +1865,7 @@ describe("AthenaWorkbench direct folder interactions", () => {
     await act(async () => response.resolve(markedResponse(project, ["foil", "sample"], true)))
     await waitForWorkbenchIdle()
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "sample" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "sample" } })
     expect(screen.getByRole("checkbox", { name: "Mark Sample scan" })).toBeChecked()
     expect(screen.queryByRole("checkbox", { name: "Mark Foil scan" })).not.toBeInTheDocument()
     const saved = nextProject(project, { foil: { marked: true } })
@@ -1880,7 +1880,7 @@ describe("AthenaWorkbench direct folder interactions", () => {
     }))
     await act(async () => secondResponse.resolve(markedResponse(saved, ["foil", "sample"], false)))
     await waitForWorkbenchIdle()
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "" } })
     fireEvent.click(screen.getByRole("button", { name: "Expand Pair group" }))
     expect(screen.getByRole("checkbox", { name: "Mark Foil scan" })).not.toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Mark Sample scan" })).not.toBeChecked()
@@ -1933,10 +1933,10 @@ describe("AthenaWorkbench direct folder interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand Pair group" }))
     expect(spectrumTitle("sample")).toHaveAttribute("aria-pressed", "false")
     fireEvent.keyDown(document, { key: "Escape" })
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "scan" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "scan" } })
     fireEvent.click(spectrumTitle("sample"), { ctrlKey: true })
     fireEvent.click(spectrumTitle("foil"), { shiftKey: true })
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "" } })
     expect(spectrumTitle("unused")).toHaveAttribute("aria-pressed", "false")
     expect(spectrumTitle("oxide")).toHaveAttribute("aria-pressed", "false")
     expect(api).toHaveBeenCalledTimes(1)
@@ -2161,7 +2161,7 @@ describe("AthenaWorkbench direct folder interactions", () => {
 
 describe("AthenaWorkbench native context actions", () => {
   function groupContext() {
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for current group' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for current data' }))
     return screen.getByRole('menu', { name: 'Actions for Foil scan' })
   }
 
@@ -2184,13 +2184,13 @@ describe("AthenaWorkbench native context actions", () => {
     selectGroup('Sample scan')
     fireEvent.change(screen.getByRole('combobox', { name: 'Background removal standard' }), { target: { value: 'oxide' } })
     selectGroup('Foil scan')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: 'Foil' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
     const pending = deferred<AthenaProject>()
     api.mockReturnValueOnce(pending.promise)
     fireEvent.contextMenu(scope === 'marked'
       ? screen.getByRole('heading', { name: 'Processing parameters' })
       : screen.getByRole('tab', { name: 'Processing' }), { clientX: 250, clientY: 300 })
-    fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} groups to current processing parameters` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} data to current processing parameters` }))
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'copy_parameters',
       group_ids: scope === 'all' ? ['sample', 'oxide', 'unused'] : ['sample', 'oxide'],
@@ -2205,7 +2205,7 @@ describe("AthenaWorkbench native context actions", () => {
     next.last_operation = { action: 'copy_parameters', skipped_group_ids: scope === 'all' ? ['oxide', 'unused'] : ['oxide'] }
     await act(async () => pending.resolve(next))
     await waitForWorkbenchIdle()
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: '' } })
     selectGroup('Sample scan')
     expect(plotProps().active?.parameters).toEqual(copied)
     expect(screen.getByRole('combobox', { name: 'Background removal standard' })).toHaveValue('unused')
@@ -2227,7 +2227,7 @@ describe("AthenaWorkbench native context actions", () => {
     selectGroup('Sample scan')
     fireEvent.change(screen.getByRole('combobox', { name: 'Background removal standard' }), { target: { value: 'oxide' } })
     selectGroup('Foil scan')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: 'Foil' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
     const title = screen.getByText('Transform grid', { exact: true })
     expect(title.closest('details')).not.toHaveAttribute('open')
     fireEvent.contextMenu(title, { clientX: 250, clientY: 300 })
@@ -2236,7 +2236,7 @@ describe("AthenaWorkbench native context actions", () => {
     const next = nextProject(project, { sample: copied(project.groups[1]), ...(scope === 'all' ? { unused: copied(project.groups[3]) } : {}) })
     next.last_operation = { action: 'copy_parameters', skipped_group_ids: ['oxide'] }
     api.mockResolvedValueOnce(next)
-    fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} groups to current transform grid parameters` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} data to current transform grid parameters` }))
     await waitForWorkbenchIdle()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'copy_parameters',
@@ -2244,7 +2244,7 @@ describe("AthenaWorkbench native context actions", () => {
       options: { section: 'grid', source_id: 'foil', values: initial.groups[0].parameters },
     })
     expect(title.closest('details')).not.toHaveAttribute('open')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: '' } })
     selectGroup('Sample scan')
     expect(plotProps().active?.parameters).toEqual(copied(project.groups[1]).parameters)
     expect(screen.getByRole('combobox', { name: 'Background removal standard' })).toHaveValue('oxide')
@@ -2269,7 +2269,7 @@ describe("AthenaWorkbench native context actions", () => {
     expect(api).toHaveBeenCalledTimes(2)
   })
 
-  it.each(['none marked', 'only current marked', 'marked frozen'])('disables Processing copy to marked groups when %s', async condition => {
+  it.each(['none marked', 'only current marked', 'marked frozen'])('disables Processing copy to marked data when %s', async condition => {
     const project = projectFixture()
     for (const group of project.groups) {
       if (condition === 'none marked') group.marked = false
@@ -2278,8 +2278,8 @@ describe("AthenaWorkbench native context actions", () => {
     }
     await openSaved(project)
     const menu = fieldContext('Processing parameters')
-    expect(within(menu).getByRole('menuitem', { name: 'Set marked groups to current processing parameters' })).toBeDisabled()
-    expect(within(menu).getByRole('menuitem', { name: 'Set all groups to current processing parameters' })).toBeEnabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Set marked data to current processing parameters' })).toBeDisabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Set all data to current processing parameters' })).toBeEnabled()
     expect(api).toHaveBeenCalledOnce()
   })
 
@@ -2289,7 +2289,7 @@ describe("AthenaWorkbench native context actions", () => {
     tab.focus()
     fireEvent.keyDown(tab, { key: 'F10', shiftKey: true })
     const menu = screen.getByRole('menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Set marked groups to current processing parameters' })).toBeEnabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Set marked data to current processing parameters' })).toBeEnabled()
     fireEvent.keyDown(menu, { key: 'Escape' })
     expect(tab).toHaveFocus()
     fireEvent.click(screen.getByRole('tab', { name: 'EXAFS fitting' }))
@@ -2304,8 +2304,8 @@ describe("AthenaWorkbench native context actions", () => {
     const other = screen.getByRole('button', { name: /^Sample scan/ })
     fireEvent.contextMenu(other, { clientX: 40, clientY: 80 })
     const menu = screen.getByRole('menu', { name: 'Actions for Foil scan' })
-    expect(within(menu).getByRole('menuitem', { name: 'Current group: Foil scan' })).toBeDisabled()
-    expect(within(menu).getByRole('menuitem', { name: 'Show the text of the current group’s data file' })).toBeDisabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Current data: Foil scan' })).toBeDisabled()
+    expect(within(menu).getByRole('menuitem', { name: 'Show the text of the current data file' })).toBeDisabled()
     expect(plotProps().active?.id).toBe('foil')
     expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toHaveValue(1)
     expect(api).toHaveBeenCalledOnce()
@@ -2360,26 +2360,26 @@ describe("AthenaWorkbench native context actions", () => {
 
   it.each(['visible', 'Shift+F10', 'ContextMenu'])('opens group actions with %s without changing the saved selection or defaults', async method => {
     const project = await openSaved()
-    const trigger = screen.getByRole('button', { name: 'Actions for current group' })
+    const trigger = screen.getByRole('button', { name: 'Actions for current data' })
     trigger.focus()
     if (method === 'visible') fireEvent.click(trigger)
     else fireEvent.keyDown(trigger, { key: method === 'Shift+F10' ? 'F10' : 'ContextMenu', shiftKey: method === 'Shift+F10' })
-    expect(screen.getByRole('menuitem', { name: 'Rename current group…' })).toHaveFocus()
+    expect(screen.getByRole('menuitem', { name: 'Rename current data…' })).toHaveFocus()
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(trigger).toHaveFocus(); expect(screen.queryByRole('menu')).toBeNull()
     expect(plotProps().active?.parameters).toEqual(project.groups[0].parameters)
     expect(api).toHaveBeenCalledOnce()
   })
 
-  it('renames the current group with an explicit label after right-clicking a different row', async () => {
+  it('renames the current data with an explicit label after right-clicking a different row', async () => {
     const project = await openSaved()
     fireEvent.contextMenu(screen.getByRole('button', { name: /^Sample scan/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename current group…' }))
-    const dialog = screen.getByRole('dialog', { name: 'Rename current group' })
-    expect(within(dialog).getByRole('textbox', { name: 'New group label' })).toHaveValue('Foil scan')
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'New group label' }), { target: { value: 'Reviewed foil' } })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename current data…' }))
+    const dialog = screen.getByRole('dialog', { name: 'Rename current data' })
+    expect(within(dialog).getByRole('textbox', { name: 'New data label' })).toHaveValue('Foil scan')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'New data label' }), { target: { value: 'Reviewed foil' } })
     api.mockResolvedValueOnce(nextProject(project, { foil: { label: 'Reviewed foil' } }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Rename group' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rename data' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'metadata', group_ids: ['foil'], options: { label: 'Reviewed foil' },
@@ -2388,9 +2388,9 @@ describe("AthenaWorkbench native context actions", () => {
   })
 
   it.each([
-    ['Copy current group', 'duplicate', ['foil']],
-    ['Remove current group', 'delete', ['foil']],
-    ['Remove marked groups', 'delete', ['sample', 'oxide']],
+    ['Duplicate current data', 'duplicate', ['foil']],
+    ['Remove current data', 'delete', ['foil']],
+    ['Remove marked data', 'delete', ['sample', 'oxide']],
   ] as const)('sends the intended IDs for %s even if a different row was right-clicked', async (label, action, ids) => {
     const project = await openSaved()
     api.mockResolvedValueOnce(nextProject(project, {}))
@@ -2399,11 +2399,44 @@ describe("AthenaWorkbench native context actions", () => {
     await waitForWorkbenchIdle()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action, group_ids: [...ids], options: {},
+      ...(action === "duplicate" ? { response_mode: "duplicate" } : {}),
     })
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  it('copies native ALL to hidden marked groups, excludes the source, and preserves frozen skipped values', async () => {
+  it('loads only the duplicate and retains the current spectrum and completed plot transform', async () => {
+    const initial = projectFixture({ group_versions: { foil: 7, sample: 7, oxide: 7, unused: 7 } })
+    initial.groups[0].result!.arrays = { ...initial.groups[0].result!.arrays, k: [0, 1, 2], chi: [0, 1, 0] }
+    const project = await openSaved(initial)
+    const copy = structuredClone(project.groups[0])
+    copy.id = "foil-copy"; copy.label = "Foil scan · copy"
+    const update = { ...project, kind: "duplicate", base_version: project.version, version: project.version + 1,
+      groups: [copy], group_order: ["foil", copy.id, "sample", "oxide", "unused"], analyses: [],
+      group_versions: { ...project.group_versions, [copy.id]: project.version + 1 },
+      last_operation: { action: "duplicate", skipped_group_ids: [] }, undo: ["Duplicate data"] }
+    api.mockImplementation(async path => {
+      if (path.endsWith("/plot-transform")) return { project_id: project.id, version: project.version, group_id: "foil", kweight: 3,
+        arrays: { r: [0, 1, 2], chir_mag: [1, 2, 1], chir_re: [1, 2, 1], chir_im: [0, 0, 0], chir_pha: [0, 0, 0] },
+        effective: { kweight: 3 }, warnings: [] }
+      if (path.endsWith("/command")) return update
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    fireEvent.click(singleViewer().getByRole("tab", { name: /R Fourier/i }))
+    fireEvent.change(screen.getByRole("combobox", { name: "Single spectrum k-weight" }), { target: { value: "3" } })
+    await waitFor(() => expect(plotProps("current").groups[0].result?.effective.kweight).toBe(3))
+    const originalPlotGroups = plotProps("current").groups
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^Foil scan/ }))
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate current data" }))
+    await waitForCommand(project.id, { version: project.version, action: "duplicate", group_ids: ["foil"], options: {}, response_mode: "duplicate" })
+    expect(listedGroupIds()).toEqual(["foil", "foil-copy", "sample", "oxide", "unused"])
+    expect(plotProps("current").active).toBe(project.groups[0])
+    expect(plotProps("current").groups).toBe(originalPlotGroups)
+    expect(singleViewer().queryByText("Updating Fourier transform…")).toBeNull()
+    expect(api.mock.calls.filter(([path]) => path.endsWith("/plot-transform"))).toHaveLength(1)
+    expect(api.mock.calls.filter(([path]) => path === `/projects/${project.id}`)).toHaveLength(1)
+  })
+
+  it('copies native ALL to hidden marked data, excludes the source, and preserves frozen skipped values', async () => {
     const initial = projectFixture()
     initial.groups[0].marked = true
     const project = await openSaved(initial)
@@ -2411,27 +2444,27 @@ describe("AthenaWorkbench native context actions", () => {
     const oxideApplied = await finishParameterDrafts(project, [{ groupId: 'oxide', options: { rbkg: 4 } }])
     const frozen = nextProject(oxideApplied, { oxide: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze group' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze group' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
     selectGroup('Foil scan'); editNumber(/^Rbkg/, 2.5)
     const foilApplied = await finishParameterDrafts(frozen, [{ groupId: 'foil', options: { rbkg: 2.5 } }])
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: 'Foil' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
     expect(screen.queryByRole('button', { name: /^Sample scan/ })).toBeNull()
     const next = nextProject(foilApplied, { sample: { parameters: { ...parameters, rbkg: 2.5 } } })
     const warning = 'Native phase correction is retained as source metadata but is not applied by Craft.'
     next.last_operation = { action: 'context_parameters', skipped_group_ids: ['oxide'], warnings: [warning] }
     api.mockResolvedValueOnce(next)
-    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Set marked groups’ values to the current' }))
+    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Set marked data values to the current' }))
     await waitForWorkbenchIdle()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: foilApplied.version, action: 'context_parameters', group_ids: ['sample', 'oxide'],
       options: { mode: 'copy', section: 'all', source_id: 'foil', values: { ...parameters, rbkg: 2.5 } },
     })
-    expect(screen.getByRole('status')).toHaveTextContent('1 group skipped')
+    expect(screen.getByRole('status')).toHaveTextContent('1 data item skipped')
     expect(screen.getByRole('status')).toHaveTextContent(warning)
     expect(plotProps().active?.parameters.rbkg).toBe(2.5)
     expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toHaveValue(2.5)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: '' } })
     selectGroup('Sample scan'); expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toHaveValue(2.5)
     selectGroup('Oxide standard'); expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toHaveValue(4)
     expect(plotProps().active?.parameters.rbkg).toBe(4)
@@ -2442,7 +2475,7 @@ describe("AthenaWorkbench native context actions", () => {
     ['Background removal', 'background', 'normalization and background parameters', 'rbkg', 2.5],
     ['Forward Fourier transform', 'forward', 'forward transform parameters', 'kmin', 4],
     ['Backward Fourier transform', 'reverse', 'backward transform parameters', 'rmin', 1.5],
-  ] as const)('copies the %s section to all or marked groups in one responsive batch', async (control, section, label, key, value) => {
+  ] as const)('copies the %s section to all or marked data in one responsive batch', async (control, section, label, key, value) => {
     for (const scope of ['all', 'marked'] as const) {
       const initial = projectFixture()
       initial.groups[0].marked = true
@@ -2451,11 +2484,11 @@ describe("AthenaWorkbench native context actions", () => {
       initial.groups[2].frozen = true
       const project = await openSaved(initial)
       // Filtering the list must not narrow either command's destination set.
-      fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: 'Foil' } })
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
       const pending = deferred<AthenaProject>()
       api.mockReturnValueOnce(pending.promise)
       fireEvent.contextMenu(screen.getByRole('button', { name: `Actions for ${control}` }), { clientX: 250, clientY: 300 })
-      fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} groups to current ${label}` }))
+      fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} data to current ${label}` }))
       expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
         version: project.version, action: 'context_parameters',
         group_ids: scope === 'all' ? ['sample', 'oxide', 'unused'] : ['sample', 'oxide'],
@@ -2479,8 +2512,8 @@ describe("AthenaWorkbench native context actions", () => {
       next.last_operation = { action: 'context_parameters', skipped_group_ids: ['oxide'] }
       await act(async () => pending.resolve(next))
       await waitForWorkbenchIdle()
-      expect(screen.getByRole('status')).toHaveTextContent('Copying current values · complete · 1 group skipped')
-      fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: '' } })
+      expect(screen.getByRole('status')).toHaveTextContent('Copying current values · complete · 1 data item skipped')
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: '' } })
       for (const [index, changed] of [[1, true], [2, false], [3, scope === 'all']] as const) {
         selectGroup(project.groups[index].label)
         expect(plotProps().active?.parameters[key]).toBe(changed ? value : project.groups[index].parameters[key])
@@ -2495,12 +2528,12 @@ describe("AthenaWorkbench native context actions", () => {
   it('shows a failed section copy and allows retry without publishing partial results', async () => {
     const project = await openSaved()
     api.mockRejectedValueOnce(new Error('The requested spline range is outside the destination spectrum.'))
-    fireEvent.click(within(fieldContext('Background removal')).getByRole('menuitem', { name: 'Set all groups to current normalization and background parameters' }))
+    fireEvent.click(within(fieldContext('Background removal')).getByRole('menuitem', { name: 'Set all data to current normalization and background parameters' }))
     await waitForWorkbenchIdle()
     expect(screen.getByRole('alert')).toHaveTextContent('The requested spline range is outside the destination spectrum.')
     expect(plotProps().groups).toEqual(project.groups.filter(g => g.marked))
     api.mockResolvedValueOnce(nextProject(project, { sample: { parameters: project.groups[0].parameters } }))
-    fireEvent.click(within(fieldContext('Background removal')).getByRole('menuitem', { name: 'Set all groups to current normalization and background parameters' }))
+    fireEvent.click(within(fieldContext('Background removal')).getByRole('menuitem', { name: 'Set all data to current normalization and background parameters' }))
     await waitForWorkbenchIdle()
     expect(screen.queryByRole('alert')).toBeNull()
     selectGroup('Sample scan')
@@ -2519,7 +2552,7 @@ describe("AthenaWorkbench native context actions", () => {
     const applied = await finishParameterDrafts(project, [{ groupId: 'foil', options: { rbkg: 2.6 } }])
     const next = nextProject(applied, {})
     api.mockResolvedValueOnce(next)
-    fireEvent.click(within(fieldContext(control)).getByRole('menuitem', { name: `Set marked groups to current ${label}` }))
+    fireEvent.click(within(fieldContext(control)).getByRole('menuitem', { name: `Set marked data to current ${label}` }))
     await waitForWorkbenchIdle()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: applied.version, action: 'copy_parameters', group_ids: ['sample', 'oxide'],
@@ -2542,7 +2575,7 @@ describe("AthenaWorkbench native context actions", () => {
     const project = await openSaved(initial)
     expect(screen.getByRole('spinbutton', { name: 'Pre-edge start eV relative' })).toHaveValue(-145.5)
     api.mockResolvedValueOnce(nextProject(project, {}))
-    fireEvent.click(within(fieldContext('Pre-edge start')).getByRole('menuitem', { name: 'Set marked groups to current Pre-edge start' }))
+    fireEvent.click(within(fieldContext('Pre-edge start')).getByRole('menuitem', { name: 'Set marked data to current Pre-edge start' }))
     await waitForWorkbenchIdle()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'copy_parameters', group_ids: ['sample', 'oxide'], options: {
@@ -2559,14 +2592,14 @@ describe("AthenaWorkbench native context actions", () => {
     const project = await openSaved()
     const frozen = nextProject(project, { foil: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze group' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze group' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
     const trigger = screen.getByRole('button', { name: 'Actions for Rbkg' })
     expect(trigger).toBeEnabled()
     expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toBeDisabled()
     fireEvent.keyDown(trigger, { key: 'F10', shiftKey: true })
     expect(screen.getByRole('menuitem', { name: 'Restore default Rbkg' })).toBeDisabled()
-    const copy = screen.getByRole('menuitem', { name: 'Set marked groups to current Rbkg' })
+    const copy = screen.getByRole('menuitem', { name: 'Set marked data to current Rbkg' })
     expect(copy).toBeEnabled()
     api.mockResolvedValueOnce(nextProject(frozen, {}))
     fireEvent.click(copy)
@@ -2615,13 +2648,13 @@ describe("AthenaWorkbench native context actions", () => {
     })
   })
 
-  it('opens source text as a read-only report for the current group', async () => {
+  it('opens source text as a read-only report for the current data', async () => {
     const initial = projectFixture()
     initial.groups[0].source.mapping = { upload_id: 'upload-foil' }
     const project = await openSaved(initial)
     const text = '# Original μ 铜 <script>data</script>\n8960 0.1\n8980 0.8\n'
     api.mockResolvedValueOnce({ filename: 'foil.xmu', text })
-    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Show the text of the current group’s data file' }))
+    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Show the text of the current data file' }))
     const dialog = await screen.findByRole('dialog', { name: 'Original data file' })
     await waitFor(() => expect(within(dialog).getByLabelText('Original data file').textContent).toBe(text))
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/groups/foil/source-text`, undefined, undefined, expect.any(AbortSignal))
@@ -2631,15 +2664,15 @@ describe("AthenaWorkbench native context actions", () => {
     expect(plotProps().active?.parameters).toEqual(project.groups[0].parameters)
   })
 
-  it('requests measurement uncertainties for all marked groups including hidden and frozen groups without saving', async () => {
+  it('requests measurement uncertainties for all marked data including hidden and frozen groups without saving', async () => {
     const initial = projectFixture(); initial.groups[2].frozen = true
     const project = await openSaved(initial)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search groups' }), { target: { value: 'Foil' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
     api.mockResolvedValueOnce({ version: project.version, kind: 'measurement_uncertainty', results: [
       { group_id: 'sample', label: 'Sample scan', epsilon_k: 0.001, epsilon_r: 0.002 },
       { group_id: 'oxide', label: 'Oxide standard', epsilon_k: 0.003, epsilon_r: 0.004 },
     ] })
-    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Show measurement uncertainties · marked groups' }))
+    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Show measurement uncertainties · marked data' }))
     const dialog = await screen.findByRole('dialog', { name: 'Measurement uncertainties' })
     expect(await within(dialog).findByRole('heading', { name: 'Oxide standard' })).toBeVisible()
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/context-report`, {
@@ -2673,7 +2706,7 @@ describe("AthenaWorkbench native context actions", () => {
     selectGroup(label)
     const selected = project.groups.find(g => g.label === label)!
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Energy shift' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Identify this group’s reference' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Identify this data’s reference' }))
     expect(screen.getByRole('status')).toHaveTextContent(message)
     expect(screen.queryByRole('menu')).toBeNull()
     expect(plotProps().active).toEqual(selected)
@@ -2723,23 +2756,23 @@ describe("AthenaWorkbench native context actions", () => {
 
   it('persists edited Importance and omits it from subsequent unrelated metadata saves', async () => {
     const project = await openSaved()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit group information' }))
-    let dialog = screen.getByRole('dialog', { name: 'Group information' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
+    let dialog = screen.getByRole('dialog', { name: 'Data information' })
     editNumber(/^Importance$/, 3.5, dialog)
     const next = nextProject(project, { foil: { source: { ...project.groups[0].source, importance: 3.5 } } })
     api.mockResolvedValueOnce(next)
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save group' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save data' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'metadata', group_ids: ['foil'],
       options: { label: 'Foil scan', notes: '', multiplier: 1, offset: 0, reference_id: null, importance: 3.5 },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit group information' }))
-    dialog = screen.getByRole('dialog', { name: 'Group information' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
+    dialog = screen.getByRole('dialog', { name: 'Data information' })
     expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toHaveValue(3.5)
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Notes' }), { target: { value: 'Reviewed metadata' } })
     api.mockResolvedValueOnce(nextProject(next, { foil: { notes: 'Reviewed metadata' } }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save group' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save data' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: next.version, action: 'metadata', group_ids: ['foil'],
@@ -2753,16 +2786,16 @@ describe("AthenaWorkbench native context actions", () => {
     const project = await openSaved(initial)
     const frozen = nextProject(project, { foil: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze group' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze group' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Edit group information' }))
-    const dialog = screen.getByRole('dialog', { name: 'Group information' })
+    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
+    const dialog = screen.getByRole('dialog', { name: 'Data information' })
     expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toBeDisabled()
     expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toHaveValue(2)
     expect(within(dialog).getByRole('button', { name: 'Actions for Importance' })).toBeEnabled()
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Notes' }), { target: { value: 'Frozen spectrum annotation' } })
     api.mockResolvedValueOnce(nextProject(frozen, { foil: { notes: 'Frozen spectrum annotation' } }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save group' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save data' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: frozen.version, action: 'metadata', group_ids: ['foil'],
@@ -2776,9 +2809,9 @@ describe("AthenaWorkbench native context actions", () => {
     const initial = projectFixture()
     initial.groups[0] = { ...initial.groups[0], multiplier: 3, offset: 2, source: { ...initial.groups[0].source, importance: 4 } }
     const project = await openSaved(initial)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit group information' }))
-    const dialog = screen.getByRole('dialog', { name: 'Group information' })
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Group label' }), { target: { value: 'Draft label' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
+    const dialog = screen.getByRole('dialog', { name: 'Data information' })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Data label' }), { target: { value: 'Draft label' } })
     editNumber(/^Importance$/, 7, dialog); editNumber(/^Plot multiplier$/, 6, dialog); editNumber(/^Plot offset$/, 5, dialog)
     const resetPlot = nextProject(project, { foil: { multiplier: 1, offset: 0 } })
     api.mockResolvedValueOnce(resetPlot)
@@ -2795,12 +2828,12 @@ describe("AthenaWorkbench native context actions", () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Actions for Importance' }))
     fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Restore default Importance' }))
     await waitFor(() => expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toHaveValue(1))
-    expect(within(dialog).getByRole('textbox', { name: 'Group label' })).toHaveValue('Draft label')
+    expect(within(dialog).getByRole('textbox', { name: 'Data label' })).toHaveValue('Draft label')
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: resetPlot.version, action: 'context_parameters', group_ids: ['foil'], options: { mode: 'reset', field: 'importance' },
     })
     api.mockResolvedValueOnce(nextProject(resetImportance, { foil: { label: 'Draft label' } }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save group' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save data' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: resetImportance.version, action: 'metadata', group_ids: ['foil'],
@@ -2813,8 +2846,8 @@ describe("AthenaWorkbench native context actions", () => {
     initial.groups[0].marked = true; initial.groups[2].frozen = true
     initial.groups[0].source = { ...initial.groups[0].source, importance: 4, xdi_metadata: { attributes: { bla: { pixel_ratio: 0.25 } } } }
     const project = await openSaved(initial)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit group information' }))
-    const dialog = screen.getByRole('dialog', { name: 'Group information' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
+    const dialog = screen.getByRole('dialog', { name: 'Data information' })
     editNumber(/^Importance$/, 9, dialog)
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Notes' }), { target: { value: 'Keep this draft' } })
     const importance = mode === 'set to one' ? 1 : 0.25
@@ -2823,7 +2856,7 @@ describe("AthenaWorkbench native context actions", () => {
     api.mockResolvedValueOnce(next)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Actions for Importance' }))
     fireEvent.click(within(dialog).getByRole('menuitem', { name: mode === 'set to one'
-      ? 'Set Importance to 1 for all groups' : 'Set Importance for marked data to BLA pixel ratio' }))
+      ? 'Set Importance to 1 for all data' : 'Set Importance for marked data to BLA pixel ratio' }))
     await waitFor(() => expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toHaveValue(importance))
     expect(within(dialog).getByRole('textbox', { name: 'Notes' })).toHaveValue('Keep this draft')
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
@@ -2846,7 +2879,7 @@ describe("AthenaWorkbench absorber and edge identity", () => {
     expect(within(identityBar()).queryByRole("button")).not.toBeInTheDocument()
     openGroupMenu()
     expect(within(screen.getByRole("navigation", { name: /main menu/i })).queryByRole("button", { name: "Edit absorber and edge…" })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Group" }))
+    fireEvent.click(screen.getByRole("button", { name: "Data" }))
     expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
     expectPolicyControlsState(false)
     selectGroup("Sample scan")
@@ -3231,7 +3264,7 @@ describe("AthenaWorkbench E₀ selection", () => {
     initial.groups[2].frozen = true
     initial.groups[3].data_type = "chi"
     const project = await openSaved(initial)
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "Foil" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "Foil" } })
     const dialog = await openE0Dialog()
     fireEvent.change(within(dialog).getByRole("combobox", { name: "E₀ targets" }), { target: { value: scope } })
     const values: Record<string, number> = scope === "all" ? { foil: 8981, sample: 8982 } : { sample: 8982 }
@@ -3311,7 +3344,7 @@ describe("AthenaWorkbench E₀ selection", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Apply E₀" }))
     expect(within(dialog).getByRole("combobox", { name: "E₀ method" })).toBeDisabled()
     expect(within(dialog).getByRole("combobox", { name: "E₀ targets" })).toBeDisabled()
-    expect(within(dialog).getByRole("combobox", { name: "Current group" })).toBeDisabled()
+    expect(within(dialog).getByRole("combobox", { name: "Current data" })).toBeDisabled()
     expect(within(dialog).getByRole("spinbutton", { name: "Edge-step fraction" })).toBeDisabled()
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled()
     expect(within(dialog).getByRole("button", { name: "Applying E₀…" })).toBeDisabled()
@@ -3345,7 +3378,7 @@ describe("AthenaWorkbench E₀ selection", () => {
     let dialog = await openE0Dialog()
     chooseE0Method(dialog, "manual")
     editNumber(/^Manual E₀/, 9200, dialog)
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "Current group" }), { target: { value: "sample" } })
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Current data" }), { target: { value: "sample" } })
     dialog = await screen.findByRole("dialog", { name: "Select E₀" })
     expect(within(dialog).getByRole("combobox", { name: "E₀ method" })).toHaveValue("derivative")
     chooseE0Method(dialog, "manual")
@@ -3380,7 +3413,7 @@ describe("AthenaWorkbench E₀ selection", () => {
     if (kind === "unmarked") fireEvent.change(within(dialog).getByRole("combobox", { name: "E₀ targets" }), { target: { value: "marked" } })
     const button = within(dialog).getByRole("button", { name: "Apply E₀" })
     expect(button).toBeDisabled()
-    expect(within(dialog).getByText(/No supported, unfrozen groups/)).toBeVisible()
+    expect(within(dialog).getByText(/No supported, unfrozen data/)).toBeVisible()
     fireEvent.click(button)
     expect(api).toHaveBeenCalledTimes(1)
   })
@@ -3402,7 +3435,7 @@ describe("AthenaWorkbench E₀ selection", () => {
     const report = await within(dialog).findByRole("region", { name: "E₀ selection results" })
     expect(report).toHaveTextContent("Foil scan: A background consumer is frozen.")
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }))
-    expect(screen.getByRole("status")).toHaveTextContent("1 group skipped")
+    expect(screen.getByRole("status")).toHaveTextContent("1 data item skipped")
     expect(screen.getByRole("spinbutton", { name: /^E₀/ })).toHaveValue(8990)
     expect(plotProps().active?.parameters.e0).toBe(8990)
   })
@@ -3744,7 +3777,7 @@ describe("AthenaWorkbench background science controls", () => {
     skipped.last_operation = { action: "background_standard", skipped_group_ids: ["foil"] }
     api.mockResolvedValueOnce(skipped)
     fireEvent.click(screen.getByRole("button", { name: "Apply standard" }))
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1 group skipped"))
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1 data item skipped"))
     expect(api.mock.calls[2]).toEqual(api.mock.calls[3])
     expect(selector).toHaveValue("sample")
     expect(selector).toBeDisabled()
@@ -3774,13 +3807,13 @@ describe("AthenaWorkbench bulk marking and freezing", () => {
     update.name = "Renamed from Dr.XAS"
     update.analyses = [{ kind: "pca", project_version: project.version, group_ids: ["foil"], options: {}, result: { explained_variance_ratio: [1] } }]
     api.mockResolvedValueOnce(update)
-    fireEvent.click(screen.getByRole("checkbox", { name: "Mark all groups" }))
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Mark all groups" })).toBeEnabled())
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark all data" }))
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Mark all data" })).toBeEnabled())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: "metadata", group_ids: project.groups.map(g => g.id),
       options: { marked: true }, response_mode: "selection",
     })
-    expect(screen.getByRole("checkbox", { name: "Mark all groups" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "Mark all data" })).toBeChecked()
     expect(screen.getByRole("button", { name: "Renamed from Dr.XAS" })).toBeInTheDocument()
     expect(screen.getByText(/Explained variance:/)).toBeInTheDocument()
     expect(plotProps().groups).toHaveLength(project.groups.length)
@@ -3795,7 +3828,7 @@ describe("AthenaWorkbench bulk marking and freezing", () => {
       version: project.version + 1, action: "undo", group_ids: [], options: {},
     })
     expect(wavelet.mock.calls.at(-1)?.[0].dataVersion).toBe(project.version + 2)
-    expect(screen.getByRole("checkbox", { name: "Mark all groups" })).not.toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "Mark all data" })).not.toBeChecked()
   })
 
   it.each(["stale", "missing group", "wrong order", "invalid flag"])("rejects a %s compact response without replacing current data", async kind => {
@@ -3806,7 +3839,7 @@ describe("AthenaWorkbench bulk marking and freezing", () => {
     if (kind === "wrong order") update.groups.reverse()
     if (kind === "invalid flag") update.groups[0].marked = "true" as unknown as boolean
     api.mockResolvedValueOnce(update)
-    fireEvent.click(screen.getByRole("checkbox", { name: "Mark all groups" }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark all data" }))
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("selection response does not match"))
     expect(plotProps().groups.map(g => g.id)).toEqual(["sample", "oxide"])
     expect(vi.mocked(AthenaWavelet).mock.calls.at(-1)?.[0]).toMatchObject({ version: project.version, dataVersion: project.version })
@@ -3818,7 +3851,7 @@ describe("AthenaWorkbench bulk marking and freezing", () => {
     await openSaved(project)
     editNumber(/^Rbkg/, 1.8)
     const applied = await finishParameterDrafts(project, [{ groupId: "foil", options: { rbkg: 1.8 } }])
-    fireEvent.change(screen.getByRole("textbox", { name: "Search groups" }), { target: { value: "Foil" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "Foil" } })
     const dialog = await openGroupControls()
     const updated = nextProject(applied, Object.fromEntries(applied.groups.map(g => [g.id, { marked: label === "Invert marks" ? !g.marked : label === "Mark all" }])))
     api.mockResolvedValueOnce(updated)
@@ -4273,7 +4306,7 @@ describe("AthenaWorkbench batch import", () => {
     fireEvent.click(view.getByText('Rebin quick scans', { exact: true }))
     expect(view.getByLabelText('Perform rebinning')).toBeChecked()
     expect(view.getByLabelText('Rebin pre-edge step · eV')).toHaveValue(7)
-    fireEvent.click(view.getByText('Preprocess imported groups', { exact: true }))
+    fireEvent.click(view.getByText('Preprocess imported data', { exact: true }))
     expect(view.getByLabelText('Mark each imported sample')).toBeChecked()
     api.mockResolvedValueOnce({ ...importedProject(project, 'remembered.dat'),
       import_preferences_warning: 'Spectra imported, but column choices could not be remembered for the next import.' })
@@ -4573,7 +4606,7 @@ describe("AthenaWorkbench project loading", () => {
     await openSaved()
     const sidebar = document.querySelector<HTMLElement>("#athena-data-groups")!
     const actions = within(sidebar).getByRole("group", { name: "Project actions" })
-    const search = within(sidebar).getByRole("textbox", { name: "Search groups" })
+    const search = within(sidebar).getByRole("textbox", { name: "Search data" })
 
     expect(within(actions).getByRole("button", { name: "Open project" })).toBeEnabled()
     expect(within(actions).getByRole("button", { name: "Project journal" })).toBeEnabled()
@@ -4737,7 +4770,7 @@ describe("AthenaWorkbench project import integration", () => {
     const panelProps = () => projectImport.mock.calls.at(-1)![0]
     await waitFor(() => expect(panelProps().disabled).toBe(false))
     expect(panelProps().getProject()).toBe(project)
-    act(() => panelProps().onBusyChange("Importing project groups"))
+    act(() => panelProps().onBusyChange("Importing project data"))
     expect(panelProps().disabled).toBe(true)
     fireEvent.click(within(dialog).getByRole("button", { name: "Close dialog" }))
     const escape = new Event("cancel", { bubbles: false, cancelable: true })
@@ -4760,7 +4793,7 @@ describe("AthenaWorkbench project import integration", () => {
     expect(api.mock.calls).toEqual([[`/projects/${project.id}`], ["/projects"]])
   })
 
-  it.each([true, false])("offers marked-only export only when marked groups exist (%s)", async hasMarks => {
+  it.each([true, false])("offers marked-only export only when marked data exist (%s)", async hasMarks => {
     const project = projectFixture()
     if (!hasMarks) project.groups.forEach(g => { g.marked = false })
     await openSaved(project)
@@ -5075,7 +5108,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     expect(project).toEqual(before)
   })
 
-  it("retains per-spectrum saved viewer weights when selected groups have different weights", async () => {
+  it("retains per-spectrum saved viewer weights when selected data have different weights", async () => {
     const initial = projectFixture()
     initial.groups[1].result!.effective.kweight = 1
     initial.groups[2].result!.effective.kweight = 3
@@ -5332,10 +5365,10 @@ describe("AthenaWorkbench group selection and drafts", () => {
     const next = nextProject(project, { sample: { parameters: { ...applied, energy_shift: -3 } } })
     next.last_operation = { action: "copy_parameters", skipped_group_ids: ["oxide"] }
     api.mockResolvedValueOnce(next)
-    fireEvent.click(screen.getByRole("checkbox", { name: /^Apply to marked groups/i }))
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Apply to marked data/i }))
     fireEvent.click(screen.getByRole("checkbox", { name: "Show instruction" }))
     fireEvent.focus(screen.getByRole("button", { name: "About Automatic processing" }))
-    expect(screen.getByText(/Frozen groups are skipped.*Energy shifts are preserved/i)).toBeVisible()
+    expect(screen.getByText(/Frozen data are skipped.*Energy shifts are preserved/i)).toBeVisible()
     editNumber(/^Rbkg/, 2.2)
     editNumber(/^Energy shift/, 9)
     selectGroup("Unused reference")
@@ -5345,7 +5378,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
       options: { source_id: "foil", section: "all", values: applied },
     })
     expect(plotProps().active).toEqual(next.groups[3])
-    expect(screen.getByRole("status")).toHaveTextContent("1 group skipped")
+    expect(screen.getByRole("status")).toHaveTextContent("1 data item skipped")
     selectGroup("Sample scan")
     expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toHaveValue(2.2)
     expect(screen.getByRole("spinbutton", { name: /^Energy shift/ })).toHaveValue(-3)
@@ -5469,7 +5502,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     const changedElsewhere = nextProject(project, { foil: { label: "Foil scan (edited elsewhere)" } })
     api.mockRejectedValueOnce(new ApiRequestError({
       code: "stale_revision", message: "This project changed in another tab. Reload it before editing.",
-      fields: [], recovery: "Review the selected groups and values, then retry.",
+      fields: [], recovery: "Review the selected data and values, then retry.",
     }, 409))
     api.mockResolvedValueOnce(changedElsewhere)
     vi.useFakeTimers()
@@ -5501,7 +5534,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     })
     api.mockRejectedValueOnce(new ApiRequestError({
       code: "stale_revision", message: "This project changed in another tab. Reload it before editing.",
-      fields: [], recovery: "Review the selected groups and values, then retry.",
+      fields: [], recovery: "Review the selected data and values, then retry.",
     }, 409))
     api.mockResolvedValueOnce(changedElsewhere)
     vi.useFakeTimers()
@@ -5538,7 +5571,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     })
     api.mockRejectedValueOnce(new ApiRequestError({
       code: "stale_revision", message: "This project changed in another tab. Reload it before editing.",
-      fields: [], recovery: "Review the selected groups and values, then retry.",
+      fields: [], recovery: "Review the selected data and values, then retry.",
     }, 409))
     api.mockResolvedValueOnce(changedElsewhere)
     vi.useFakeTimers()
@@ -5556,7 +5589,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     await openSaved()
     api.mockRejectedValueOnce(new ApiRequestError({
       code: "stale_revision", message: "This project changed in another tab. Reload it before editing.",
-      fields: [], recovery: "Review the selected groups and values, then retry.",
+      fields: [], recovery: "Review the selected data and values, then retry.",
     }, 409))
     api.mockRejectedValueOnce(new TypeError("offline"))
     vi.useFakeTimers()
@@ -5648,7 +5681,7 @@ describe("AthenaWorkbench parameter copy and reset", () => {
       version: processed.version, action: "copy_parameters", group_ids: project.groups.map(g => g.id),
       options: { source_id: "foil", section: "background", values: draft },
     })
-    expect(screen.getByRole("status")).toHaveTextContent("2 groups skipped")
+    expect(screen.getByRole("status")).toHaveTextContent("2 data items skipped")
     expect(screen.getByRole("spinbutton", { name: /^E₀/ })).toHaveValue(8982)
     selectGroup("Sample scan")
     expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toHaveValue(2.3)
@@ -5722,15 +5755,15 @@ describe("AthenaWorkbench parameter copy and reset", () => {
     expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
   })
 
-  it("resets a single parameter on marked groups without changing the source or frozen saved values", async () => {
+  it("resets a single parameter on marked data without changing the source or frozen saved values", async () => {
     const project = await openSaved()
     selectGroup("Oxide standard")
     editNumber(/^Rbkg/, 4)
     const oxideApplied = await finishParameterDrafts(project, [{ groupId: "oxide", options: { rbkg: 4 } }])
     const frozen = nextProject(oxideApplied, { oxide: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole("button", { name: /^Freeze group$/i }))
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Unfreeze group$/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole("button", { name: /^Freeze data$/i }))
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Unfreeze data$/i })).toBeEnabled())
     selectGroup("Foil scan")
     editNumber(/^Rbkg/, 2.9)
     const processed = await finishParameterDrafts(frozen, [{ groupId: "foil", options: { rbkg: 2.9 } }])
@@ -5745,7 +5778,7 @@ describe("AthenaWorkbench parameter copy and reset", () => {
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: processed.version, action: "reset_parameters", group_ids: ["sample", "oxide"], options: { parameter: "rbkg" },
     })
-    expect(screen.getByRole("status")).toHaveTextContent("1 group skipped")
+    expect(screen.getByRole("status")).toHaveTextContent("1 data item skipped")
     expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toHaveValue(2.9)
     selectGroup("Sample scan")
     expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toHaveValue(1)
@@ -5765,7 +5798,7 @@ describe("AthenaWorkbench parameter copy and reset", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("Reset could not be processed")
     expect(within(dialog).getByRole("combobox", { name: "Parameters to change" })).toHaveValue("normalization")
-    expect(within(dialog).getByRole("combobox", { name: "Destination groups" })).toHaveValue("all")
+    expect(within(dialog).getByRole("combobox", { name: "Destination data" })).toHaveValue("all")
     expect(plotProps().active).toEqual(applied.groups[0])
     const next = { ...applied, version: applied.version + 1, groups: applied.groups.map(g => ({
       ...g, parameters: { ...g.parameters, e0: null },
@@ -5794,7 +5827,7 @@ describe("AthenaWorkbench parameter copy and reset", () => {
     const dialog = await openParameterDialog()
     expect(within(dialog).getByRole("button", { name: /^Copy parameters$/i })).toBeDisabled()
     expect(within(dialog).getByRole("button", { name: /reset to defaults/i })).toBeDisabled()
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "Destination groups" }), { target: { value: "all" } })
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Destination data" }), { target: { value: "all" } })
     expect(within(dialog).getByRole("button", { name: /^Copy parameters$/i })).toBeEnabled()
     expect(within(dialog).getByRole("button", { name: /reset to defaults/i })).toBeEnabled()
     fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }))
@@ -5810,17 +5843,17 @@ function serveMerge(project:AthenaProject){
     return path.endsWith('/command')?mergeSaved(project,v):v
   })
 }
-async function readyMerge(dialog:HTMLElement){await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Save merged groups'})).toBeEnabled(),{timeout:2500})}
-async function saveMerge(dialog:HTMLElement){fireEvent.click(within(dialog).getByRole('button',{name:'Save merged groups'}));await within(dialog).findByText('Merge saved. The source spectra are unchanged.');fireEvent.click(within(dialog).getByRole('button',{name:'Close merge result'}))}
+async function readyMerge(dialog:HTMLElement){await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Save merged data'})).toBeEnabled(),{timeout:2500})}
+async function saveMerge(dialog:HTMLElement){fireEvent.click(within(dialog).getByRole('button',{name:'Save merged data'}));await within(dialog).findByText('Merge saved. The source spectra are unchanged.');fireEvent.click(within(dialog).getByRole('button',{name:'Close merge result'}))}
 
 describe("AthenaWorkbench weighted combinations", () => {
   it('opens each native merge shortcut in its requested space and ignores text editing',async()=>{
     const project=await openSaved();serveMerge(project)
-    fireEvent.keyDown(screen.getByRole('textbox',{name:'Search groups'}),{key:'M',ctrlKey:true,shiftKey:true})
-    expect(screen.queryByRole('dialog',{name:'Merge marked groups'})).not.toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('textbox',{name:'Search data'}),{key:'M',ctrlKey:true,shiftKey:true})
+    expect(screen.queryByRole('dialog',{name:'Merge marked data'})).not.toBeInTheDocument()
     for(const [key,array] of [['M','mu'],['N','norm'],['C','chi']]){
       fireEvent.keyDown(document.body,{key,ctrlKey:true,shiftKey:true})
-      const dialog=await screen.findByRole('dialog',{name:'Merge marked groups'})
+      const dialog=await screen.findByRole('dialog',{name:'Merge marked data'})
       expect(within(dialog).getByLabelText('Merge as')).toHaveValue(array)
       fireEvent.keyDown(document.body,{key:'M',ctrlKey:true,shiftKey:true})
       expect(within(dialog).getByLabelText('Merge as')).toHaveValue(array)
@@ -5838,12 +5871,12 @@ describe("AthenaWorkbench weighted combinations", () => {
       if(!pressed){pressed=true;document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'M',ctrlKey:true,shiftKey:true,bubbles:true}))}
     })
     serveMerge(project)
-    await screen.findByRole('dialog',{name:'Merge marked groups'})
+    await screen.findByRole('dialog',{name:'Merge marked data'})
   })
   it("keeps relative merge weights paired with marked IDs in the saved list order", async () => {
     const initial=projectFixture();initial.groups=[initial.groups[0],initial.groups[2],initial.groups[1],initial.groups[3]]
     const project=await openSaved(initial);serveMerge(project);selectGroup('Unused reference')
-    const dialog=await openTool('Process',/merge marked groups/i)
+    const dialog=await openTool('Process',/merge marked data/i)
     fireEvent.change(within(dialog).getByLabelText('Merge as'),{target:{value:'norm'}})
     editNumber(/^Importance: Oxide standard$/,3,dialog);editNumber(/^Importance: Sample scan$/,1,dialog);await readyMerge(dialog)
     await saveMerge(dialog)
@@ -5855,7 +5888,7 @@ describe("AthenaWorkbench weighted combinations", () => {
     const initial = projectFixture()
     initial.groups[0].marked = true
     const project = await openSaved(initial)
-    const dialog = await openTool("Process", /sum marked groups/i)
+    const dialog = await openTool("Process", /sum marked data/i)
     expect(within(dialog).getAllByRole("spinbutton").map(input => (input as HTMLInputElement).value)).toEqual(["1", "1", "1"])
     expect(within(dialog).getByRole("combobox", { name: /signal to combine/i })).toHaveValue("")
     editNumber(/^Coefficient: Foil scan$/, 2, dialog)
@@ -5871,7 +5904,7 @@ describe("AthenaWorkbench weighted combinations", () => {
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: "sum", group_ids: ["foil", "sample", "oxide"], options: { weights: [2, -1.5, 0], array: "mu" },
     })
-    const reopened = await openTool("Process", /sum marked groups/i)
+    const reopened = await openTool("Process", /sum marked data/i)
     for (const input of within(reopened).getAllByRole("spinbutton")) expect(input).toHaveValue(1)
     expect(within(reopened).getByRole("combobox", { name: /signal to combine/i })).toHaveValue("")
     api.mockResolvedValueOnce(importedProject(next, "default-sum"))
@@ -5889,10 +5922,10 @@ describe("AthenaWorkbench weighted combinations", () => {
     api.mockResolvedValueOnce(applied);editNumber(/^Rbkg/,2.9)
     await waitForCommand(project.id,{version:project.version,action:'parameters',group_ids:['foil'],options:{rbkg:2.9}})
     serveMerge(applied)
-    const dialog=await openTool('Process',/merge marked groups/i)
+    const dialog=await openTool('Process',/merge marked data/i)
     editNumber(/^Importance: Sample scan$/,weights[0],dialog);editNumber(/^Importance: Oxide standard$/,weights[1],dialog)
     if(weights[0]===0)expect(await within(dialog).findByRole('alert')).toHaveTextContent('positive total')
-    expect(within(dialog).getByRole('button',{name:'Save merged groups'})).toBeDisabled()
+    expect(within(dialog).getByRole('button',{name:'Save merged data'})).toBeDisabled()
     expect(within(dialog).getByLabelText('Importance: Sample scan')).toHaveValue(weights[0])
     expect(api.mock.calls.some(([path,body])=>path.endsWith('/command')&&(body as {action?:string}|undefined)?.action==='merge')).toBe(false)
     editNumber(/^Importance: Sample scan$/,3,dialog);editNumber(/^Importance: Oxide standard$/,1,dialog);await readyMerge(dialog);await saveMerge(dialog)
@@ -5901,7 +5934,7 @@ describe("AthenaWorkbench weighted combinations", () => {
 
   it("reports an empty coefficient instead of silently treating it as zero or one", async () => {
     await openSaved()
-    const dialog = await openTool("Process", /sum marked groups/i)
+    const dialog = await openTool("Process", /sum marked data/i)
     editNumber(/^Coefficient: Sample scan$/, "", dialog)
     fireEvent.click(within(dialog).getByRole("button", { name: /^Apply$/i }))
 
@@ -5918,18 +5951,18 @@ describe("AthenaWorkbench weighted combinations", () => {
 
   it('offers chi for marked processed EXAFS with overlapping grids, including mixed input types',async()=>{
     const initial=withExafs(projectFixture());initial.groups[2].data_type='chi'
-    const project=await openSaved(initial);serveMerge(project);const dialog=await openTool('Process',/merge marked groups/i)
+    const project=await openSaved(initial);serveMerge(project);const dialog=await openTool('Process',/merge marked data/i)
     fireEvent.change(within(dialog).getByLabelText('Merge as'),{target:{value:'chi'}});await readyMerge(dialog);await saveMerge(dialog)
     expect(api.mock.calls.findLast(([path])=>path.endsWith('/command'))?.[1]).toEqual(expect.objectContaining({group_ids:['sample','oxide'],options:expect.objectContaining({array:'chi',weights:{sample:1,oxide:1}})}))
   })
 
-  it.each(["missing chi", "disjoint grids", "XANES data"])("disables chi when a marked group has %s", async condition => {
+  it.each(["missing chi", "disjoint grids", "XANES data"])("disables chi when a marked data has %s", async condition => {
     const project = withExafs(projectFixture())
     if (condition === "missing chi") project.groups[2].result!.arrays.chi = []
     if (condition === "disjoint grids") project.groups[2].result!.arrays.k = [4, 5, 6]
     if (condition === "XANES data") project.groups[2].data_type = "xanes"
     await openSaved(project)
-    const dialog = await openTool("Process", /sum marked groups/i)
+    const dialog = await openTool("Process", /sum marked data/i)
 
     expect(within(dialog).getByRole("option", { name: "χ(k)" })).toBeDisabled()
     fireEvent.click(screen.getByRole("checkbox", { name: "Show instruction" }))
@@ -5941,7 +5974,7 @@ describe("AthenaWorkbench weighted combinations", () => {
 
   it("keeps difference options independent of a previously edited sum dialog", async () => {
     const project = await openSaved()
-    const sum = await openTool("Process", /sum marked groups/i)
+    const sum = await openTool("Process", /sum marked data/i)
     editNumber(/^Coefficient: Sample scan$/, -2, sum)
     fireEvent.change(within(sum).getByRole("combobox", { name: /signal to combine/i }), { target: { value: "norm" } })
     fireEvent.click(within(sum).getByRole("button", { name: /cancel/i }))
@@ -5951,21 +5984,21 @@ describe("AthenaWorkbench weighted combinations", () => {
     const preview = differencePreview(project, ["foil"], { standard_id: "oxide" })
     api.mockResolvedValueOnce(preview)
     fireEvent.click(within(difference).getByRole("button", { name: "Preview difference" }))
-    await waitFor(() => expect(within(difference).getByRole("button", { name: "Save difference groups" })).toBeEnabled())
+    await waitFor(() => expect(within(difference).getByRole("button", { name: "Save difference data" })).toBeEnabled())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/difference/preview`, {
       version: project.version, action: "difference", group_ids: ["foil"], options: { ...differenceOptions, standard_id: "oxide" },
     })
     expect(plotProps().active?.id).toBe("foil")
     const next = differenceSaved(project, preview)
     api.mockResolvedValueOnce(next)
-    fireEvent.click(within(difference).getByRole("button", { name: "Save difference groups" }))
+    fireEvent.click(within(difference).getByRole("button", { name: "Save difference data" }))
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: "difference", group_ids: ["foil"], options: preview.options,
     })
     expect(plotProps().active?.id).toBe("diff-foil")
-    expect(screen.getByRole("status")).toHaveTextContent("Difference groups saved · 1 created")
+    expect(screen.getByRole("status")).toHaveTextContent("Difference data saved · 1 created")
   })
 
   it("previews marked differences after processing edits and preserves source data on save", async () => {
@@ -5985,12 +6018,12 @@ describe("AthenaWorkbench weighted combinations", () => {
     const preview = differencePreview(processed, ["sample", "oxide"], { standard_id: "unused" })
     api.mockResolvedValueOnce(preview)
     fireEvent.click(view.getByRole("button", { name: "Preview difference" }))
-    await waitFor(() => expect(view.getByRole("button", { name: "Save difference groups" })).toBeEnabled())
+    await waitFor(() => expect(view.getByRole("button", { name: "Save difference data" })).toBeEnabled())
     expect(api.mock.calls.at(-1)?.[1]).toEqual({ version: processed.version, action: "difference", group_ids: ["sample", "oxide"], options: preview.options })
     expect(plotProps().active?.parameters.rbkg).toBe(3.1)
     const next = differenceSaved(processed, preview)
     api.mockResolvedValueOnce(next)
-    fireEvent.click(view.getByRole("button", { name: "Save difference groups" }))
+    fireEvent.click(view.getByRole("button", { name: "Save difference data" }))
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(plotProps().active?.id).toBe("diff-oxide")
     selectGroup("Sample scan")
@@ -6006,7 +6039,7 @@ describe("AthenaWorkbench weighted combinations", () => {
 })
 
 describe("AthenaWorkbench reference ties", () => {
-  it("ties exactly two marked groups in list order and unties the active reference using the accepted revision", async () => {
+  it("ties exactly two marked data in list order and unties the active reference using the accepted revision", async () => {
     const initial = projectFixture()
     initial.groups = [initial.groups[0], initial.groups[2], initial.groups[1], initial.groups[3]]
     initial.groups[1].parameters.energy_shift = 2.5
@@ -6019,7 +6052,7 @@ describe("AthenaWorkbench reference ties", () => {
     api.mockResolvedValueOnce(tied)
     openGroupMenu()
     fireEvent.click(screen.getByRole("checkbox", { name: "Show instruction" }))
-    fireEvent.focus(screen.getByRole("button", { name: "About Group references" }))
+    fireEvent.focus(screen.getByRole("button", { name: "About Data references" }))
     expect(screen.getByText(/keeps both shifts linked when either is edited/i)).toBeVisible()
     expect(screen.getByText(/Sample: Oxide standard/)).toBeVisible()
     fireEvent.click(screen.getByRole("button", { name: /^Tie marked sample and reference$/i }))
@@ -6043,7 +6076,7 @@ describe("AthenaWorkbench reference ties", () => {
     expect(plotProps().active).toEqual(untied.groups[2])
   })
 
-  it.each([0, 1, 3])("does not allow tying %i marked groups", async count => {
+  it.each([0, 1, 3])("does not allow tying %i marked data", async count => {
     const project = projectFixture()
     project.groups.forEach((g, index) => { g.marked = index < count })
     await openSaved(project)
@@ -6099,8 +6132,8 @@ describe("AthenaWorkbench tools and analysis dialogs", () => {
     expect(plotProps().active).toEqual(next.groups[3])
   })
 
-  it('merges marked groups in list order and selects the returned derived group',async()=>{
-    const project=await openSaved();serveMerge(project);const dialog=await openTool('Process',/merge marked groups/i)
+  it('merges marked data in list order and selects the returned derived group',async()=>{
+    const project=await openSaved();serveMerge(project);const dialog=await openTool('Process',/merge marked data/i)
     expect(within(dialog).getByLabelText('Merge as')).toHaveValue('mu')
     expect(within(dialog).getByLabelText('Importance: Sample scan')).toHaveValue(1)
     await readyMerge(dialog);await saveMerge(dialog)
@@ -6196,7 +6229,7 @@ describe("AthenaWorkbench tools and analysis dialogs", () => {
     expect(screen.getByRole("checkbox", { name: "Mark Unused reference" })).not.toBeChecked()
   })
 
-  it("adds, edits and removes peaks, then submits the remaining model for only the current group", async () => {
+  it("adds, edits and removes peaks, then submits the remaining model for only the current data", async () => {
     const project = await openSaved()
     const dialog = await openTool("Analysis", /xanes peak fitting/i)
     editNumber(/^Range maximum/, 9010, dialog)
@@ -6329,10 +6362,10 @@ describe('Athena processing settings', () => {
     else { expect(e0).toBeEnabled(); expect(kmin).toBeDisabled() }
     expect(rbkg).toBeDisabled()
   })
-  it('cancels without writes and lets the user choose another current group', async () => {
+  it('cancels without writes and lets the user choose another current data', async () => {
     await openSaved()
     const panel = await dialog(); const calls = api.mock.calls.length
-    fireEvent.change(within(panel).getByRole('combobox', { name: 'Current group' }), { target: { value: 'sample' } })
+    fireEvent.change(within(panel).getByRole('combobox', { name: 'Current data' }), { target: { value: 'sample' } })
     fireEvent.click(within(panel).getByRole('button', { name: 'Cancel' }))
     expect(api).toHaveBeenCalledTimes(calls)
     expect(plotProps().active?.id).toBe('sample')
@@ -6347,7 +6380,7 @@ describe('Athena processing settings', () => {
     fireEvent.change(within(panel).getByRole('combobox', { name: 'Apply settings to' }), { target: { value: 'marked' } })
     expect(apply).toBeDisabled()
     fireEvent.change(within(panel).getByRole('combobox', { name: 'Apply settings to' }), { target: { value: 'all' } })
-    expect(within(panel).getByText('2 eligible of 4 selected groups')).toBeVisible()
+    expect(within(panel).getByText('2 eligible of 4 selected data')).toBeVisible()
     expect(apply).toBeEnabled()
   })
   it('shows a rejected request and retains the form for correction', async () => {
@@ -6390,13 +6423,13 @@ describe('Athena processing settings', () => {
     expect(plotProps().active?.is_normalized).toBe(true)
     expect(plotProps().active?.frozen).toBe(true)
   })
-  it('loads both saved settings when selecting another current group', async () => {
+  it('loads both saved settings when selecting another current data', async () => {
     const p = projectFixture(); p.groups[1].data_type = 'xanes'; p.groups[1].is_normalized = true
     await openSaved(p)
     const panel = await dialog()
     expect(within(panel).getByRole('checkbox', { name: 'Input already normalized' })).not.toBeChecked()
     expect(within(panel).getByRole('checkbox', { name: 'Enable EXAFS processing' })).toBeChecked()
-    fireEvent.change(within(panel).getByRole('combobox', { name: 'Current group' }), { target: { value: 'sample' } })
+    fireEvent.change(within(panel).getByRole('combobox', { name: 'Current data' }), { target: { value: 'sample' } })
     expect(within(panel).getByRole('checkbox', { name: 'Input already normalized' })).toBeChecked()
     expect(within(panel).getByRole('checkbox', { name: 'Enable EXAFS processing' })).not.toBeChecked()
   })
@@ -6867,7 +6900,7 @@ describe('Legacy detector records in the workbench', () => {
     const p = projectFixture(); p.groups[0].data_type = 'detector'; await openSaved(p)
     fireEvent.click(screen.getByRole('button', { name: 'Spectrum processing settings' }))
     const panel = await screen.findByRole('dialog', { name: 'Processing settings' })
-    expect(within(panel).getByText('1 eligible of 1 selected groups')).toBeVisible()
+    expect(within(panel).getByText('1 eligible of 1 selected data')).toBeVisible()
     expect(within(panel).getByRole('button', { name: 'Apply settings' })).toBeEnabled()
     expect(within(panel).getByRole('checkbox', { name: 'Input already normalized' })).not.toBeChecked()
     expect(within(panel).getByRole('checkbox', { name: 'Enable EXAFS processing' })).toBeChecked()

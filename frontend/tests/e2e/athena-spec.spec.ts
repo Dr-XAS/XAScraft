@@ -132,13 +132,13 @@ test('SPEC scan selection, actual column previews, both scans and PRJ roundtrip'
   await page.getByRole('button', { name: 'Open project', exact: true }).click()
   await page.getByLabel('Open project file', { exact: true }).setInputFiles(prj)
   const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-  await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await page.getByRole('button', { name: 'Import all data', exact: true }).click()
   const result = await (await restored).json(); expect(result.groups).toHaveLength(4)
   for (let i = 0; i < 2; i++) {
     expect(result.groups[i+2].source).toEqual(project.groups[i].source)
     expect(result.groups[i+2].result.arrays).toEqual(project.groups[i].result.arrays)
   }
-  await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 4\b/ })).toBeVisible()
+  await page.reload(); await expect(page.getByRole('heading', { name: /^Data 4\b/ })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -169,9 +169,9 @@ test('SPEC second-scan inspection retry preserves the first scan and continues i
   await expectSignal(dialog.getByLabel('Imported signal preview plot', { exact: true }), 1, true)
   await dialog.getByRole('button', { name: 'Import spectrum', exact: true }).click()
   const projectPanel = page.getByRole('dialog', { name: 'Open a project', exact: true })
-  await expect(projectPanel.getByRole('button', { name: 'Import all groups', exact: true })).toBeEnabled()
+  await expect(projectPanel.getByRole('button', { name: 'Import all data', exact: true })).toBeEnabled()
   expect(imports).toEqual(collection.scans.map(scan => scan.upload_id))
-  await projectPanel.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await projectPanel.getByRole('button', { name: 'Import all data', exact: true }).click()
   await expect(dialog.getByText('cu_10k.xmu', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
   // A flip is a concrete operand edit. A different column layout starts from
@@ -192,6 +192,6 @@ test('SPEC second-scan inspection retry preserves the first scan and continues i
   expect(project.groups[5].mu).toEqual(rawData.map(row => row[1]))
   expect(imports).toHaveLength(3)
   await expect(dialog).not.toBeVisible()
-  await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 6\b/ })).toBeVisible()
+  await page.reload(); await expect(page.getByRole('heading', { name: /^Data 6\b/ })).toBeVisible()
   expect(errors).toEqual([])
 })

@@ -299,7 +299,7 @@ it('warns before a series batch that cannot fit the project, saying how many fil
     reference_numerator: 'c2', reference_denominator: 'c1', additional_fluorescence: null, individual_channels: false }
   const existing = Array.from({ length: 50 }, () => ({ energy: [1, 2], source: {} }) as unknown as AthenaGroup)
   expect(batchCapacityWarning(mapping, inspection, existing, 29)).toBe(
-    'This batch would bring the project to 108 groups (2 per file, counting each reference); a project holds at most 100. '
+    'This batch would bring the project to 108 data (2 per file, counting each reference); a project holds at most 100. '
     + 'Only the first 25 of these 29 files fit: import the series into its own new project, or choose fewer files.')
   expect(batchCapacityWarning(mapping, inspection, [], 29)).toBeNull()
 })

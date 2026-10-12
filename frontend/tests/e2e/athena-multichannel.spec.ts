@@ -48,9 +48,9 @@ for (const reader of ['X23A2MultiChannel','10BMMultiChannel']) {
     const initial = await (await inspection).json(); expect(initial.kind).toBe('project')
     const dialog = page.getByRole('dialog', { name: 'Open a project', exact: true })
     const panel = dialog.getByRole('region', { name: 'Project file import', exact: true })
-    await expect(panel.getByRole('button', { name: 'Import all groups', exact: true })).toBeEnabled()
+    await expect(panel.getByRole('button', { name: 'Import all data', exact: true })).toBeEnabled()
     for (const [i,g] of expected.entries()) {
-      await panel.getByRole('button', { name: `Preview ${g.label}, group ${i+1}`, exact: true }).click()
+      await panel.getByRole('button', { name: `Preview ${g.label}, data ${i+1}`, exact: true }).click()
       await matches(panel.getByLabel(`Preview of ${g.label}`, { exact: true }), g)
     }
     if (reader === '10BMMultiChannel') {
@@ -86,11 +86,11 @@ for (const reader of ['X23A2MultiChannel','10BMMultiChannel']) {
       expect(updated.upload_id).not.toBe(initial.preview.upload_id)
       expected = oracle(next).groups
       for (const [i,g] of expected.entries()) {
-        await panel.getByRole('button', { name: `Preview ${g.label}, group ${i+1}`, exact: true }).click()
+        await panel.getByRole('button', { name: `Preview ${g.label}, data ${i+1}`, exact: true }).click()
         await matches(panel.getByLabel(`Preview of ${g.label}`, { exact: true }), g)
       }
     }
-    await panel.getByRole('button', { name: `Preview ${expected[0].label}, group 1`, exact: true }).click()
+    await panel.getByRole('button', { name: `Preview ${expected[0].label}, data 1`, exact: true }).click()
     const normalized = page.waitForResponse(r => r.url().includes('/groups/channel-1?mode=norm'))
     await panel.getByRole('combobox', { name: 'Preview signal' }).selectOption('norm')
     const norm = await (await normalized).json(); expect(norm.processing_error).toBeFalsy()
@@ -107,12 +107,12 @@ for (const reader of ['X23A2MultiChannel','10BMMultiChannel']) {
     }
     await panel.getByLabel(`Preview of ${expected[0].label}`, { exact: true }).scrollIntoViewIfNeeded()
     await dialog.screenshot({ path: info.outputPath('channel-preview.png') })
-    for (const button of await panel.getByRole('button', { name: /^Preview .*group/ }).all()) {
+    for (const button of await panel.getByRole('button', { name: /^Preview .*data/ }).all()) {
       expect(await button.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
     }
-    await panel.getByRole('checkbox', { name: `Import ${expected[1].label}, group 2`, exact: true }).uncheck()
+    await panel.getByRole('checkbox', { name: `Import ${expected[1].label}, data 2`, exact: true }).uncheck()
     const importing = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await panel.getByRole('button', { name: 'Import 3 selected groups', exact: true }).click()
+    await panel.getByRole('button', { name: 'Import 3 selected data', exact: true }).click()
     const imported = await importing; expect(imported.ok()).toBe(true)
     const project = await imported.json(); expect(project.groups).toHaveLength(3)
     for (const [i,g] of project.groups.entries()) {
@@ -137,13 +137,13 @@ for (const reader of ['X23A2MultiChannel','10BMMultiChannel']) {
     await page.getByRole('button', { name: 'Open project', exact: true }).click()
     await page.getByLabel('Open project file', { exact: true }).setInputFiles(prj)
     const restoring = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+    await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const restored = await (await restoring).json(); expect(restored.groups).toHaveLength(6)
     for (let i=0; i<3; i++) {
       expect(restored.groups[i+3].source).toEqual(project.groups[i].source)
       expect(restored.groups[i+3].result.arrays).toEqual(project.groups[i].result.arrays)
     }
-    await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 6\b/ })).toBeVisible()
+    await page.reload(); await expect(page.getByRole('heading', { name: /^Data 6\b/ })).toBeVisible()
     expect(errors).toEqual([])
   })
 }

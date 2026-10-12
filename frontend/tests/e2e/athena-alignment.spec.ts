@@ -78,7 +78,7 @@ for(const mobile of [false,true])test(`${mobile?'mobile':'desktop'} Cu column pr
   const download=page.waitForEvent('download');await page.getByRole("button", { name: "File", exact: true }).click(); await page.getByRole("button", { name: "Save Craft project (.prj)", exact: true }).click(); await confirmProjectSave(page);const path=info.outputPath('aligned-native.prj');await(await download).saveAs(path)
   const native=gunzipSync(readFileSync(path)).toString().split('\n').filter(l=>!l.startsWith('# Athena-Web ')).join('\n');expect(native).toContain('bkg_delta_eshift');writeFileSync(path,native)
   await page.getByRole('button',{name:'File',exact:true}).click();await page.getByRole('button',{name:'Open project…',exact:true}).click();await page.getByLabel('Open project file',{exact:true}).setInputFiles(path)
-  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all groups',exact:true}).click();const restoredResponse=await restoring;expect(restoredResponse.ok()).toBe(true)
+  const restoring=page.waitForResponse(r=>r.url().endsWith('/restore-upload'));await page.getByRole('button',{name:'Import all data',exact:true}).click();const restoredResponse=await restoring;expect(restoredResponse.ok()).toBe(true)
   const restored=(await restoredResponse.json()).groups.at(-1);expect(restored.parameters.energy_shift).toBe(-3.125);expect(restored.parameters.e0).toBe(saved.groups[1].parameters.e0)
   expect(restored.source.alignment.native_shift_stderr).toBe(v.rows[0].fit!.summary.native_shift_stderr);expect(errors).toEqual([])
 })

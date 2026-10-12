@@ -21,7 +21,7 @@ function preview(shift=122):MEEPreview {
       {role:'corrected',label:'LaCoO3 (MEE)',x:space==='E'?[5400,5500,5650]:[0,1,2],y:[0,.99,1.09]}]])) as MEEPreview['results'][0]['traces'],
   }]}
 }
-const saveButton = () => screen.getByRole('button',{name:'Make group from MEE-corrected data'})
+const saveButton = () => screen.getByRole('button',{name:'Save MEE-corrected data'})
 const handoff = () => plot.mock.calls.at(-1)![0]
 async function ready(){await waitFor(()=>expect(saveButton()).toBeEnabled(),{timeout:2000})}
 function shift(value='122'){fireEvent.change(screen.getByLabelText('Energy shift (eV)'),{target:{value}})}

@@ -128,11 +128,11 @@ for (const name of ['X15B', 'X23A2MED']) {
     await page.getByRole('button', { name: 'Open project', exact: true }).click()
     await page.getByLabel('Open project file', { exact: true }).setInputFiles(prj)
     const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+    await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const restoredProject = await (await restored).json()
     expect(restoredProject.groups[1].source).toEqual(group.source)
     expect(restoredProject.groups[1].result.arrays).toEqual(group.result.arrays)
-    await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+    await page.reload(); await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
     panel = await registry(page); editor = await configure(panel, name)
     await expect(editor.getByRole(name === 'X15B' ? 'spinbutton' : 'combobox', {
       name: name === 'X15B' ? 'I0 column' : 'Integration time source', exact: true,

@@ -436,13 +436,13 @@ describe("AthenaPlot range overrides", () => {
   it("explains an empty selection when a highlighted spectrum is available", () => {
     show({ groups: [], active: group(), plotScope: "selected" })
     expect(screen.getByRole("heading", { name: "No spectra selected" })).toBeInTheDocument()
-    expect(screen.getByText("Check data groups to compare spectra. The Single spectrum viewer shows the highlighted group.")).toBeInTheDocument()
+    expect(screen.getByText("Check data to compare spectra. The Single spectrum viewer shows the highlighted data.")).toBeInTheDocument()
     expect(plotly).not.toHaveBeenCalled()
   })
 })
 
 describe("AthenaPlot backgrounds and displayed groups", () => {
-  it("gives only the active background the same multiplier, group offset, and stack offset as the signal", () => {
+  it("gives only the active background the same multiplier, data offset, and stack offset as the signal", () => {
     const sample = group("Scaled")
     sample.multiplier = 2
     sample.offset = 3
@@ -604,7 +604,7 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
     expect(handoff().data[0].x).toEqual([8960, 8980, 9000])
   })
 
-  it("interpolates bounds on current raw mu and applies multiplier, group offset, and stack offset once", () => {
+  it("interpolates bounds on current raw mu and applies multiplier, data offset, and stack offset once", () => {
     const sample = group("Scaled")
     sample.multiplier = 2
     sample.offset = 3

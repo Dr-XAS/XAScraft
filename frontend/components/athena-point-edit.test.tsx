@@ -116,12 +116,12 @@ it('uses signal-unit margin defaults, plots limits, plucks relative E0 and rejec
 
 it('submits marked truncation with a floor anchor and preserves controls in its draft',async()=>{
   const p=props(),second={...project.groups[0],id:'second',label:'Frozen',frozen:true};p.project={...project,groups:[...project.groups,second]}
-  api.mockImplementation(async(_path,body)=>{const options=(body as {options:Options}).options;const r=preview(options);if(options.scope==='marked')r.skipped_reasons={second:'Unfreeze this group'};return r})
+  api.mockImplementation(async(_path,body)=>{const options=(body as {options:Options}).options;const r=preview(options);if(options.scope==='marked')r.skipped_reasons={second:'Unfreeze this data'};return r})
   render(<AthenaPointEdit {...p} initialMode="truncate"/>);
   change('Cutoff energy · eV','7033.6');change('Apply to','marked')
   const save=screen.getByRole('button',{name:'Truncate data'});await waitFor(()=>expect(save).toBeEnabled())
   expect(screen.getByText(/Cutoff anchor: 7033 eV/)).toBeVisible()
-  expect(screen.getByText('Frozen: Unfreeze this group')).toBeVisible()
+  expect(screen.getByText('Frozen: Unfreeze this data')).toBeVisible()
   expect(api.mock.calls.at(-1)?.[1]).toEqual({version:4,action:'truncate',group_ids:['g','second'],options:{mode:'truncate',side:'after',value:7033.6,scope:'marked'}})
   expect(p.rememberDraft).toHaveBeenLastCalledWith(expect.objectContaining({value:'7033.6',scope:'marked'}))
 })

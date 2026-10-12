@@ -88,7 +88,7 @@ it('limits replacement to one existing group while retaining column, signal and 
   expect(screen.getByRole('button', { name: 'Apply column changes' })).toBeEnabled()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   expect(screen.queryByRole('option', { name: 'Transmission + fluorescence' })).not.toBeInTheDocument()
-  expect(screen.queryByLabelText('Save each channel as its own group')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Save each channel as a separate data item')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('reference numerator')).not.toBeInTheDocument()
   expect(screen.queryByText('Reference channel & ordering')).not.toBeInTheDocument()
   expect(screen.queryByText('Preprocessing')).not.toBeInTheDocument()
@@ -129,7 +129,7 @@ it('imports both modes with independent detector columns and signal scales', () 
     additional_fluorescence: { numerator: ['c3', 'c4'], denominator: 'c1', invert: false, signal_multiplier: 0.5 } })
   expect(screen.getByText('μ(E) = ln(|(i0) / (it)|)')).toBeInTheDocument()
   expect(screen.getByText('μ(E) = 0.5 × (detA + detB) / (i0)')).toBeInTheDocument()
-  fireEvent.click(screen.getByLabelText('Save each fluorescence channel as its own group'))
+  fireEvent.click(screen.getByLabelText('Save each fluorescence channel as a separate data item'))
   expect(accepted().additional_fluorescence.individual_channels).toBe(true)
   expect(accepted().individual_channels).toBeFalsy()
 })
@@ -226,7 +226,7 @@ it('freezes all additional fluorescence controls during import', () => {
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
   rerender(<Harness busy inspection={{ plugin_suggestions: readerSuggestions }} />)
   for (const label of ['Fluorescence numerator detA', 'Fluorescence denominator i0',
-    'Fluorescence multiplicative constant', 'Save each fluorescence channel as its own group']) {
+    'Fluorescence multiplicative constant', 'Save each fluorescence channel as a separate data item']) {
     expect(screen.getByLabelText(label)).toBeDisabled()
   }
   expect(screen.getByRole('button', { name: 'Flip fluorescence numerator and denominator' })).toBeDisabled()
@@ -273,7 +273,7 @@ it('applies native transmission/fluorescence suggestions only on request and pre
   expect(accepted()).toEqual(initial)
   fireEvent.click(screen.getByLabelText('Input already normalized'))
   fireEvent.change(screen.getByLabelText('reference numerator'), { target: { value: 'c2' } })
-  fireEvent.click(screen.getByLabelText('Save each channel as its own group'))
+  fireEvent.click(screen.getByLabelText('Save each channel as a separate data item'))
   fireEvent.click(screen.getByRole('button', { name: 'Use fluorescence columns' }))
   expect(accepted()).toMatchObject({ numerator: ['c3'], denominator: 'c1', mode: 'fluorescence', units: 'eV',
     data_type: 'norm', is_normalized: true, exafs: null, individual_channels: false, reference_numerator: 'c2' })
@@ -371,7 +371,7 @@ it("adds a range to selected numerator buttons, skips energy, and clears all on 
 })
 it("sends individual-channel and reference toggles and clears references for chi", () => {
   render(<Harness />)
-  fireEvent.click(screen.getByLabelText("Save each channel as its own group"))
+  fireEvent.click(screen.getByLabelText("Save each channel as a separate data item"))
   fireEvent.change(screen.getByLabelText("reference numerator"), { target: { value: "c2" } })
   fireEvent.change(screen.getByLabelText("reference denominator"), { target: { value: "c5" } })
   fireEvent.click(screen.getByLabelText("Reference natural log"))

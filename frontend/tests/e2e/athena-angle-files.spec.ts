@@ -126,12 +126,12 @@ for (const { name, reader } of samples) {
     await page.getByRole('button', { name: 'Open project', exact: true }).click()
     await page.getByLabel('Open project file', { exact: true }).setInputFiles(prj)
     const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+    await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const result = await (await restored).json()
     expect(result.groups).toHaveLength(2)
     expect(result.groups[1].source).toEqual(group.source)
     expect(result.groups[1].result.arrays).toEqual(group.result.arrays)
-    await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+    await page.reload(); await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
     if (name === 'pfbl12c') {
       // The native converter accepts a missing D with 2D=1. Show that fallback
       // explicitly and verify its preview without accepting the altered data.
@@ -145,7 +145,7 @@ for (const { name, reader } of samples) {
       await dialog.getByLabel('File conversion').scrollIntoViewIfNeeded()
       await dialog.screenshot({ path: info.outputPath('pf-default-spacing.png') })
       await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
-      await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
     }
     expect(errors).toEqual([])
   })

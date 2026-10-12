@@ -151,7 +151,7 @@ it('clears a stale preview when the request fails',async()=>{
   await click('Fit preview')
   expect(screen.queryAllByTestId('plot')).toHaveLength(0)
   expect(screen.getByRole('alert')).toHaveTextContent('The calibration did not converge.')
-  expect(screen.getByRole('button',{name:'Make fluorescence XAS group'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Make fluorescence XAS data'})).toBeDisabled()
 })
 
 it('reports the pre-edge, the post-edge and detector agreement with a pass or fail',async()=>{
@@ -233,17 +233,17 @@ it('names the detector elements it left out of the agreement check',async()=>{
 
 it('disables export until a preview has arrived',async()=>{
   render(<Harness/>);await tick()
-  expect(screen.queryByRole('button',{name:'Make fluorescence XAS group'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Make fluorescence XAS data'})).not.toBeInTheDocument()
   await upload()
   // No target element yet, so there is nothing to fit and nothing to export.
   expect(screen.getByRole('button',{name:'Fit preview'})).toBeDisabled()
-  expect(screen.getByRole('button',{name:'Make fluorescence XAS group'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Make fluorescence XAS data'})).toBeDisabled()
   expect(screen.getByRole('alert')).toHaveTextContent('Name the target element by its symbol')
   fireEvent.change(screen.getByLabelText('Target element'),{target:{value:'Mn'}});await tick()
-  expect(screen.getByRole('button',{name:'Make fluorescence XAS group'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Make fluorescence XAS data'})).toBeDisabled()
   await click('Fit preview')
-  expect(screen.getByRole('button',{name:'Make fluorescence XAS group'})).toBeEnabled()
-  await click('Make fluorescence XAS group')
+  expect(screen.getByRole('button',{name:'Make fluorescence XAS data'})).toBeEnabled()
+  await click('Make fluorescence XAS data')
   expect(requests('/make').at(-1)![1]).toMatchObject({point_stride:1,include_window_sum:true,target:'Mn'})
   expect(saved).toHaveBeenCalledWith(expect.objectContaining({version:8}))
 })
@@ -357,7 +357,7 @@ it('offers only the engines the server has, and fits with the one chosen',async(
   expect(screen.getByRole('status')).toHaveTextContent('Settings changed since the last fit')
   await click('Fit preview')
   expect(requests('/preview').at(-1)![1].engine).toBe('mapstorch')
-  await click('Make fluorescence XAS group')
+  await click('Make fluorescence XAS data')
   expect(requests('/make').at(-1)![1].engine).toBe('mapstorch')
 })
 

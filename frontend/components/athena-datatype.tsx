@@ -26,16 +26,16 @@ export function AthenaDatatype({ project, activeId, selectGroup, busy, error, cl
   return <form className="ath-modal-body" onSubmit={event => { event.preventDefault(); void submit() }}>
     <fieldset disabled={busy} className="ath-e0-fields"><div className="ath-fields">
       <label className="ath-field"><span>Apply settings to <SectionHelp label="Data processing settings">Choose how to process your spectra. Raw data, calibration and saved parameters are retained.</SectionHelp></span><select value={scope} onChange={event => { edit(); setScope(event.target.value) }}>
-        <option value="current">Current group</option><option value="marked">All marked groups</option><option value="all">All groups</option>
+        <option value="current">Current data</option><option value="marked">All marked data</option><option value="all">All data</option>
       </select></label>
-      {scope === 'current' && <label className="ath-field"><span>Current group <SectionHelp label="Current group">Choose the single group whose normalized-input and EXAFS-processing settings will change. The other groups retain their current settings.</SectionHelp></span><select value={activeId} onChange={event => { edit(); selectGroup(event.target.value); setSettings(energyProcessingSettings(project.groups.find(g => g.id === event.target.value))) }}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}</select></label>}
+      {scope === 'current' && <label className="ath-field"><span>Current data <SectionHelp label="Current data">Choose the single data item whose normalized-input and EXAFS-processing settings will change. The other data retain their current settings.</SectionHelp></span><select value={activeId} onChange={event => { edit(); selectGroup(event.target.value); setSettings(energyProcessingSettings(project.groups.find(g => g.id === event.target.value))) }}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}</select></label>}
     </div>
       <label className="ath-check"><input type="checkbox" checked={settings.is_normalized} aria-describedby="ath-input-normalized-hint" onChange={event => { edit(); setSettings(s => ({ ...s, is_normalized: event.target.checked })) }} />Input already normalized <SectionHelp id="ath-input-normalized-hint" label="Normalized input">Use the supplied signal directly as normalized μ(E).</SectionHelp></label>
       <label className="ath-check"><input type="checkbox" checked={settings.exafs} aria-describedby="ath-exafs-processing-hint" onChange={event => { edit(); setSettings(s => ({ ...s, exafs: event.target.checked })) }} />Enable EXAFS processing <SectionHelp id="ath-exafs-processing-hint" label="EXAFS processing">Calculate background removal and Fourier transforms. Turn off for near-edge analysis only.</SectionHelp></label>
     </fieldset>
-    <p>{eligible.length} eligible of {groups.length} selected groups</p>
+    <p>{eligible.length} eligible of {groups.length} selected data</p>
     {groups.length > 0 && <ul>{groups.map(g => <li key={g.id}>{g.label} · {dataTypeLabel(g)}{!eligible.includes(g) && ' · skipped: χ(k) and FEFF types cannot be changed here'}</li>)}</ul>}
-    {!!report?.datatype_results && <div role="status"><p>Processing settings updated for {report.datatype_results.length} groups.</p>
+    {!!report?.datatype_results && <div role="status"><p>Processing settings updated for {report.datatype_results.length} data.</p>
       {Object.entries(report.processing_errors ?? {}).map(([id, message]) => <p className="ath-warning" key={id}>{project.groups.find(g => g.id === id)?.label}: {message}</p>)}
     </div>}
     {error && <div role="alert" className="ath-error">{error}</div>}

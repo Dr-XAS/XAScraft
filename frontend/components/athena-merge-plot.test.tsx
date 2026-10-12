@@ -57,7 +57,7 @@ it('ignores an older group response after switching to a different merged spectr
   expect(api.mock.calls.at(-1)![0]).toContain('/groups/chi/')
 })
 
-it('disables invalid k weights and retries a failed read without changing group parameters',async()=>{
+it('disables invalid k weights and retries a failed read without changing data parameters',async()=>{
   serve();api.mockRejectedValueOnce(new Error('Saved scatter is missing.'))
   const p=props();render(<AthenaMergePlot {...p} groupId="chi"/>);await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Saved scatter is missing'))
   fireEvent.click(screen.getByRole('button',{name:'Replot saved merge'}));await ready()

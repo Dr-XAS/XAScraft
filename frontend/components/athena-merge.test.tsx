@@ -20,7 +20,7 @@ function serve(mutate?:(v:MergePreview)=>void){api.mockImplementation(async(path
   const r=body as Request,v=mergePreview(project,r.group_ids,r.options);mutate?.(v)
   return path.endsWith('/command')?mergeSaved(project,v):v
 })}
-const save=()=>screen.getByRole('button',{name:'Save merged groups'})
+const save=()=>screen.getByRole('button',{name:'Save merged data'})
 const change=(name:string,value:string)=>fireEvent.change(screen.getByLabelText(name,{exact:true}),{target:{value}})
 async function ready(){await waitFor(()=>expect(save()).toBeEnabled(),{timeout:2500})}
 afterEach(()=>{cleanup();vi.clearAllMocks();api.mockReset()})
@@ -52,12 +52,12 @@ it('ignores a delayed preview after weights change and immediately disables stal
   expect((api.mock.calls.at(-1)![1] as Request).options.weights.first).toBe(3)
 })
 
-it('retains the saved inputs and all three spread views after the new marked group arrives',async()=>{
+it('retains the saved inputs and all three spread views after the new marked data arrives',async()=>{
   serve();const p=props(),view=render(<AthenaMerge {...p}/>);await ready()
   const r=api.mock.calls.at(-1)![1] as Request,v=mergePreview(project,r.group_ids,r.options),next=mergeSaved(project,v)
   fireEvent.click(save());await waitFor(()=>expect(p.saved).toHaveBeenCalledWith(next,'merged-0'))
   view.rerender(<AthenaMerge {...p} project={next}/>)
-  expect(screen.getByText('3 source groups')).toBeVisible();expect(screen.queryByLabelText('Importance: merge')).not.toBeInTheDocument()
+  expect(screen.getByText('3 source data')).toBeVisible();expect(screen.queryByLabelText('Importance: merge')).not.toBeInTheDocument()
   expect(screen.getByLabelText('Merge as')).toBeDisabled()
   for(const mode of ['variance','marked','stddev'] as const){change('Merge plot',mode);expect(plot.mock.calls.at(-1)![0].data.map(t=>({x:t.x,y:t.y,name:t.name}))).toEqual(v.outputs[0].plots[mode])}
   expect(p.close).not.toHaveBeenCalled()

@@ -80,7 +80,7 @@ describe("AthenaSpecialPlot", () => {
     expect(screen.getByText("Native diagnostic note")).toBeInTheDocument()
   })
 
-  it("uses marked groups in project order and renders backend skip explanations", async () => {
+  it("uses marked data in project order and renders backend skip explanations", async () => {
     serve(value => { value.result.skipped = [{ group_id: "Second", label: "Second", channel: "i0", reason: "No retained I₀ channel." }] })
     const first = group("First"), hidden = group("Hidden", false), second = group("Second")
     show("i0", [first, hidden, second], hidden)
@@ -162,13 +162,13 @@ describe("AthenaSpecialPlot", () => {
     await waitFor(() => expect(api).toHaveBeenLastCalledWith("/projects/project/plots/special", expect.objectContaining({ view: "biquad", group_ids: ["First", "Second"] }), "POST", expect.any(AbortSignal)))
   })
 
-  it("requires a current selection or exactly two marked groups before making a request", () => {
+  it("requires a current selection or exactly two marked data before making a request", () => {
     const rendered = show("biquad", [group("Only")])
-    expect(screen.getByRole("status")).toHaveTextContent("Mark exactly two groups")
+    expect(screen.getByRole("status")).toHaveTextContent("Mark exactly two data items")
     expect(api).not.toHaveBeenCalled()
     rendered.unmount()
     show("i0", [group("Unmarked", false)], undefined)
-    expect(screen.getByRole("status")).toHaveTextContent("Mark groups")
+    expect(screen.getByRole("status")).toHaveTextContent("Mark data")
     expect(api).not.toHaveBeenCalled()
   })
 

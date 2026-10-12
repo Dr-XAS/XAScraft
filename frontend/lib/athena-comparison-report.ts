@@ -43,7 +43,7 @@ export function comparisonTargets(project: AthenaProject, referenceId: string, s
 export function comparisonGroupLabel(project: AthenaProject, id: string) {
   const index = project.groups.findIndex(group => group.id === id), group = project.groups[index]
   if (!group) return id
-  return project.groups.filter(other => other.label === group.label).length > 1 ? `${group.label} · group ${index + 1}` : group.label
+  return project.groups.filter(other => other.label === group.label).length > 1 ? `${group.label} · data ${index + 1}` : group.label
 }
 
 export function confirmedComparisonReport(data: unknown, project: AthenaProject, referenceId: string, scope: ComparisonScope): data is ComparisonReport {
@@ -85,6 +85,6 @@ export function confirmedComparisonReport(data: unknown, project: AthenaProject,
 }
 
 export function comparisonReportFilename(report: ComparisonReport) {
-  const safe = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'group'
+  const safe = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'data'
   return `craft-comparison-${safe(report.project_id)}-v${report.version}-${report.scope}-ref-${safe(report.reference_id)}.json`
 }

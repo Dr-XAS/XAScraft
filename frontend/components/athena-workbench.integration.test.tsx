@@ -142,7 +142,7 @@ describe("AthenaWorkbench integrated request gating", () => {
     }} fetcher={fetcher}><AthenaProjectImport getProject={() => project} onImported={vi.fn()} onComplete={vi.fn()} onBusyChange={vi.fn()}
       initialFiles={[new File(["project"], "source.prj")]} initialPreview={preview} canRestore={false} /></AthenaProvider>)
 
-    const restore = await screen.findByRole("button", { name: "Import all groups" })
+    const restore = await screen.findByRole("button", { name: "Import all data" })
     expect(restore).toBeDisabled()
     fireEvent.click(restore)
     expect(fetcher).not.toHaveBeenCalled()

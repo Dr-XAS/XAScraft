@@ -30,7 +30,7 @@ for (const mobile of [false, true]) test(`${mobile ? 'mobile' : 'desktop'} origi
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fileURLToPath(new URL('../../../examples/xafsdata/AthenaProjectFiles/Fe.prj', import.meta.url)))
   const importing = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-  await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await page.getByRole('button', { name: 'Import all data', exact: true }).click()
   const imported = await importing; expect(imported.ok()).toBe(true)
   let project = await imported.json() as AthenaProject
   const ids = project.groups.filter(g => g.result?.effective.exafs && !g.processing_error && !['chi', 'xanes', 'detector'].includes(g.data_type)).slice(0, 2).map(g => g.id)

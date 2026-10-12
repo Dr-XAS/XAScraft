@@ -18,7 +18,7 @@ test("project saves confirm the filename and cancel without exporting", async ({
   await page.goto("/")
   const instructions = page.getByRole("checkbox", { name: "Show instruction" })
   const credits = page.locator(".ath-brand-credits")
-  const groupHelp = page.getByRole("button", { name: "About Group references", exact: true })
+  const groupHelp = page.getByRole("button", { name: "About Data references", exact: true })
   await expect(instructions).not.toBeChecked()
   await expect(credits).toBeVisible()
   await expect(groupHelp).toHaveCount(0)
@@ -91,7 +91,7 @@ test("project saves confirm the filename and cancel without exporting", async ({
   expect(saved.name).toBe(imported.name)
   expect(saved.groups).toEqual(imported.groups)
 
-  await page.getByRole("checkbox", { name: "Mark all groups", exact: true }).check()
+  await page.getByRole("checkbox", { name: "Mark all data", exact: true }).check()
   await page.getByRole("button", { name: "File", exact: true }).click()
   await page.getByRole("button", { name: "Save marked project (.prj)", exact: true }).click()
   await expect(filename).toHaveValue(`${imported.name}-marked.prj`)

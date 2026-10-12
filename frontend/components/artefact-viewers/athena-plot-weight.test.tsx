@@ -224,6 +224,48 @@ describe("useAthenaPlotWeight", () => {
     expect(api).toHaveBeenCalledTimes(2)
   })
 
+  it("keeps the current plot identity after duplicate and calculates only a newly displayed spectrum", async () => {
+    serve()
+    const groups = [group()]
+    const props = options({ groups, dataVersion: 4 })
+    const view = show(props)
+    await calculate()
+    const currentGroups = view.result.current.groups
+    const currentArrays = currentGroups[0].result?.arrays
+
+    // The duplicate command advances the project revision while the original
+    // spectrum and its scientific revision remain unchanged.
+    view.rerender({ ...props, version: 5 })
+    expect(view.result.current.groups).toBe(currentGroups)
+    expect(view.result.current.groups[0].result?.arrays).toBe(currentArrays)
+    await calculate()
+    expect(api).toHaveBeenCalledTimes(1)
+
+    const duplicate = group("Copy")
+    view.rerender({ ...props, version: 5, groups: [...groups, duplicate] })
+    await calculate()
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(api).toHaveBeenLastCalledWith("/projects/p/groups/Copy/plot-transform", { version: 5, kweight: 3 }, "POST", expect.any(AbortSignal))
+    expect(view.result.current.groups[0].result?.arrays.chir_mag).toBe(currentArrays?.chir_mag)
+    expect(view.result.current.groups.map(item => item.id)).toEqual(["Copper", "Copy"])
+    expect(view.result.current.loading).toBe(false)
+  })
+
+  it("does not reuse a completed transform when a source result has been replaced", async () => {
+    serve()
+    const props = options({ dataVersion: 4 })
+    const view = show(props)
+    await calculate()
+    const updated = group()
+    updated.result!.arrays.chi = [0, 4, -2, 2]
+    view.rerender({ ...props, version: 5, groups: [updated, group("Copy")] })
+    await calculate()
+    expect(api).toHaveBeenCalledTimes(3)
+    expect(api.mock.calls.slice(1).map(([path]) => path)).toEqual([
+      "/projects/p/groups/Copper/plot-transform", "/projects/p/groups/Copy/plot-transform",
+    ])
+  })
+
   it("restarts pending products after an organization revision and ignores late responses from the earlier version", async () => {
     const previous = deferred(), next = deferred()
     api.mockReturnValueOnce(previous.promise).mockReturnValueOnce(next.promise)

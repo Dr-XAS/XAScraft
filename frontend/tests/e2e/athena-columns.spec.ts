@@ -79,7 +79,7 @@ test('shared batch shows one progress bar until every file is imported', async (
       await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toHaveCount(0)
       await expect(panel.getByLabel('Column selection preview', { exact: true })).toHaveCount(0)
       // Accepted data are published together, avoiding intermediate plot changes.
-      await expect(page.getByRole('heading', { name: /^Data groups 0\b/ })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /^Data 0\b/ })).toBeVisible()
       if (index === 1) {
         await panel.screenshot({ path: info.outputPath('batch-progress-desktop.png') })
         await page.setViewportSize({ width: 390, height: 844 })
@@ -91,9 +91,9 @@ test('shared batch shows one progress bar until every file is imported', async (
       releases[index]()
     }
     await expect(panel).not.toBeVisible()
-    await expect(page.getByRole('heading', { name: /^Data groups 3\b/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Data 3\b/ })).toBeVisible()
     await page.reload()
-    await expect(page.getByRole('heading', { name: /^Data groups 3\b/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Data 3\b/ })).toBeVisible()
     expect(errors).toEqual([])
   } finally {
     releases.forEach(release => release())
@@ -163,7 +163,7 @@ test('official MRCAT quick scan compares original and rebinned data and imports 
     expect(group.source.rebin_original.column_arrays.column_0002).toEqual(raw.map(row => row[1]))
   }
   await page.reload()
-  await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
 })
 
 test('batch choice pauses on renamed columns and names the change, resets, and permits individual review', async ({ page }, info) => {
@@ -255,7 +255,7 @@ test('batch choice pauses on renamed columns and names the change, resets, and p
   expect(individual.groups[2].mu[200]).toBeCloseTo(measured[200][1], 12)
   expect(individual.groups[3].mu[200]).toBeCloseTo(2 * measured[200][1], 12)
   await page.reload()
-  await expect(page.getByRole('heading', { name: /^Data groups 4\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 4\b/ })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -350,7 +350,7 @@ test('imports transmission and fluorescence together across a shared real-Cu bat
     expect(group.mu).toEqual(preview[index % 2].y)
   }
   await page.reload()
-  await expect(page.getByRole('heading', { name: /^Data groups 4\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 4\b/ })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -403,7 +403,7 @@ test("column preview, reference, invalid mapping recovery and imported values", 
   expect(project.groups[0].reference_id).toBe(project.groups[1].id)
   expect(project.groups[1].marked).toBe(false)
   await page.reload()
-  await expect(page.getByRole("heading", { name: /^Data groups 2\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 2\b/ })).toBeVisible()
   await expect(page.getByText("trans", { exact: true })).toHaveCount(2)
   expect(errors).toEqual([])
 })
@@ -420,7 +420,7 @@ test("MED range selection, pause/replot, separate channel import and mobile prev
   await panel.getByRole("button", { name: "Clear numerator", exact: true }).click()
   await panel.getByLabel("Numerator column numbers", { exact: true }).fill("4-5")
   await panel.getByRole("button", { name: "Select range", exact: true }).click()
-  await panel.getByLabel("Save each channel as its own group", { exact: true }).check()
+  await panel.getByLabel("Save each channel as a separate data item", { exact: true }).check()
   await expect(panel.getByRole("status").filter({ hasText: 'previous column selection' })).toBeVisible()
   await panel.getByRole("button", { name: "Replot", exact: true }).click()
   await expect.poll(async () => (await curves(panel)).length).toBe(2)
@@ -535,7 +535,7 @@ test("imports a batch with standard parameters, reference alignment and sample-o
   await batch.getByText('Reference channel & ordering', { exact: true }).click()
   await batch.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption({ label: 'ref · column 3' })
   await batch.getByLabel('Reference natural log', { exact: true }).uncheck()
-  await batch.getByText('Preprocess imported groups', { exact: true }).click()
+  await batch.getByText('Preprocess imported data', { exact: true }).click()
   await batch.getByRole('combobox', { name: 'Preprocessing standard', exact: true }).selectOption(initial.groups[0].id)
   await batch.getByLabel('Set parameters to the standard', { exact: true }).check()
   await batch.getByLabel('Align to the standard', { exact: true }).check()
@@ -568,10 +568,10 @@ test("imports a batch with standard parameters, reference alignment and sample-o
     expect(sample.reference_id).toBe(ref.id)
   }
   await page.reload()
-  await expect(page.getByRole('heading', { name: /^Data groups 6\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 6\b/ })).toBeVisible()
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles({ name: 'new-choice.dat', mimeType: 'text/plain', buffer: content })
-  await page.getByText('Preprocess imported groups', { exact: true }).click()
+  await page.getByText('Preprocess imported data', { exact: true }).click()
   await expect(page.getByLabel('Mark each imported sample', { exact: true })).toBeChecked()
 })
 
@@ -599,7 +599,7 @@ test("XAS-QA-007: retrying an import whose response was lost does not import the
   await importButton.click()
   await expect(page.getByText(/cu-detectors\.dat had already been imported before the connection dropped/)).toBeVisible()
   await expect(page.getByRole("dialog", { name: "Import spectra", exact: true })).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: /^Data groups 1\b/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /^Data 1\b/ })).toBeVisible()
   expect(keys).toHaveLength(2)
   expect(keys[0]).toBeTruthy()
   expect(keys[1]).toBe(keys[0])

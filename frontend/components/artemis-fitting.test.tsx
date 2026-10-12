@@ -1157,7 +1157,7 @@ describe("automatic model persistence", () => {
   })
 })
 
-describe("copy fit transforms to marked groups", () => {
+describe("copy fit transforms to marked data", () => {
   function markedModel(id: string, value = "0.65"): AthenaGroup {
     const item = persistedGroup(value)
     item.id = id
@@ -1196,11 +1196,11 @@ describe("copy fit transforms to marked groups", () => {
     return { project: () => current, flush: () => actions!.flush(), save }
   }
 
-  const copySection = "Apply fit range & transform to marked groups"
+  const copySection = "Apply fit range & transform to marked data"
   const select = (id: string) => fireEvent.click(screen.getByRole("button", { name: `Select ${id}` }))
   const modelSaves = () => api.mock.calls.filter(([url]) => url.endsWith("/model"))
 
-  it("copies the live whole transform to every other marked group and saves serially after switching spectra", async () => {
+  it("copies the live whole transform to every other marked data and saves serially after switching spectra", async () => {
     const target = markedModel("iron")
     const originalPaths = structuredClone(target.artemis!.model.paths)
     const originalParameters = structuredClone(target.artemis!.model.parameters)
@@ -1255,7 +1255,7 @@ describe("copy fit transforms to marked groups", () => {
     fireEvent.change(screen.getByLabelText("k min (Å⁻¹)"), { target: { value: "5" } })
     fireEvent.contextMenu(screen.getByLabelText("k min (Å⁻¹)"))
     expect(screen.getByRole("menuitem", { name: copySection })).toBeEnabled()
-    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked groups" }))
+    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked data" }))
     select("iron")
     expect(screen.getByLabelText("k min (Å⁻¹)")).toHaveValue(5)
     expect(screen.getByLabelText("k max (Å⁻¹)")).toHaveValue(17)
@@ -1270,14 +1270,14 @@ describe("copy fit transforms to marked groups", () => {
     expect(api.mock.calls.filter(([url]) => url.endsWith("/groups/copper/model"))).toHaveLength(1)
   })
 
-  it("rejects a field that would invalidate any target before changing any marked group", async () => {
+  it("rejects a field that would invalidate any target before changing any marked data", async () => {
     const valid = markedModel("iron")
     const invalid = markedModel("zinc")
     invalid.artemis!.model.transform.kmax = "4"
     const state = workspace([{ ...persistedGroup(), marked: true }, valid, invalid])
     fireEvent.change(screen.getByLabelText("k min (Å⁻¹)"), { target: { value: "5" } })
     fireEvent.contextMenu(screen.getByLabelText("k min (Å⁻¹)"))
-    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked groups" }))
+    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked data" }))
     expect(screen.getByRole("alert")).toHaveTextContent(/k range/i)
     select("iron")
     expect(screen.getByLabelText("k min (Å⁻¹)")).toHaveValue(3)
@@ -1290,7 +1290,7 @@ describe("copy fit transforms to marked groups", () => {
     expect(state.project().groups[2].artemis).toEqual(invalid.artemis)
   })
 
-  it("disables copying without another marked group and closes the accessible menu with Escape", () => {
+  it("disables copying without another marked data and closes the accessible menu with Escape", () => {
     const source = { ...persistedGroup(), marked: true }
     const view = render(<ArtemisFittingPanel projectId="p" version={5} group={source} groups={[source, group("iron")]} onProjectChange={acceptProject} />)
     fireEvent.click(screen.getByRole("button", { name: "Fit range & transform actions" }))
@@ -1316,7 +1316,7 @@ describe("copy fit transforms to marked groups", () => {
     const fitBody = api.mock.calls.find(([url]) => url.endsWith("/fit-saved"))![1]
     select("iron")
     fireEvent.contextMenu(screen.getByLabelText("k min (Å⁻¹)"))
-    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked groups" }))
+    fireEvent.click(screen.getByRole("menuitem", { name: "Apply k min (Å⁻¹) to marked data" }))
     expect(screen.getByRole("alert")).toHaveTextContent("Wait for the current fit or project operation to finish before copying settings.")
     expect(modelSaves()).toHaveLength(0)
     const saved = savedFit(fitBody, fitResult({ version: 5 }))
@@ -1333,7 +1333,7 @@ describe("copy fit transforms to marked groups", () => {
   ])("offers a single-field action for %s beside the whole transform action", (controlLabel, menuLabel) => {
     workspace()
     fireEvent.contextMenu(screen.getByLabelText(controlLabel, { exact: true }))
-    expect(screen.getByRole("menuitem", { name: `Apply ${menuLabel} to marked groups` })).toBeEnabled()
+    expect(screen.getByRole("menuitem", { name: `Apply ${menuLabel} to marked data` })).toBeEnabled()
     expect(screen.getByRole("menuitem", { name: copySection })).toBeEnabled()
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     expect(screen.queryByRole("menu")).not.toBeInTheDocument()

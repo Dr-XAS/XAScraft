@@ -83,9 +83,9 @@ it('fits only on Auto align, shows scale/error and saves the captured preference
   expect(next.groups[1].parameters.e0).toBe(8985)
 })
 
-it('includes marked groups and reports the fixed standard skip',async()=>{
+it('includes marked data and reports the fixed standard skip',async()=>{
   serve();render(<AthenaAlignment {...props()}/>);await ready()
-  fireEvent.click(screen.getByRole('button',{name:'Align marked groups'}));await ready()
+  fireEvent.click(screen.getByRole('button',{name:'Align marked data'}));await ready()
   expect((api.mock.calls.at(-1)![1] as {group_ids:string[]}).group_ids).toEqual(['standard','moving'])
   expect(screen.getByText(/Skipped standard/)).toBeVisible()
 })

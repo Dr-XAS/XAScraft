@@ -976,7 +976,7 @@ class Command(BaseModel):
     action: str
     group_ids: list[str] = Field(default_factory=list, max_length=100)
     options: dict[str, Any] = Field(default_factory=dict)
-    response_mode: Literal["project", "selection"] = "project"
+    response_mode: Literal["project", "selection", "duplicate"] = "project"
 
     @model_validator(mode="after")
     def selection_response_requires_selection_only(self):
@@ -986,6 +986,8 @@ class Command(BaseModel):
                 and set(self.options) <= {"marked", "frozen"})
         ):
             raise ValueError("A selection response requires only mark or freeze changes.")
+        if self.response_mode == "duplicate" and self.action != "duplicate":
+            raise ValueError("A duplicate response requires the duplicate action.")
         return self
 
 
@@ -993,6 +995,19 @@ def _command_response(project: dict, request: Command) -> dict:
     """Omit unchanged spectra only after persistence and integration accounting."""
     if request.response_mode == "project":
         return project
+    if request.response_mode == "duplicate":
+        # A replay returns the current project, which may include later edits.
+        # Such a response cannot safely be merged into the requested revision.
+        operation = project.get("last_operation") or {}
+        if operation.get("idempotent_replay") or project["version"] != request.version + 1:
+            return project
+        created = set(operation.get("created_group_ids", []))
+        return {
+            **{key: value for key, value in project.items() if key != "groups"},
+            "kind": "duplicate", "base_version": request.version,
+            "group_order": [group["id"] for group in project["groups"]],
+            "groups": [group for group in project["groups"] if group["id"] in created],
+        }
     return {
         "kind": "selection", "base_version": request.version,
         # Integration renames and saved analyses can change without advancing
@@ -3470,8 +3485,16 @@ class AthenaStore:
             old = self.load(ident)
             seen["before"] = old
             self.check(old, request.version)
-            p = copy.deepcopy(old)
             action, options = request.action, request.options
+            if action == "duplicate":
+                # Duplication only reads existing spectrum content. Copy each
+                # wrapper for save-time metadata refreshes, but avoid walking
+                # every unchanged numeric array. The new spectrum itself is
+                # still deeply copied below, so it remains fully independent.
+                p = copy.deepcopy({key: value for key, value in old.items() if key != "groups"})
+                p["groups"] = [dict(group) for group in old["groups"]]
+            else:
+                p = copy.deepcopy(old)
             groups = [self.group(p, gid) for gid in dict.fromkeys(request.group_ids)]
             skipped, operation_details = [], {}
             if action in ("undo", "redo"):
@@ -3793,6 +3816,7 @@ class AthenaStore:
                         from .athena_xdi_history import inherit_source
                         clone['source']['xdi_metadata'] = inherit_source(g, 'duplicate', {})
                         created[g['id']] = clone
+                    operation_details = {"created_group_ids": [group["id"] for group in created.values()]}
                     p['groups'] = [item for parent in p['groups'] for item in
                                    ([parent, created[parent['id']]] if parent['id'] in created else [parent])]
                     for folder in p.get("group_folders", []):

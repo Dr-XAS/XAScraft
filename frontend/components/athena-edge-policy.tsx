@@ -57,7 +57,7 @@ export function EdgePolicyControls({ policy, apply, busy = false }: {
         if (event.target.checked) setEditing(true)
         else apply(null)
       }} />Enforce element and edge</label>
-      <p>Next batch: <strong>{edgePolicyDescription(policy)}</strong><SectionHelp label="Import edge policy">Applies to future raw-file import batches in this tab. Existing groups and restored projects are unchanged; χ(k) imports ignore it.</SectionHelp></p>
+      <p>Next batch: <strong>{edgePolicyDescription(policy)}</strong><SectionHelp label="Import edge policy">Applies to future raw-file import batches in this tab. Existing data and restored projects are unchanged; χ(k) imports ignore it.</SectionHelp></p>
       {policy && <button type="button" disabled={busy} onClick={() => setEditing(true)}>Edit element and edge…</button>}
     </details>
     {editing && <EdgePolicyDialog policy={policy} apply={apply} close={() => setEditing(false)} />}
@@ -83,12 +83,12 @@ export function EdgePolicyDialog({ policy, apply, close }: {
     close()
   }
   return <dialog ref={dialog} className="ath-modal" aria-label="Enforce element and edge" onCancel={event => { event.preventDefault(); event.stopPropagation(); dismiss() }}>
-    <header><h2>Enforce element and edge <SectionHelp label="Import policy lifetime">Applies to new batches in this browser tab. Existing groups and restored projects are unchanged. It is separate from project saves and Undo, and survives refresh in this tab.<br /><br />Choose the absorber, edge, and edge-step fraction for subsequent raw-file imports, including reference channels. χ(k) imports ignore this policy.</SectionHelp></h2><button type="button" aria-label="Close dialog" onClick={dismiss}>×</button></header>
+    <header><h2>Enforce element and edge <SectionHelp label="Import policy lifetime">Applies to new batches in this browser tab. Existing data and restored projects are unchanged. It is separate from project saves and Undo, and survives refresh in this tab.<br /><br />Choose the absorber, edge, and edge-step fraction for subsequent raw-file imports, including reference channels. χ(k) imports ignore this policy.</SectionHelp></h2><button type="button" aria-label="Close dialog" onClick={dismiss}>×</button></header>
     <form className="ath-modal-body" noValidate onSubmit={event => { event.preventDefault(); submit() }}>
 
       <label className="ath-field"><span>Element symbol <SectionHelp label="Element lookup">Look up the element, then choose an edge from its table. Editing the symbol discards any pending lookup.</SectionHelp></span><input value={element} maxLength={2} placeholder="Cu" onChange={event => changeElement(event.target.value)} /></label>
       <button type="button" disabled={loading || !element.trim()} onClick={() => { void lookup() }}>{loading ? "Looking up edges…" : "Look up edges"}</button>
-      <div className="ath-fields"><label className="ath-field"><span>Enforced edge <SectionHelp label="Enforced edge">Choose the element’s edge to seed E₀ and automatic processing defaults for future imports. Existing groups keep their current parameters.</SectionHelp></span><select aria-label="Enforced edge" value={edge} disabled={loading || !catalog} onChange={event => changeEdge(event.target.value)}><option value="">Choose an edge</option>{catalog?.edges.map(item => <option key={item.edge} value={item.edge}>{item.edge} · {item.energy} eV</option>)}</select></label>
+      <div className="ath-fields"><label className="ath-field"><span>Enforced edge <SectionHelp label="Enforced edge">Choose the element’s edge to seed E₀ and automatic processing defaults for future imports. Existing data keep their current parameters.</SectionHelp></span><select aria-label="Enforced edge" value={edge} disabled={loading || !catalog} onChange={event => changeEdge(event.target.value)}><option value="">Choose an edge</option>{catalog?.edges.map(item => <option key={item.edge} value={item.edge}>{item.edge} · {item.energy} eV</option>)}</select></label>
         <label className="ath-field"><span>Edge-step fraction <SectionHelp label="Edge-step fraction">Use 0 &lt; fraction ≤ 1; 0.5 is half the edge step, and 1 is the full step.</SectionHelp></span><input type="number" step="any" min="0" max="1" value={fraction} disabled={loading} onChange={event => { setFraction(event.target.value); setError("") }} /></label></div>
       {error && <div className="ath-error" role="alert">{error}</div>}
       <div className="ath-modal-actions"><button type="button" disabled={loading} onClick={dismiss}>Cancel</button><button className="ath-primary" disabled={loading || !catalog || !edge} type="submit">Apply enforcement</button></div>

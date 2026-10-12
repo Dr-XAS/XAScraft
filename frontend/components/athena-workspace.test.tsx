@@ -61,7 +61,7 @@ describe("ResizableAthenaWorkspace", () => {
     const { workspace } = showWorkspace()
     expect(Array.from(workspace.children).map(child => child.id || child.getAttribute("aria-label"))).toEqual([
       "athena-data-groups",
-      "Resize data groups and processing parameters",
+      "Resize data and processing parameters",
       "athena-processing-parameters",
       "Resize processing parameters and spectrum viewer",
       "athena-spectrum-viewer",
@@ -130,7 +130,7 @@ describe("ResizableAthenaWorkspace", () => {
 
   it("ignores non-primary and mismatched pointers and cancels the active pointer safely", () => {
     const { workspace } = showWorkspace()
-    const first = screen.getByRole("separator", { name: "Resize data groups and processing parameters" })
+    const first = screen.getByRole("separator", { name: "Resize data and processing parameters" })
     fireEvent(first, pointer("pointerdown", 237, 8, false))
     expect(workspace).not.toHaveAttribute("data-resizing")
 

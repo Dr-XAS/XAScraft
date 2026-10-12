@@ -30,7 +30,7 @@ function preview(options: SmoothingPreview['options'] = {method: 'boxcar', windo
       {role: 'smoothed', label: 'Cu, smoothed', x: space === 'E' ? energy : [0,1,2], y: space === 'E' ? mu : [0,.09,-.09]},
     ]])) as SmoothingPreview['results'][0]['traces']}]}
 }
-const saveButton = () => screen.getByRole('button', {name: 'Make smoothed group'})
+const saveButton = () => screen.getByRole('button', {name: 'Make smoothed data'})
 const handoff = () => plot.mock.calls.at(-1)![0]
 const change = (name: string, value: string) => fireEvent.change(screen.getByLabelText(name), {target: {value}})
 async function ready() { await waitFor(() => expect(saveButton()).toBeEnabled(), {timeout: 2000}) }

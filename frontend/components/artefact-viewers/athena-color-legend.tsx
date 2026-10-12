@@ -27,7 +27,7 @@ export function AthenaColorLegend({ value, onChange, disabled = false, storageKe
   const range = normalizePlotColorRange(value)
   const continuous = value.palette !== "classic"
   return <AthenaColorLegendControl label="Spectrum colors" pickerLabel="Color legend" endpoints={["First", "Last"]}
-    title="Click the colorbar to choose how plotted groups are colored."
+    title="Click the colorbar to choose how plotted data are colored."
     options={plotPaletteOptions(value.reversed)} value={value.palette} reversed={value.reversed} disabled={disabled}
     range={{ ...(continuous ? range : { vmin: 0, vmax: 1 }), minGap: MIN_PLOT_COLOR_SPAN,
       disabled: !continuous,

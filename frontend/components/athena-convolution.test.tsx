@@ -25,7 +25,7 @@ function preview(options: ConvolutionPreview['options'] = {form: 'gaussian', wid
       {role: 'modified', label: 'Cu: modified', x: space === 'E' ? energy : [0,1,2], y: space === 'E' ? mu : [0,.09,-.09]},
     ]])) as ConvolutionPreview['results'][0]['traces']}]}
 }
-const saveButton = () => screen.getByRole('button', {name: 'Make modified group'})
+const saveButton = () => screen.getByRole('button', {name: 'Make modified data'})
 const replot = () => fireEvent.click(screen.getByRole('button', {name: 'Plot data and modified'}))
 const handoff = () => plot.mock.calls.at(-1)![0]
 const change = (name: string, value: string) => fireEvent.change(screen.getByLabelText(name), {target: {value}})

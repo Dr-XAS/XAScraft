@@ -14,7 +14,7 @@ test("orders and resizes the desktop Athena workspace", async ({ page }) => {
   const groups = page.locator("#athena-data-groups")
   const processing = page.locator("#athena-processing-parameters")
   const spectrum = page.locator("#athena-spectrum-viewer")
-  const first = page.getByRole("separator", { name: "Resize data groups and processing parameters" })
+  const first = page.getByRole("separator", { name: "Resize data and processing parameters" })
   const second = page.getByRole("separator", { name: "Resize processing parameters and spectrum viewer" })
   await expect(workspace).toBeVisible()
   await expect(first).toBeVisible()
@@ -23,7 +23,7 @@ test("orders and resizes the desktop Athena workspace", async ({ page }) => {
   const children = await workspace.locator(":scope > *").evaluateAll(elements => elements.map(element => element.id || element.getAttribute("aria-label")))
   expect(children).toEqual([
     "athena-data-groups",
-    "Resize data groups and processing parameters",
+    "Resize data and processing parameters",
     "athena-processing-parameters",
     "Resize processing parameters and spectrum viewer",
     "athena-spectrum-viewer",

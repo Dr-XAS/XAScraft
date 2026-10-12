@@ -297,7 +297,7 @@ export function ResizableAthenaWorkspace({ groups, processing, spectrum }: Props
 
   return <div ref={workspaceRef} className="ath-workspace" data-testid="athena-workspace" data-resizing={activeDivider ?? undefined} style={style}>
     {groups}
-    <WorkspaceDivider divider="groups-processing" label="Resize data groups and processing parameters" controls="athena-data-groups athena-processing-parameters"
+    <WorkspaceDivider divider="groups-processing" label="Resize data and processing parameters" controls="athena-data-groups athena-processing-parameters"
       now={effectiveSizes.groups} minimum={minimumGroupsWidth} maximum={effectiveSizes.groups + effectiveSizes.processing - minimumProcessingWidth}
       onPointerDown={beginResize} onPointerCaptureLost={finishResize} onKeyboardResize={resizeWithKeyboard} onReset={resetSizes} />
     {processing}

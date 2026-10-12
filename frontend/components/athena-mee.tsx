@@ -73,13 +73,13 @@ export function AthenaMEE({ project, activeId, selectGroup, setBusy, saved, clos
 
   async function save() {
     if (!current || disabled || saving.current || committed.current !== key) return
-    saving.current = true; setBusy('Saving MEE-corrected group'); setPicking(false); setError('')
+    saving.current = true; setBusy('Saving MEE-corrected data'); setPicking(false); setError('')
     try {
       const next = await athenaApi<AthenaProject>(`/projects/${project.id}/command`, { version: current.version, action: 'multi_electron', group_ids: [activeId], options: current.options })
-      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the MEE group.')
+      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the MEE data.')
       saved(next); close()
     } catch (reason) {
-      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the MEE group. Preview again.')
+      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the MEE data. Preview again.')
     } finally { saving.current = false; setBusy('') }
   }
   const arrays = group?.result?.arrays ?? {}
@@ -98,7 +98,7 @@ export function AthenaMEE({ project, activeId, selectGroup, setBusy, saved, clos
   return <div className="ath-modal-body">
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
-        <label className="ath-field"><span>Source group <SectionHelp label="Corrected group">The corrected group keeps the source recipe and is processed again. Frozen sources can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source group" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
+        <label className="ath-field"><span>Source data <SectionHelp label="Corrected data">The corrected data keeps the source recipe and is processed again. Frozen sources can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
         <label className="ath-field"><span>Algorithm <SectionHelp label="Multi-electron excitation model">Model a secondary edge using a shifted, broadened copy of the normalized spectrum or an arctangent. Adjust the model while comparing the original and corrected curves. Parameters are chosen from your data; they are not fitted automatically.</SectionHelp></span><select aria-label="Algorithm" value={draft.method} onChange={e => setDraft(d => ({ ...d, method: e.target.value as Options['method'] }))}><option value="reflection">Reflection</option><option value="arctangent">Arctangent</option></select></label>
         <div className={styles.pickField}>
           <label className="ath-field"><span>Energy shift (eV) <SectionHelp label="Energy shift (eV)">Place the secondary excitation this many eV above the primary E₀. Set it from the observed feature or an appropriate excitation energy; this is not an energy-axis calibration.</SectionHelp></span><input type="number" min="0" step="any" value={draft.shift} onChange={e => setDraft(d => ({ ...d, shift: e.target.value }))} /></label>
@@ -126,6 +126,6 @@ export function AthenaMEE({ project, activeId, selectGroup, setBusy, saved, clos
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close MEE tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make group from MEE-corrected data</button></div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close MEE tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save MEE-corrected data</button></div>
   </div>
 }

@@ -140,11 +140,11 @@ for (const name of ['cmc', 'hxma', 'lnls']) {
     await page.getByRole('button', { name: 'Open project', exact: true }).click()
     await page.getByLabel('Open project file', { exact: true }).setInputFiles(prj)
     const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+    await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const result = await (await restored).json()
     expect(result.groups).toHaveLength(2); expect(result.groups[1].source).toEqual(group.source)
     expect(result.groups[1].result.arrays).toEqual(group.result.arrays)
-    await page.reload(); await expect(page.getByRole('heading', { name: /^Data groups 2\b/ })).toBeVisible()
+    await page.reload(); await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
     expect(errors).toEqual([])
   })
 }

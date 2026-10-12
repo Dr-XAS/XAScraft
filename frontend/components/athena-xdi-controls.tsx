@@ -104,7 +104,7 @@ export function AthenaXDIControls({ projectId, groupId, onSaved, onBusyChange, c
     {error && <p role="alert" className="ath-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {saved && <>
-      <p>Current group <strong>{saved.label}</strong></p>
+      <p>Current data <strong>{saved.label}</strong></p>
       <p>XDI {saved.xdi_version}{saved.extra_version && ` · ${saved.extra_version}`} <SectionHelp label="Metadata identity">Element fields follow the current absorber selection. The original acquisition header remains in Source metadata.</SectionHelp></p>
       {saved.history && <section className={styles.history} aria-label="Acquisition and processing history">
         <h3>Acquisition and processing history <SectionHelp label="Processing history">Scan.process is retained as recorded text. Saved processing parameters are included in column-file exports.{saved.history.inherited && <p>Acquisition fields and comments are inherited from the source scan. Column metadata describes the acquisition; exported column files describe their actual output columns.</p>}</SectionHelp></h3>
@@ -141,7 +141,7 @@ export function AthenaXDIControls({ projectId, groupId, onSaved, onBusyChange, c
         {report.results.some(r => !r.valid) && <ul>{report.results.filter(r => !r.valid).map(r =>
           <li key={`${r.family}.${r.tag}`}><strong>{r.family}.{r.tag}</strong>: {r.message}</li>)}</ul>}
       </section>}
-      <label className="ath-field"><span>XDI comments <SectionHelp label="XDI comments">These comments are saved with XDI metadata and Craft projects. Group notes are edited in Group information.</SectionHelp></span><textarea aria-label="XDI comments" rows={7} maxLength={50000} value={comments} disabled={pending}
+      <label className="ath-field"><span>XDI comments <SectionHelp label="XDI comments">These comments are saved with XDI metadata and Craft projects. Data notes are edited in Data information.</SectionHelp></span><textarea aria-label="XDI comments" rows={7} maxLength={50000} value={comments} disabled={pending}
         onChange={e => { setComments(e.target.value); setNotice('') }} /></label>
       {comments !== saved.comments && <p role="status">Unsaved XDI comments</p>}
     </>}

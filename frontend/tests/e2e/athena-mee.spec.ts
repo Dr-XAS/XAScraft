@@ -12,7 +12,7 @@ async function load(page:Page) {
   await dialog.getByLabel('Preview signal').selectOption('norm')
   await expect(dialog.locator('.js-line').first()).toBeVisible()
   const response=page.waitForResponse(r=>r.url().endsWith('/restore-upload'))
-  await dialog.getByRole('button',{name:'Import all groups',exact:true}).click()
+  await dialog.getByRole('button',{name:'Import all data',exact:true}).click()
   const p=await response;expect(p.ok()).toBe(true)
   return await p.json() as AthenaProject
 }
@@ -28,7 +28,7 @@ async function configure(page:Page,dialog:Locator,method='reflection') {
   const waiting=page.waitForResponse(r=>r.url().endsWith('/mee/preview')&&r.request().postDataJSON().options.shift===122)
   await dialog.getByLabel('Energy shift (eV)',{exact:true}).fill('122')
   const response=await waiting;expect(response.ok()).toBe(true)
-  await expect(dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true})).toBeEnabled()
+  await expect(dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true})).toBeEnabled()
   return await response.json() as MEEPreview
 }
 async function curves(plot:Locator) {
@@ -39,7 +39,7 @@ async function curves(plot:Locator) {
 test('official LaCoO3 PRJ, native reflection, E/k/R plots, curve picking, save and undo',async({page},info)=>{
   await page.setViewportSize({width:1500,height:1040});const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   const project=await load(page);expect(project.groups).toHaveLength(2)
-  const dialog=await open(page);await dialog.getByLabel('Source group',{exact:true}).selectOption(project.groups[1].id)
+  const dialog=await open(page);await dialog.getByLabel('Source data',{exact:true}).selectOption(project.groups[1].id)
   const preview=await configure(page,dialog);const result=preview.results[0]
   for (const space of ['E','k','R'] as const) {
     await dialog.getByRole('button',{name:space==='E'?'Plot in energy':`Plot in ${space}`,exact:true}).click()
@@ -60,14 +60,14 @@ test('official LaCoO3 PRJ, native reflection, E/k/R plots, curve picking, save a
   await expect(dialog.getByLabel('Energy shift (eV)',{exact:true})).toHaveValue((point.energy-result.details.e0).toFixed(3))
   const picked=page.waitForResponse(r=>r.url().endsWith('/mee/preview'))
   const nextPreview=await (await picked).json() as MEEPreview
-  await expect(dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true})).toBeEnabled()
+  await expect(dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true})).toBeEnabled()
   const waiting=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='multi_electron')
-  await dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true}).click()
+  await dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true}).click()
   const response=await waiting;expect(response.ok()).toBe(true);const saved=await response.json() as AthenaProject
   expect(saved.groups.slice(0,2)).toEqual(project.groups);expect(saved.groups[2].mu).toEqual(nextPreview.results[0].corrected_mu)
   await expect(dialog).toHaveCount(0)
-  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data groups 2\b/ })).toBeVisible()
-  await page.getByRole('button',{name:'Redo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data groups 3\b/ })).toBeVisible()
+  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data 2\b/ })).toBeVisible()
+  await page.getByRole('button',{name:'Redo',exact:true}).click();await expect(page.getByRole('heading',{ name: /^Data 3\b/ })).toBeVisible()
   const download=page.waitForEvent('download');await page.getByRole("button", { name: "File", exact: true }).click(); await page.getByRole("button", { name: "Save Craft project (.prj)", exact: true }).click(); await confirmProjectSave(page)
   await (await download).saveAs(info.outputPath('LaCoO3-corrected.prj'))
   expect(errors).toEqual([])
@@ -82,7 +82,7 @@ test('mobile arctangent clamps and a cross-window conflict cannot save an obsole
   await expect(dialog.getByText('Negative amplitude was reset to zero, as in Athena.',{exact:true})).toBeVisible()
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true)
   const bounds=await dialog.boundingBox()
-  for(const name of ['Close MEE tool','Preview again','Make group from MEE-corrected data']) {
+  for(const name of ['Close MEE tool','Preview again','Save MEE-corrected data']) {
     const button=await dialog.getByRole('button',{name,exact:true}).boundingBox()
     expect(button!.x).toBeGreaterThanOrEqual(bounds!.x)
     expect(button!.x+button!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width)
@@ -90,16 +90,16 @@ test('mobile arctangent clamps and a cross-window conflict cannot save an obsole
   await dialog.getByLabel('E-space MEE preview',{exact:true}).scrollIntoViewIfNeeded()
   await expect(dialog.getByLabel('E-space MEE preview',{exact:true}).getByText('Energy (eV)',{exact:true})).toBeVisible()
   await page.screenshot({path:info.outputPath('mee-mobile-energy.png')})
-  await dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true}).scrollIntoViewIfNeeded()
+  await dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true}).scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath('mee-mobile-actions.png')})
   const changed=await page.request.post(`/api/backend/api/athena/projects/${project.id}/command`,{data:{version:project.version,action:'project',options:{name:'Changed elsewhere'}}})
   expect(changed.ok()).toBe(true)
-  await dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true}).click()
+  await dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true}).click()
   await expect(dialog.getByRole('alert')).toContainText('changed in another tab')
-  await expect(dialog.getByRole('button',{name:'Make group from MEE-corrected data',exact:true})).toBeDisabled()
+  await expect(dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true})).toBeDisabled()
   expect((await (await page.request.get(`/api/backend/api/athena/projects/${project.id}`)).json()).groups).toHaveLength(2)
   await page.reload();const reopened=await open(page);await configure(page,reopened,'arctangent')
   const saved=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='multi_electron')
-  await reopened.getByRole('button',{name:'Make group from MEE-corrected data',exact:true}).click()
-  expect((await saved).ok()).toBe(true);await expect(page.getByRole('heading',{ name: /^Data groups 3\b/ })).toBeVisible()
+  await reopened.getByRole('button',{name:'Save MEE-corrected data',exact:true}).click()
+  expect((await saved).ok()).toBe(true);await expect(page.getByRole('heading',{ name: /^Data 3\b/ })).toBeVisible()
 })

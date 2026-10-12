@@ -30,10 +30,10 @@ export function AthenaContextReport({ kind, project, groups }: { kind: ContextRe
   const finite = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
   const mean = finite.reduce((sum, v) => sum + v, 0) / finite.length
   const deviation = Math.sqrt(finite.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (finite.length - 1))
-  return <section className="ath-context-report" aria-label="Group report">
+  return <section className="ath-context-report" aria-label="Data report">
     {error && <p role="alert" className="ath-error">{error}</p>}
     {needsRequest && !remote && !error && <p role="status">Preparing report…</p>}
-    {!groups.length && <p>No groups in this selection.</p>}
+    {!groups.length && <p>No data in this selection.</p>}
     {kind === 'about' && groups.map(g => <article key={g.id}><h3>{g.label}</h3><dl>
       <dt>Data type</dt><dd>{dataTypeLabel(g)}</dd><dt>Points</dt><dd>{g.energy.length.toLocaleString()}</dd>
       <dt>Source</dt><dd>{String(g.source.filename ?? 'Generated spectrum')}</dd>
@@ -42,9 +42,9 @@ export function AthenaContextReport({ kind, project, groups }: { kind: ContextRe
       <dt>State</dt><dd>{g.frozen ? 'Frozen' : 'Editable'}{g.marked ? ' · marked' : ''}</dd>
       <dt>Processing</dt><dd>{g.processing_error ?? (g.result ? 'Processed' : 'No result')}</dd>
     </dl>{g.notes && <p>{g.notes}</p>}</article>)}
-    {kind === 'yaml' && <><h3>Group YAML <SectionHelp label="Group YAML contents">Saved parameters, source metadata, and complete data arrays.</SectionHelp></h3><pre aria-label="Group YAML">{groupYaml(groups.length === 1 ? groups[0] : groups)}</pre></>}
+    {kind === 'yaml' && <><h3>Data YAML <SectionHelp label="Data YAML contents">Saved parameters, source metadata, and complete data arrays.</SectionHelp></h3><pre aria-label="Data YAML">{groupYaml(groups.length === 1 ? groups[0] : groups)}</pre></>}
     {kind === 'source' && remote && <><h3>{remote.filename}</h3><pre aria-label="Original data file">{remote.text}</pre></>}
-    {(kind === 'shifts' || kind === 'steps') && <><table><thead><tr><th>Group</th><th>{kind === 'shifts' ? 'Energy shift (eV)' : 'Edge step'}</th>{kind === 'shifts' && <th>Recorded uncertainty (eV)</th>}</tr></thead><tbody>{groups.map((g, index) => {
+    {(kind === 'shifts' || kind === 'steps') && <><table><thead><tr><th>Data</th><th>{kind === 'shifts' ? 'Energy shift (eV)' : 'Edge step'}</th>{kind === 'shifts' && <th>Recorded uncertainty (eV)</th>}</tr></thead><tbody>{groups.map((g, index) => {
       const alignment = g.source.alignment as { energy_shift?: number; shift_stderr?: number } | undefined
       return <tr key={g.id}><th scope="row">{g.label}</th><td>{number(values[index])}</td>{kind === 'shifts' && <td>{number(alignment?.energy_shift === g.parameters.energy_shift ? alignment?.shift_stderr : null)}</td>}</tr>
     })}</tbody></table>{finite.length > 1 && <p>Average: {number(mean)} · Standard deviation: {number(deviation)}</p>}</>}

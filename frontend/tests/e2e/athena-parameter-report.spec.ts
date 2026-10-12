@@ -13,7 +13,7 @@ async function example(page:Page){
 async function openReport(page:Page,scope='all'){
   await page.getByRole('button',{name:'Edit',exact:true}).click()
   const preview=page.waitForResponse(r=>r.url().endsWith('/parameter-report/preview'))
-  await page.getByRole('button',{name:`Excel report on ${scope} groups…`,exact:true}).click()
+  await page.getByRole('button',{name:`Excel report on ${scope} data…`,exact:true}).click()
   const response=await preview;expect(response.ok()).toBe(true)
   const dialog=page.getByRole('dialog',{name:'Excel parameter report',exact:true})
   await expect(dialog.getByRole('button',{name:'Download Excel report'})).toBeEnabled()

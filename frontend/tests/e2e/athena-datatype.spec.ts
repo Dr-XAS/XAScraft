@@ -13,7 +13,7 @@ async function command(page: Page, name: string, action: () => Promise<unknown>)
   return project
 }
 async function openSettings(page: Page) {
-  await page.getByRole('navigation', { name: 'Main menu' }).getByRole('button', { name: 'Group', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Main menu' }).getByRole('button', { name: 'Data', exact: true }).click()
   await page.getByRole('button', { name: 'Processing settings…', exact: true }).click()
   return page.getByRole('dialog', { name: 'Processing settings', exact: true })
 }
@@ -46,7 +46,7 @@ test('real copper processing settings: four combinations, frozen recipes, scopes
   })
   expect(processed.groups[0].parameters.rbkg).toBe(1.9)
   expect(processed.groups[0].result?.arrays.chi).not.toEqual(initial.groups[0].result?.arrays.chi)
-  const frozen = await command(page, 'metadata', () => page.getByRole('button', { name: 'Freeze group', exact: true }).click())
+  const frozen = await command(page, 'metadata', () => page.getByRole('button', { name: 'Freeze data', exact: true }).click())
   // Freeze returns selection flags only; retain arrays and recipe from the completed processing response.
   const frozenFlags = frozen.groups.find(group => group.id === processed.groups[0].id)!
   expect(frozenFlags.frozen).toBe(true)
@@ -135,13 +135,13 @@ test('normalized input with EXAFS disabled survives downloaded .prj and reopened
   const path = info.outputPath('normalized-xanes.prj'); await (await download).saveAs(path)
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('button', { name: 'File', exact: true }).click()
   await page.getByRole('button', { name: 'New project', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /^Data groups 0\b/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Data 0\b/ })).toBeVisible()
   await page.getByRole('button', { name: 'Open project', exact: true }).click()
   await page.getByLabel('Open project file', { exact: true }).setInputFiles(path)
   const open = page.getByRole('dialog', { name: 'Open a project', exact: true })
-  await expect(open.getByRole('button', { name: 'Import all groups', exact: true })).toBeEnabled()
+  await expect(open.getByRole('button', { name: 'Import all data', exact: true })).toBeEnabled()
   const response = page.waitForResponse(r => r.url().endsWith('/restore-upload'), { timeout: 30000 })
-  await open.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await open.getByRole('button', { name: 'Import all data', exact: true }).click()
   const accepted = await response; expect(accepted.ok()).toBe(true)
   await expect(open).not.toBeVisible()
   const next = await accepted.json() as AthenaProject

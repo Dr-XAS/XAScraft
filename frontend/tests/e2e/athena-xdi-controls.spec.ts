@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 const fixtures = fileURLToPath(new URL('../../../backend/tests/fixtures/', import.meta.url))
 async function openMetadata(page: Page) {
-  await page.getByRole('button', { name: 'Group', exact: true }).click()
+  await page.getByRole('button', { name: 'Data', exact: true }).click()
   const loading = page.waitForResponse(r => r.url().endsWith('/xdi'))
   await page.getByRole('button', { name: 'File metadata…', exact: true }).click()
   const response = await loading; expect(response.ok()).toBe(true)
@@ -33,8 +33,8 @@ for (const file of ['xdi-official-cu_metal_rt.xdi', 'demeter-x11a-cu.012']) {
     const imported = await importing; expect(imported.ok()).toBe(true)
     const initial = await imported.json(), original = initial.groups[0]
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Group', exact: true }).click()
-    const frozen = await command(page, 'metadata', () => page.getByRole('navigation', { name: 'Main menu' }).getByRole('button', { name: 'Freeze group', exact: true }).click())
+    await page.getByRole('button', { name: 'Data', exact: true }).click()
+    const frozen = await command(page, 'metadata', () => page.getByRole('navigation', { name: 'Main menu' }).getByRole('button', { name: 'Freeze data', exact: true }).click())
     expect(frozen.ok()).toBe(true)
     let { dialog, data } = await openMetadata(page)
     await expect(dialog.getByText('Required metadata: 3 of 3 present', { exact: true })).toBeVisible()
@@ -99,7 +99,7 @@ for (const file of ['xdi-official-cu_metal_rt.xdi', 'demeter-x11a-cu.012']) {
     await page.getByRole('button', { name: 'Open project…', exact: true }).click()
     await page.getByLabel('Open project file', { exact: true }).setInputFiles(path)
     const restoring = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-    await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+    await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const restored = await restoring; expect(restored.ok()).toBe(true)
     const native = (await restored.json()).groups.at(-1)
     expect(native.source.xdi_metadata.comments_text).toBe(comments)
@@ -120,7 +120,7 @@ test('ordinary groups expose absorber metadata and missing field status', async 
   await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
   await page.locator('.ath-group-select').filter({ hasText: 'Cu foil · 10 K' }).click()
   await page.getByRole('tab', { name: 'Processing', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Edit group information', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit data information', exact: true })).toBeVisible()
   const { dialog } = await openMetadata(page)
   await expect(dialog.getByText('Required metadata: 2 of 3 present', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Recommended metadata: 0 of 5 present', { exact: true })).toBeVisible()

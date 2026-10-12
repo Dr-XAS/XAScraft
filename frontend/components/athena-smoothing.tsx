@@ -102,10 +102,10 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
 
   async function save() {
     if (!current || disabled || saving.current || committed.current !== key) return
-    saving.current = true; setBusy('Saving smoothed group'); setError('')
+    saving.current = true; setBusy('Saving smoothed data'); setError('')
     try {
       const next = await athenaApi<AthenaProject>(`/projects/${project.id}/command`, { version: current.version, action: 'smooth', group_ids: [activeId], options: current.options })
-      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the smoothed group.')
+      if (committed.current !== key) throw new Error('The workspace changed while saving. Reload the project to see the smoothed data.')
       const added = next.groups?.filter(g => !project.groups.some(old => old.id === g.id)), expected = current.results[0]
       if (next.id !== project.id || next.version !== current.version + 1 || added?.length !== 1
         || added[0].source.parent !== activeId || added[0].mu.length !== expected.smoothed_mu.length
@@ -113,7 +113,7 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
         || added[0].mu.some((v, i) => v !== expected.smoothed_mu[i]) || added[0].energy.some((v, i) => v !== expected.smoothed_energy[i])) throw new Error('The saved smoothing result could not be confirmed. Reload the project before trying again.')
       saved(next); close()
     } catch (reason) {
-      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the smoothed group. Preview again.')
+      setPreview(null); setError(reason instanceof Error ? reason.message : 'Could not save the smoothed data. Preview again.')
     } finally { saving.current = false; setBusy('') }
   }
   const arrays = group?.result?.arrays ?? {}, result = current?.results[0]
@@ -125,8 +125,8 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
   return <div className={`ath-modal-body ${smoothingStyles.body}`}>
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
-        <label className="ath-field"><span>Source group <SectionHelp label="Smoothing source">Frozen source groups can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source group" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
-        <label className="ath-field"><span>Algorithm <SectionHelp label="Smoothing algorithm">{draft.method === 'boxcar' || draft.method === 'gaussian' ? 'Even kernel sizes become the next odd size. Craft trims the filter boundaries; the preview reports how many points remain.' : draft.method === 'savitzky_golay' ? 'Uses Larch’s Savitzky–Golay filter and endpoint padding. Craft’s effective defaults are a 31-sample window and order 9. The preference ranges are window 0–39 and order 9–39; Larch may adjust their relationship.' : 'Repeats Craft’s three-point kernel: half the centre sample plus one quarter of each neighbour. Repetitions share the kernel-size control used by boxcar and Gaussian.'}<br /><br />Compare the original and filtered data before making a new group. Filters use neighbouring samples; on an irregular energy grid, their energy width varies along the scan. Smoothing can distort peak shapes and affect later analysis.</SectionHelp></span><select aria-label="Algorithm" value={draft.method} onChange={e => setDraft(d => ({ ...d, method: e.target.value as Method }))}>
+        <label className="ath-field"><span>Source data <SectionHelp label="Smoothing source">Frozen source data can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
+        <label className="ath-field"><span>Algorithm <SectionHelp label="Smoothing algorithm">{draft.method === 'boxcar' || draft.method === 'gaussian' ? 'Even kernel sizes become the next odd size. Craft trims the filter boundaries; the preview reports how many points remain.' : draft.method === 'savitzky_golay' ? 'Uses Larch’s Savitzky–Golay filter and endpoint padding. Craft’s effective defaults are a 31-sample window and order 9. The preference ranges are window 0–39 and order 9–39; Larch may adjust their relationship.' : 'Repeats Craft’s three-point kernel: half the centre sample plus one quarter of each neighbour. Repetitions share the kernel-size control used by boxcar and Gaussian.'}<br /><br />Compare the original and filtered data before making new data. Filters use neighbouring samples; on an irregular energy grid, their energy width varies along the scan. Smoothing can distort peak shapes and affect later analysis.</SectionHelp></span><select aria-label="Algorithm" value={draft.method} onChange={e => setDraft(d => ({ ...d, method: e.target.value as Method }))}>
           <option value="boxcar">Boxcar average</option><option value="gaussian">Gaussian filter</option><option value="savitzky_golay">Savitzky–Golay</option><option value="three_point">Three-point smoothing</option>
         </select></label>
         <div className="ath-fields">{fields.map(field => <label className="ath-field" key={field}><span>{names[field]} <SectionHelp label={names[field]}>{fieldInstructions[field]}</SectionHelp></span><input type="number" min={field === 'order' ? 9 : 0} max={field === 'order' || field === 'sgWindow' ? 39 : field === 'sigma' || draft.method === 'three_point' ? 1000 : 501} step={field === 'sigma' ? 'any' : 1} value={draft[field]} onChange={e => setDraft(d => ({ ...d, [field]: e.target.value, ...((field === 'sgWindow' || field === 'order') ? {sgEdited: true} : {}) }))} /></label>)}</div>
@@ -153,6 +153,6 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close smoothing tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and smoothed</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make smoothed group</button></div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close smoothing tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and smoothed</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make smoothed data</button></div>
   </div>
 }

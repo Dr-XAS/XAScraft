@@ -40,7 +40,7 @@ for (const mobile of [false, true]) test((mobile ? 'mobile' : 'desktop') + ' ori
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fileURLToPath(new URL('../../../examples/xafsdata/AthenaProjectFiles/Fe.prj', import.meta.url)))
   const importing = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-  await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await page.getByRole('button', { name: 'Import all data', exact: true }).click()
   expect((await importing).ok()).toBe(true)
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fileURLToPath(new URL('../../../backend/tests/fixtures/demeter-merge-fe.060', import.meta.url)))
@@ -142,7 +142,7 @@ for (const mobile of [false, true]) test((mobile ? 'mobile' : 'desktop') + ' ori
   await page.getByRole('button', { name: 'Open project', exact: true }).click()
   await page.getByLabel('Open project file', { exact: true }).setInputFiles(path)
   const restoring = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
-  await page.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await page.getByRole('button', { name: 'Import all data', exact: true }).click()
   const restored = await restoring; expect(restored.ok()).toBe(true)
   const roundtrip = await restored.json() as AthenaProject
   const copy = roundtrip.groups.at(-1)!

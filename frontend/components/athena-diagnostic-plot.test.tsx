@@ -37,11 +37,11 @@ it('renders every server-supplied panel, exposes fractional weights and k/q comp
   fireEvent.click(screen.getByRole('button', { name: 'Close diagnostic plots' })); expect(p.close).toHaveBeenCalledOnce()
 })
 
-it('uses exactly the marked groups in project order and explains incorrect scope', async () => {
+it('uses exactly the marked data in project order and explains incorrect scope', async () => {
   serve(); const p = props(), rendered = render(<AthenaDiagnosticPlot {...p} initialView="biquad" />); await ready()
   expect((api.mock.calls[0][1] as Options).group_ids).toEqual(['a', 'b'])
   rendered.rerender(<AthenaDiagnosticPlot {...p} project={{ ...project, groups: project.groups.map(g => ({ ...g, marked: g.id === 'b' })) }} />)
-  expect(screen.getByRole('status')).toHaveTextContent('mark exactly two groups')
+  expect(screen.getByRole('status')).toHaveTextContent('mark exactly two data items')
   expect(screen.queryByTestId('diagnostic-traces')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Replot diagnostics' })).toBeDisabled()
 })

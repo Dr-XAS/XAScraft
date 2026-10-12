@@ -138,7 +138,7 @@ it('aborts an inspection when closed so late results cannot reopen or change the
 it('rejects an inspection for another group before allowing any replacement', async () => {
   api.mockResolvedValueOnce({ ...inspection(), reimport_group_id: 'different' })
   const state = setup()
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('do not belong to this group'))
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('do not belong to this data'))
   expect(screen.queryByRole('button', { name: 'Apply column changes' })).not.toBeInTheDocument()
   expect(state.onApplied).not.toHaveBeenCalled()
 })

@@ -9,7 +9,7 @@ async function plotted(panel: Locator, space: 'E' | 'k') {
   return plot.evaluate(node => (node as HTMLElement & { data: { x: number[]; y: number[]; name: string }[] }).data.map(t => ({ x: [...t.x], y: [...t.y], name: t.name })))
 }
 
-test('Athena rebin previews measured E and k data, inserts current/marked groups, and undoes a whole batch', async ({ page }, info) => {
+test('Athena rebin previews measured E and k data, inserts current/marked data, and undoes a whole batch', async ({ page }, info) => {
   test.setTimeout(90000)
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message))
   await page.goto('/')
@@ -21,11 +21,11 @@ test('Athena rebin previews measured E and k data, inserts current/marked groups
   expect((await unmarking).ok()).toBe(true)
   // Marking returns selection flags; load the full saved arrays for the preview comparison.
   original = await (await page.request.get(`/api/backend/api/athena/projects/${original.id}`)).json()
-  await expect(page.getByRole('heading', { name: new RegExp(`^Data groups ${original.groups.length}\\b`) })).toBeVisible()
+  await expect(page.getByRole('heading', { name: new RegExp(`^Data ${original.groups.length}\\b`) })).toBeVisible()
   await page.getByRole('button', { name: 'Process', exact: true }).click()
   await page.getByRole('button', { name: 'Rebin data', exact: true }).click()
   const panel = page.getByRole('dialog', { name: 'Rebin data' })
-  await panel.getByLabel('Rebin source group').selectOption(original.groups[0].id)
+  await panel.getByLabel('Rebin source data').selectOption(original.groups[0].id)
   await expect.poll(async () => (await plotted(panel, 'E'))[0].name).toContain(original.groups[0].label)
   const ecurves = await plotted(panel, 'E')
   expect(ecurves).toHaveLength(2)
@@ -43,7 +43,7 @@ test('Athena rebin previews measured E and k data, inserts current/marked groups
   }
   expect(kcurves[0].y).toEqual(original.groups[0].result.arrays.weighted_chi)
   const created = page.waitForResponse(r => r.url().endsWith('/command'))
-  await panel.getByRole('button', { name: 'Make rebinned data group', exact: true }).click()
+  await panel.getByRole('button', { name: 'Make rebinned data', exact: true }).click()
   const one = await (await created).json()
   expect(one.groups).toHaveLength(original.groups.length + 1)
   expect(one.groups[0]).toEqual(original.groups[0])
@@ -53,10 +53,10 @@ test('Athena rebin previews measured E and k data, inserts current/marked groups
   expect(rebinned.result.arrays.weighted_chi).toEqual(kcurves[1].y)
   expect(rebinned.marked).toBe(false)
   await expect(panel.getByRole('status').filter({ hasText: 'Created 1' })).toBeVisible()
-  await panel.getByLabel('Preview marked groups (3)').check()
+  await panel.getByLabel('Preview marked data (3)').check()
   await expect.poll(async () => (await plotted(panel, 'k')).length).toBe(6)
   const batchResponse = page.waitForResponse(r => r.url().endsWith('/command'))
-  await panel.getByRole('button', { name: 'Rebin marked data and make groups', exact: true }).click()
+  await panel.getByRole('button', { name: 'Rebin marked data', exact: true }).click()
   const batch = await (await batchResponse).json()
   expect(batch.groups).toHaveLength(original.groups.length + 4)
   expect(batch.last_operation.rebin_results).toHaveLength(3)
@@ -74,11 +74,11 @@ test('Athena rebin previews measured E and k data, inserts current/marked groups
   await panel.screenshot({ path: info.outputPath('rebin-k-mobile.png') })
   await panel.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
-  await expect(page.getByRole('heading', { name: new RegExp(`^Data groups ${one.groups.length}\\b`) })).toBeVisible()
+  await expect(page.getByRole('heading', { name: new RegExp(`^Data ${one.groups.length}\\b`) })).toBeVisible()
   await page.getByRole('button', { name: 'Redo', exact: true }).click()
-  await expect(page.getByRole('heading', { name: new RegExp(`^Data groups ${batch.groups.length}\\b`) })).toBeVisible()
+  await expect(page.getByRole('heading', { name: new RegExp(`^Data ${batch.groups.length}\\b`) })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('heading', { name: new RegExp(`^Data groups ${batch.groups.length}\\b`) })).toBeVisible()
+  await expect(page.getByRole('heading', { name: new RegExp(`^Data ${batch.groups.length}\\b`) })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -90,7 +90,7 @@ test('saved rebin grid is shared with import, survives a new browser session, an
   try {
     await page.goto('/')
     await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
-    await expect(page.getByRole('heading', { name: /^Data groups 5\b/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /^Data 5\b/ })).toBeVisible()
     await page.getByRole('button', { name: 'Process', exact: true }).click()
     await page.getByRole('button', { name: 'Rebin data', exact: true }).click()
     let panel = page.getByRole('dialog')

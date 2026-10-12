@@ -15,7 +15,7 @@ async function importIron(page: Page) {
     fileURLToPath(new URL("../../../examples/xafsdata/AthenaProjectFiles/Fe.prj", import.meta.url)),
   )
   const importing = page.waitForResponse(response => response.url().endsWith("/restore-upload"))
-  await page.getByRole("button", { name: "Import all groups", exact: true }).click()
+  await page.getByRole("button", { name: "Import all data", exact: true }).click()
   const response = await importing
   expect(response.ok()).toBe(true)
   const project = await response.json() as AthenaProject

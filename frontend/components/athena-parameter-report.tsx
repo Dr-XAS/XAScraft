@@ -74,16 +74,16 @@ export function AthenaParameterReport({ project, initialScope, close, onBusyChan
   const columns = report?.columns.filter(c => c.index === 0 || section === 'all' || c.section === section) ?? []
   return <section className={styles.export} aria-label="Parameter report controls">
     <div className="ath-fields">
-      <label className="ath-field"><span>Report groups <SectionHelp label="Parameter report">The XLS report contains all 28 parameter columns. Processed values take precedence over saved settings. Main-pane edits process automatically; wait for processing to finish before exporting. Unused or unavailable settings are identified in the report notes.</SectionHelp></span><select value={scope} disabled={downloading} onChange={e => setScope(e.target.value as Scope)}>
-        <option value="all">All groups</option><option value="marked">Marked groups</option>
+      <label className="ath-field"><span>Report data <SectionHelp label="Parameter report">The XLS report contains all 28 parameter columns. Processed values take precedence over saved settings. Main-pane edits process automatically; wait for processing to finish before exporting. Unused or unavailable settings are identified in the report notes.</SectionHelp></span><select value={scope} disabled={downloading} onChange={e => setScope(e.target.value as Scope)}>
+        <option value="all">All data</option><option value="marked">Marked data</option>
       </select></label>
       <label className="ath-field"><span>Preview section <SectionHelp label="Preview section">Choose which family of processing parameters to inspect in the preview. The downloaded report still contains all 28 parameter columns.</SectionHelp></span><select value={section} onChange={e => setSection(e.target.value)}>
-        {(report?.sections ?? [{ key: 'identity', label: 'Group information' }]).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+        {(report?.sections ?? [{ key: 'identity', label: 'Data information' }]).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         <option value="all">All parameter columns</option>
       </select></label>
     </div>
-    <p>{selected.length} groups in project list order. Frozen groups are included.</p>
-    {!selected.length && <p role="status">Mark at least one group or choose All groups.</p>}
+    <p>{selected.length} data in project list order. Frozen data are included.</p>
+    {!selected.length && <p role="status">Mark at least one data item or choose All data.</p>}
     {loading && <p role="status">Preparing parameter report…</p>}
     {error && <p className="ath-error" role="alert">{error}</p>}
     {report && <><h3>{report.filename}</h3><div className={styles.table}><table aria-label="Parameter report preview">

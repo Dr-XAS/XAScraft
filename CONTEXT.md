@@ -11,8 +11,12 @@ The top-level container a user works in, holding an ordered list of groups plus 
 _Avoid_: session, document, workbook
 
 **Group**:
-One spectrum inside a project, carrying its own measured arrays, processing parameters, computed result and source record. Everything the user marks, freezes, plots, merges or exports is a group.
-_Avoid_: dataset, spectrum record, data group, trace
+The native Larch and API term for one spectrum inside a project, carrying its own measured arrays, processing parameters, computed result and source record. Code, saved projects and API fields retain `group` and `groups`.
+The web interface calls these spectra **data** (for example, **Current data**, **Marked data**, and **Duplicate current data**), so they are distinct from folder groups.
+_Avoid in interface copy_: group, data group, dataset, spectrum record, trace
+
+**Folder group**:
+A named folder used to organize spectra in the data list. Grouping changes organization, not the spectra or their processing parameters. The interface retains **Group** as the verb for putting spectra together in a folder.
 
 **Mark**:
 A per-group boolean saying the group is included in the next batch operation. Marks are independent of which group is currently highlighted, so a command can act on the marked set, the current group, or all groups.
@@ -248,7 +252,7 @@ deliberate and the naming follows Dr.XAS.
 
 ### Upstream terms are not ours to rename
 
-**Group**, **E0**, **edge step**, **AUTOBK**, **rbkg**, `xftf` and `xftr`, **k-weight**, and
+**Group** (retained in native/library/API vocabulary; displayed as **data** in the web interface), **E0**, **edge step**, **AUTOBK**, **rbkg**, `xftf` and `xftr`, **k-weight**, and
 the array names `norm`, `flat`, `chir_mag`, `chiq_re` come from Larch. **Project**, **Mark**,
 **Freeze**, **Linked reference**, **Background standard**, **Importance**, **Data type**,
 and **File plugin** come from desktop Athena and Demeter. **Oracle**, **Parity**, **Import

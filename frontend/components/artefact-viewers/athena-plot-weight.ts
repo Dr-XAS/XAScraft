@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { type AthenaGroup, type AthenaResult } from "@/lib/athena"
 import { useAthenaApi } from "@/lib/athena-context"
 import type { PlotSpace } from "./athena-plot-range"
@@ -15,7 +15,7 @@ export interface PlotWeightResult extends AthenaResult {
 interface Options {
   projectId?: string
   version?: number
-  /** Scientific revision; unchanged only after acknowledged flags or organization edits. */
+  /** Scientific revision; unchanged after edits that preserve existing spectra. */
   dataVersion?: number
   groups: AthenaGroup[]
   kWeight: number | null
@@ -62,6 +62,7 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
     transforms?: Map<string, PlotWeightResult>
     error?: string
   } | null>(null)
+  const cache = useRef<{ key: string; products: Map<string, { source: AthenaGroup["result"]; transform: PlotWeightResult }> }>({ key: "", products: new Map() })
   const retry = useCallback(() => setAttempt(value => value + 1), [])
   // Fourier products belong to individual spectra, independent of display order.
   const selection = JSON.stringify(groups.map(group => [group.id, usable(group)] as const)
@@ -75,6 +76,7 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
     ? "Open a saved project revision to calculate this k-weight." : null
   const ready = canTransform && !blockedGroup && !pending && !!projectId && version !== undefined
   const key = JSON.stringify([projectId, dataVersion, kWeight, space, selection, pending, ready, attempt])
+  const cacheKey = JSON.stringify([projectId, dataVersion, kWeight, space, attempt])
   const latest = useRef({ key, version })
   latest.current = { key, version }
   const requestAbort = useRef<AbortController | null>(null)
@@ -86,6 +88,7 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
   useEffect(() => () => requestAbort.current?.abort(), [])
 
   useEffect(() => {
+    if (!ready || cache.current.key !== cacheKey) cache.current = { key: cacheKey, products: new Map() }
     if (!ready || !projectId || version === undefined || kWeight === null || (space !== "R" && space !== "q")) return
     // Metadata-only revisions may reuse completed products, but unfinished
     // requests must restart with the server's current concurrency version.
@@ -94,9 +97,12 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
     requestAbort.current = abort
     let completed = false
     const ids = (JSON.parse(selection) as [string, boolean][]).filter(([, eligible]) => eligible).map(([id]) => id)
+    const sources = new Map(groups.map(group => [group.id, group.result]))
     const timer = window.setTimeout(async () => {
       try {
         const entries = await Promise.all(ids.map(async id => {
+          const cached = cache.current.products.get(id)
+          if (cache.current.key === cacheKey && cached && cached.source === sources.get(id)) return [id, cached.transform] as const
           const data = await athenaApi<PlotWeightResult>(`/projects/${projectId}/groups/${id}/plot-transform`, {
             version, kweight: kWeight,
           }, "POST", abort.signal)
@@ -108,6 +114,9 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
         }))
         if (!abort.signal.aborted && latest.current.key === key && latest.current.version === version) {
           completed = true
+          // Cache only an entirely successful request. A newly duplicated or
+          // marked spectrum needs its own product; unchanged ones keep theirs.
+          cache.current = { key: cacheKey, products: new Map(entries.map(([id, transform]) => [id, { source: sources.get(id)!, transform }])) }
           setResponse({ key, version, abort, transforms: new Map(entries) })
         }
       } catch (error) {
@@ -116,10 +125,11 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
       }
     }, 150)
     return () => { window.clearTimeout(timer); if (!completed || latest.current.key !== key) abort.abort() }
-  }, [key, ready, projectId, version, kWeight, space, selection])
+  }, [key, cacheKey, ready, projectId, version, kWeight, space, selection])
 
-  const transformedGroups = current?.transforms ? groups.map(group => {
-    const transform = current.transforms?.get(group.id)
+  const transforms = current?.transforms
+  const transformedGroups = useMemo(() => transforms ? groups.map(group => {
+    const transform = transforms.get(group.id)
     if (!transform || !group.result) return group
     return { ...group, result: {
       ...group.result,
@@ -127,7 +137,7 @@ export function useAthenaPlotWeight({ projectId, version, dataVersion = version,
       effective: { ...group.result.effective, ...transform.effective },
       warnings: [...new Set([...group.result.warnings, ...transform.warnings])],
     } }
-  }) : groups
+  }) : groups, [groups, transforms])
 
   return {
     groups: transformedGroups,

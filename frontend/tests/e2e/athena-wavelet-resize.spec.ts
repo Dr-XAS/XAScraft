@@ -140,7 +140,7 @@ test("combined wavelet views share data, preserve camera and keep the heatmap sq
   await page.getByRole("button", { name: "Import data", exact: true }).click()
   await page.getByLabel("Choose data files", { exact: true }).setInputFiles(fileURLToPath(new URL("../../../examples/xafsdata/AthenaProjectFiles/Fe.prj", import.meta.url)))
   const importing = page.waitForResponse(response => response.url().endsWith("/restore-upload"))
-  await page.getByRole("button", { name: "Import all groups", exact: true }).click()
+  await page.getByRole("button", { name: "Import all data", exact: true }).click()
   const imported = await importing
   expect(imported.ok()).toBe(true)
   const project = await imported.json() as AthenaProject

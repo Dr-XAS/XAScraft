@@ -108,7 +108,7 @@ export function AthenaProjectImport({ getProject, onImported, onComplete, onBusy
     if (!canRestore || !preview || !files.length) return
     const wholeBatch = all
     let remainingData: File[] | null = null
-    await task("Importing project groups", async () => {
+    await task("Importing project data", async () => {
       let current = preview
       let pending = files
       let selection = selected
@@ -188,16 +188,16 @@ export function AthenaProjectImport({ getProject, onImported, onComplete, onBusy
     try {
       const expression = new RegExp(pattern)
       const ids = preview?.groups.filter(group => expression.test(group.label)).map(group => group.id) ?? []
-      setSelected(ids); setSelectionNote(`${ids.length} groups match the pattern.`); setError("")
+      setSelected(ids); setSelectionNote(`${ids.length} data match the pattern.`); setError("")
     } catch { setError("Invalid regular expression. Check brackets and escaping, then try again.") }
   }
   function selectPeriodic() {
     const interval = Number(every), offset = Number(start)
     if (!Number.isInteger(interval) || interval < 1 || !Number.isInteger(offset) || offset < 1) {
-      setError("Use positive whole numbers for the interval and first group."); return
+      setError("Use positive whole numbers for the interval and first data item."); return
     }
     const ids = preview?.groups.filter((_, index) => index >= offset - 1 && (index - offset + 1) % interval === 0).map(group => group.id) ?? []
-    setSelected(ids); setSelectionNote(`${ids.length} groups selected by position.`); setError("")
+    setSelected(ids); setSelectionNote(`${ids.length} data selected by position.`); setError("")
   }
 
   return <section aria-label="Project file import" className={styles.panel}>
@@ -205,7 +205,7 @@ export function AthenaProjectImport({ getProject, onImported, onComplete, onBusy
     {files.length > 0 && <p className={styles.progress} role="status">{busy || `Reviewing ${files[0].name}`} · {files.length} project file{files.length === 1 ? "" : "s"} remaining</p>}
     {preview && <>
       {preview.file_plugin && <section aria-label="Project file conversion">
-        <h4>{preview.file_plugin.description} <SectionHelp label="Reader settings">Groups below use the reader settings from this inspection. Reinspect after changing configuration to recalculate and reset group selection.<br /><br />{preview.file_plugin.summary}</SectionHelp></h4>
+        <h4>{preview.file_plugin.description} <SectionHelp label="Reader settings">Data below use the reader settings from this inspection. Reinspect after changing configuration to recalculate and reset data selection.<br /><br />{preview.file_plugin.summary}</SectionHelp></h4>
         <div className="ath-modal-actions">
           <AthenaDownloadButton className="ath-button" path={`/projects/${project().id}/preview-project/${preview.upload_id}/file?variant=source`}>Download original file</AthenaDownloadButton>
           <AthenaDownloadButton className="ath-button" path={`/projects/${project().id}/preview-project/${preview.upload_id}/file?variant=converted`}>Download converted project</AthenaDownloadButton>
@@ -222,32 +222,32 @@ export function AthenaProjectImport({ getProject, onImported, onComplete, onBusy
             <button disabled={locked} onClick={() => { setSelected([]); setSelectionNote("") }}>Select none</button>
             <button disabled={locked} onClick={() => { setSelected(preview.groups.filter(group => !selected.includes(group.id)).map(group => group.id)); setSelectionNote("") }}>Invert</button>
           </div>
-          <div className={styles.groups} aria-label="Groups in project">
+          <div className={styles.groups} aria-label="Data in project">
             {preview.groups.map((group, index) => <div key={group.id} className={`${styles.group} ${activeId === group.id ? styles.active : ""}`}>
-              <input type="checkbox" aria-label={`Import ${group.label}, group ${index + 1}`} checked={selected.includes(group.id)} disabled={locked} onChange={event => selectGroup(index, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)} />
-              <button disabled={locked} aria-label={`Preview ${group.label}, group ${index + 1}`} aria-pressed={activeId === group.id} onClick={() => { setActiveId(group.id); setMode(group.data_type === "chi" ? "chi" : "mu") }}><strong>{group.label}</strong><small>{index + 1} · {group.data_type} · {group.points.toLocaleString()} points</small></button>
+              <input type="checkbox" aria-label={`Import ${group.label}, data ${index + 1}`} checked={selected.includes(group.id)} disabled={locked} onChange={event => selectGroup(index, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)} />
+              <button disabled={locked} aria-label={`Preview ${group.label}, data ${index + 1}`} aria-pressed={activeId === group.id} onClick={() => { setActiveId(group.id); setMode(group.data_type === "chi" ? "chi" : "mu") }}><strong>{group.label}</strong><small>{index + 1} · {group.data_type} · {group.points.toLocaleString()} points</small></button>
             </div>)}
             {!preview.groups.length && <p>No spectra in this project. Its journal and metadata can still be imported.</p>}
           </div>
           <div className={styles.periodic}>
-            <label className="ath-field"><span>Select every <SectionHelp label="Select every">Select every nth group in the archived project. Enter 1 to include every group, or a larger integer to sample a repeated series.</SectionHelp></span><input aria-label="Selection interval" type="number" min="1" step="1" value={every} disabled={locked} onChange={event => setEvery(event.target.value)} /></label>
-            <label className="ath-field"><span>Starting at group <SectionHelp label="Starting at group">Use the one-based group position where periodic selection begins. Review the marked rows before importing.</SectionHelp></span><input aria-label="Selection start" type="number" min="1" step="1" value={start} disabled={locked} onChange={event => setStart(event.target.value)} /></label>
+            <label className="ath-field"><span>Select every <SectionHelp label="Select every">Select every nth data item in the archived project. Enter 1 to include every data item, or a larger integer to sample a repeated series.</SectionHelp></span><input aria-label="Selection interval" type="number" min="1" step="1" value={every} disabled={locked} onChange={event => setEvery(event.target.value)} /></label>
+            <label className="ath-field"><span>Starting at data item <SectionHelp label="Starting at data item">Use the one-based data position where periodic selection begins. Review the marked rows before importing.</SectionHelp></span><input aria-label="Selection start" type="number" min="1" step="1" value={start} disabled={locked} onChange={event => setStart(event.target.value)} /></label>
             <button disabled={locked} onClick={selectPeriodic}>Select by position</button>
           </div>
-          <label className="ath-field"><span>Matching labels (regular expression) <SectionHelp label="Group selection">JavaScript regular expressions. Shift-click a checkbox to select a range.</SectionHelp></span><input value={pattern} disabled={locked} onChange={event => setPattern(event.target.value)} placeholder="e.g. foil|standard" /></label>
+          <label className="ath-field"><span>Matching labels (regular expression) <SectionHelp label="Data selection">JavaScript regular expressions. Shift-click a checkbox to select a range.</SectionHelp></span><input value={pattern} disabled={locked} onChange={event => setPattern(event.target.value)} placeholder="e.g. foil|standard" /></label>
           <button disabled={locked} onClick={selectMatching}>Select matching</button>
         </div>
         <div className={styles.details}>
           <h4>Project journal</h4><pre className={styles.journal}>{preview.journal || "No journal entries."}</pre>
           {active && <>
-            <label className="ath-field"><span>Preview signal <SectionHelp label="Preview signal">Inspect the highlighted archived group as absorption, normalized/flattened absorption, derivative or χ(k), as available. This does not change the imported parameters.</SectionHelp></span><select disabled={locked} value={mode} onChange={event => setMode(event.target.value as PreviewMode)}>{(active.data_type === "chi" ? ["chi"] : active.data_type === "detector" ? ["mu"] : ["mu", "norm", "flat", "dmude"]).map(value => <option value={value} key={value}>{active.data_type === "detector" ? "Detector signal" : modeLabels[value as PreviewMode]}</option>)}</select></label>
+            <label className="ath-field"><span>Preview signal <SectionHelp label="Preview signal">Inspect the highlighted archived data as absorption, normalized/flattened absorption, derivative or χ(k), as available. This does not change the imported parameters.</SectionHelp></span><select disabled={locked} value={mode} onChange={event => setMode(event.target.value as PreviewMode)}>{(active.data_type === "chi" ? ["chi"] : active.data_type === "detector" ? ["mu"] : ["mu", "norm", "flat", "dmude"]).map(value => <option value={value} key={value}>{active.data_type === "detector" ? "Detector signal" : modeLabels[value as PreviewMode]}</option>)}</select></label>
             <div className={styles.plot} aria-label={`Preview of ${active.label}`}>
               {plotBusy ? <p role="status">Calculating preview…</p> : trace?.x.length && !plotError ? <Plot data={[{x: trace.x.slice(), y: trace.y.slice(), type: "scatter", mode: "lines", name: trace.label, line: {color: "#16736b", width: 1.5}}]} layout={{autosize: true, margin: {l: 60, r: 14, t: 15, b: 50}, xaxis: {title: {text: mode === "chi" ? "k (Å⁻¹)" : "Energy (eV)"}}, yaxis: {title: {text: active.data_type === "detector" ? "Detector signal" : modeLabels[mode]}, automargin: true}, showlegend: false, uirevision: `${preview.upload_id}-${active.id}-${mode}`}} config={{responsive: true, displaylogo: false, displayModeBar: false}} useResizeHandler style={{width: "100%", height: "100%"}} /> : <p>{plotError || "No preview points available."}</p>}
             </div>
             {plotError && <button disabled={locked || plotBusy} onClick={() => setPlotRetry(value => value + 1)}>Retry plot preview</button>}
             {trace && active.points > trace.x.length && <p className="ath-hint">Displaying {trace.x.length} of {active.points.toLocaleString()} source points. The full data are imported.</p>}
-            <h4>Group notes</h4><pre className={styles.notes}>{active.notes || "No group notes."}</pre>
-            {active.reference_id && <p className="ath-hint">Reference: {preview.groups.find(group => group.id === active.reference_id)?.label ?? active.reference_id}. Include both groups to keep the link.</p>}
+            <h4>Data notes</h4><pre className={styles.notes}>{active.notes || "No data notes."}</pre>
+            {active.reference_id && <p className="ath-hint">Reference: {preview.groups.find(group => group.id === active.reference_id)?.label ?? active.reference_id}. Include both data items to keep the link.</p>}
             {active.background_standard_id && <p className="ath-hint">Background standard: {preview.groups.find(group => group.id === active.background_standard_id)?.label ?? active.background_standard_id}. Include the standard and its dependencies to retain this processing.</p>}
           </>}
         </div>
@@ -255,17 +255,17 @@ export function AthenaProjectImport({ getProject, onImported, onComplete, onBusy
       {!!compatibilityNotes.length && <details><summary>{compatibilityNotes.length} compatibility notes · original settings retained</summary>{compatibilityNotes.map((warning, index) => <p className="ath-warning" key={index}>{warning}</p>)}</details>}
       {selectionNote && <p role="status">{selectionNote}</p>}
       {!!getProject()?.groups.length && <div aria-label="Destination project">
-        <p className="ath-warning">{separate ? 'These groups open in a new, empty project.'
-          : `These groups are added to the open project “${getProject()!.name || 'Untitled project'}”, which already holds ${getProject()!.groups.length} groups.`}</p>
-        {newProject && <label className="ath-check"><input type="checkbox" checked={separate} disabled={locked} onChange={event => setSeparate(event.target.checked)} />Open in a new project instead <SectionHelp label="Open in a new project instead">Create a separate project from the chosen groups instead of appending them to the current project.</SectionHelp></label>}
+        <p className="ath-warning">{separate ? 'These data open in a new, empty project.'
+          : `These data are added to the open project “${getProject()!.name || 'Untitled project'}”, which already holds ${getProject()!.groups.length} data item${getProject()!.groups.length === 1 ? "" : "s"}.`}</p>
+        {newProject && <label className="ath-check"><input type="checkbox" checked={separate} disabled={locked} onChange={event => setSeparate(event.target.checked)} />Open in a new project instead <SectionHelp label="Open in a new project instead">Create a separate project from the chosen data instead of appending them to the current project.</SectionHelp></label>}
       </div>}
-      <p className="ath-hint">{!selected.length ? "No groups selected: Import all will import the entire project." : `${selected.length} of ${preview.groups.length} groups selected.`} <SectionHelp label="Project import scope">{all ? "Journal and supported analysis state are included. Compatibility notes identify settings retained only as metadata. Remaining project files will be imported in full." : "A subset imports data and recipes; saved analysis state is not restored. The next project will open for selection."}</SectionHelp></p>
+      <p className="ath-hint">{!selected.length ? "No data selected: Import all will import the entire project." : `${selected.length} of ${preview.groups.length} data selected.`} <SectionHelp label="Project import scope">{all ? "Journal and supported analysis state are included. Compatibility notes identify settings retained only as metadata. Remaining project files will be imported in full." : "A subset imports data and recipes; saved analysis state is not restored. The next project will open for selection."}</SectionHelp></p>
     </>}
     {error && <div className="ath-error" role="alert">{error}</div>}
     {files.length > 0 && <div className="ath-modal-actions">
       <button disabled={locked} onClick={() => { setFiles([]); setPreview(null); setError(""); setTrace(null) }}>Choose other projects</button>
       {!preview ? <button disabled={locked} onClick={() => { void task("Reading project preview", async () => { await inspect(files[0]) }) }}>Retry preview</button>
-        : <button className="ath-primary" disabled={locked || !canRestore} onClick={() => { void importSelected() }}>{busy ? "Importing…" : !preview.groups.length ? "Import project" : all ? "Import all groups" : `Import ${selected.length} selected groups`}</button>}
+        : <button className="ath-primary" disabled={locked || !canRestore} onClick={() => { void importSelected() }}>{busy ? "Importing…" : !preview.groups.length ? "Import project" : all ? "Import all data" : `Import ${selected.length} selected data`}</button>}
     </div>}
   </section>
 }

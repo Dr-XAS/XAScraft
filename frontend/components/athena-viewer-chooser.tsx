@@ -89,7 +89,7 @@ export function AthenaViewerChooser({ order, shown, onToggle, onToggleAll, onMov
   return <>
     <div ref={container} className="ath-viewer-chips" role="group" aria-label="Choose viewers">
       <button type="button" className="ath-viewer-chip ath-viewer-all" aria-pressed={order.every(id => shown.has(id))} onClick={onToggleAll}>All viewers</button>
-      <SectionHelp label="Choose viewers">Show or hide each results panel, or toggle all panels together. Single spectrum follows the highlighted group; Multiple spectra follows the marked groups. Drag a handle or use its arrow keys to reorder panels. These choices do not change project data.</SectionHelp>
+      <SectionHelp label="Choose viewers">Show or hide each results panel, or toggle all panels together. Single spectrum follows the highlighted data; Multiple spectra follows the marked data. Drag a handle or use its arrow keys to reorder panels. These choices do not change project data.</SectionHelp>
       {order.map((id, index) => {
         const Icon = viewerIcons[id]
         return <div key={id} className="ath-viewer-chip ath-viewer-chip-sortable" data-viewer-theme={id} data-viewer-chip-id={id} data-shown={shown.has(id)} data-dragging={preview?.source === id ? true : undefined} data-drop-target={preview?.target === id && preview.source !== id}>

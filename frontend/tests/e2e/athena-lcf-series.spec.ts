@@ -22,9 +22,9 @@ async function openProject(page: Page, file: string) {
     await expect(dialog).toBeVisible({ timeout: 3000 })
   }).toPass({ timeout: 120000 })
   await dialog.getByLabel('Open project file', { exact: true }).setInputFiles(file)
-  await expect(dialog.getByRole('button', { name: 'Import all groups', exact: true })).toBeEnabled({ timeout: 120000 })
+  await expect(dialog.getByRole('button', { name: 'Import all data', exact: true })).toBeEnabled({ timeout: 120000 })
   const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'), { timeout: 180000 })
-  await dialog.getByRole('button', { name: 'Import all groups', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Import all data', exact: true }).click()
   const project = await (await restored).json()
   await expect(dialog).toHaveCount(0, { timeout: 60000 })
   return project as { groups: { id: string; label: string }[] }

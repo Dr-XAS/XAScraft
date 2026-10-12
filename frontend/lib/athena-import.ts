@@ -337,7 +337,7 @@ export function batchCapacityWarning(mapping: ColumnMapping, inspection: Inspect
     Math.floor((MAX_PROJECT_VALUES - (valuesAfter - files * valuesPerFile)) / valuesPerFile)))
   if (groupsAfter <= MAX_PROJECT_GROUPS && valuesAfter <= MAX_PROJECT_VALUES) return null
   const reason = groupsAfter > MAX_PROJECT_GROUPS
-    ? `${groupsAfter} groups (${perFile} per file${referenced ? ', counting each reference' : ''}); a project holds at most ${MAX_PROJECT_GROUPS}`
+    ? `${groupsAfter} data (${perFile} per file${referenced ? ', counting each reference' : ''}); a project holds at most ${MAX_PROJECT_GROUPS}`
     : `about ${(valuesAfter / 1e6).toFixed(1)} million stored values; a project holds at most 2 million`
   return `This batch would bring the project to ${reason}. Only the first ${fit} of these ${files} files fit: import the series into its own new project, or choose fewer files.`
 }

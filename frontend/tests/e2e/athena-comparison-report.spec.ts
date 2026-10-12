@@ -67,7 +67,7 @@ for (const mobile of [false, true]) test(`${mobile ? 'mobile' : 'desktop'} compa
   expect(changed.reference_id).toBe(newReference.id)
   expect(changed.groups.every(group => group.id !== newReference.id)).toBe(true)
   const allResponse = page.waitForResponse(response => response.url().endsWith('/comparison-report'))
-  await dialog.getByRole('combobox', { name: 'Comparison groups', exact: true }).selectOption('all')
+  await dialog.getByRole('combobox', { name: 'Comparison data', exact: true }).selectOption('all')
   const all = await (await allResponse).json() as ComparisonReport
   expect(all.groups.map(group => group.id)).toEqual(project.groups.filter(group => group.id !== newReference.id).map(group => group.id))
   const duplicate = all.groups.find(group => group.duplicate_inputs.some(match => match.id === newReference.id))!

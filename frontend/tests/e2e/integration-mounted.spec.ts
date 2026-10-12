@@ -80,7 +80,7 @@ test("mounted persistent Athena completes its authorized lifecycle", async ({ pa
     const imported = await (await importedResponse).json()
     expect(imported.groups).toHaveLength(1)
     const group = imported.groups[0]
-    await expect(page.getByRole("heading", { name: /^Data groups 1/ })).toBeVisible()
+    await expect(page.getByRole("heading", { name: /^Data 1/ })).toBeVisible()
 
     const processedResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "parameters")
     const e0 = page.getByRole("spinbutton", { name: "E₀ eV", exact: true })
@@ -90,7 +90,7 @@ test("mounted persistent Athena completes its authorized lifecycle", async ({ pa
     expect(processed.groups[0].parameters.e0).toBe(8988)
 
     await page.reload()
-    await expect(page.getByRole("heading", { name: /^Data groups 1/ })).toBeVisible()
+    await expect(page.getByRole("heading", { name: /^Data 1/ })).toBeVisible()
     await expect(page.getByRole("spinbutton", { name: "E₀ eV", exact: true })).toHaveValue("8988")
 
     const download = page.waitForEvent("download")
@@ -103,7 +103,7 @@ test("mounted persistent Athena completes its authorized lifecycle", async ({ pa
     await page.getByLabel(`Mark ${group.label}`, { exact: true }).check()
     const markedProject = await (await markedResponse).json()
     await page.route("**/advanced-xas", route => route.fulfill({ status: 200, contentType: "text/html", body: "<title>Controlled Dr.XAS return</title>" }))
-    await page.getByRole("link", { name: "Import 1 selected group into Dr.XAS", exact: true }).click()
+    await page.getByRole("link", { name: "Import 1 selected data item into Dr.XAS", exact: true }).click()
     await expect(page).toHaveURL(`${frontendOrigin}/advanced-xas`)
     const selection = JSON.parse((await page.evaluate(() => sessionStorage.getItem("xraylarch.integration.return-selection.v1")))!)
     expect(selection).toEqual({
@@ -122,7 +122,7 @@ test("mounted persistent Athena completes its authorized lifecycle", async ({ pa
     })
     expect(stale.status()).toBe(404)
     await openLaunch(page, await launchProject(request, project))
-    await expect(page.getByRole("heading", { name: /^Data groups 1/ })).toBeVisible()
+    await expect(page.getByRole("heading", { name: /^Data 1/ })).toBeVisible()
 
     const unauthenticated = await request.get(`${mount}/api/backend/api/athena/projects/${project.project_id}`)
     expect(unauthenticated.status()).toBe(404)
