@@ -1,9 +1,3 @@
-# Shared project memory
-
-Read [CLAUDE.md](CLAUDE.md) for the shared memory bridge. Run the exact session
-bootstrap `memoryctl load` command before project mutation, and publish durable
-notes through `memoryctl` transactions. The API instructions below remain in force.
-
 # Git workflow
 
 Prefer working, committing, and pushing directly on our `master` branch. Use a
