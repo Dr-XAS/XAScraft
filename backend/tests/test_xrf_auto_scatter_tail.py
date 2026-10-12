@@ -233,3 +233,133 @@ def test_a_longer_tail_that_still_fails_the_pre_edge_check_is_not_taken(tail_run
                and 'pre-edge null check did not pass' in row['rejected_reasons'] for row in longer)
     assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
     assert result['fit_counts'] == fixed['fit_counts']
+
+
+def _refused_default(original, record=None, error=None):
+    """Stand in for _extract_fixed: the default 0.5 is refused (by `error`, a
+    fit failure unless given), longer tails run for real unless refused too."""
+    def extract_fixed(scan, counts, request, *args, **kwargs):
+        if record is not None:
+            record.append(request.scatter_beta)
+        if request.scatter_beta == 0.5 or error is not None and request.scatter_beta in error:
+            raise (error or {}).get(request.scatter_beta, engine.FitRefused(
+                'All selected detector elements failed calibration or amplitude fitting.'))
+        return original(scan, counts, request, *args, **kwargs)
+    return extract_fixed
+
+
+def _fail_default_fit(monkeypatch, failure):
+    """Make only the default 0.5 fit fail, below _extract_fixed, so the
+    production code itself must classify the refusal."""
+    if failure == 'calibration':
+        calibrate = engine.calibrate
+
+        def stopped(fitter, *args, **kwargs):
+            if fitter.options.scatter_beta == 0.5:
+                kwargs['max_nfev'] = 1
+            return calibrate(fitter, *args, **kwargs)
+        monkeypatch.setattr(engine, 'calibrate', stopped)
+    else:
+        fit_detector = engine.fit_detector
+
+        def shifted(*args):
+            fitted = fit_detector(*args)
+            if args[0].options.scatter_beta == 0.5:
+                fitted['energy'] = fitted['energy'] + 5.0     # the line leaves the window
+            return fitted
+        monkeypatch.setattr(engine, 'fit_detector', shifted)
+
+
+def test_a_refused_default_is_rescued_by_a_longer_tail_that_passes_every_check(
+        long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    _fail_default_fit(monkeypatch, 'calibration')
+    with pytest.raises(engine.FitRefused):
+        engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}))
+    result = engine.extract(scan, counts, options)
+    choice = result['metadata']['scatter_tail']
+    assert choice['selected_beta'] > 0.5
+    assert 'FitRefused' in choice['candidates'][0]['error']
+    selected = next(row for row in choice['candidates'] if row['beta'] == choice['selected_beta'])
+    assert selected['eligible'] and selected['checks']['pre_edge_null'] is True
+    assert result['quality']['fit']['checks']['pre_edge_null'] is True
+    assert any('default 0.5 peak widths could not be fitted' in text
+               for text in result['metadata']['warnings'])
+
+
+def test_a_rescue_needs_detector_elements_that_agree_in_shape(long_tail, monkeypatch):
+    """With no default to compare against, a candidate whose elements disagree
+    must not be taken even when the summed spectrum passes every check."""
+    scan, counts, options, _, _ = long_tail
+    _fail_default_fit(monkeypatch, 'calibration')
+    evidence = engine._tail_evidence
+
+    def disagreeing(result, beta):
+        found = evidence(result, beta)
+        found['detector_agreement'] = dict(detectors=2, checks=dict(shape_agreement=False))
+        return found
+    monkeypatch.setattr(engine, '_tail_evidence', disagreeing)
+    with pytest.raises(engine.FitRefused, match='also tried 2, 4, 8 and 16'):
+        engine.extract(scan, counts, options)
+
+
+def test_an_element_with_no_counts_is_refused_before_any_fit(long_tail, monkeypatch):
+    """Missing counts cannot be repaired by another tail: an input error, named,
+    and no calibration spent on it."""
+    scan, counts, options, _, _ = long_tail
+    calls = []
+    monkeypatch.setattr(engine, 'calibrate', lambda *args, **kwargs: calls.append(1))
+    with pytest.raises(ScientificError, match='element 1 recorded no counts') as error:
+        engine.extract(scan, np.zeros_like(counts), options)
+    assert not isinstance(error.value, engine.FitRefused) and not calls
+
+
+def test_an_input_error_at_the_default_never_starts_a_tail_search(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    missing = ScientificError('The scan has no channel named i0.')
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, {0.5: missing}))
+    with pytest.raises(ScientificError, match='no channel named') as error:
+        engine.extract(scan, counts, options)
+    assert tried == [0.5] and not isinstance(error.value, engine.FitRefused)
+
+
+def test_a_refusal_stands_when_no_longer_tail_can_be_fitted(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    refused = {beta: engine.FitRefused('All selected detector elements failed calibration.')
+               for beta in (0.5, 2.0, 4.0, 8.0, 16.0)}
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, refused))
+    with pytest.raises(engine.FitRefused, match='also tried 2, 4, 8 and 16'):
+        engine.extract(scan, counts, options)
+    assert tried == [0.5, 2.0, 4.0, 8.0, 16.0]
+
+
+def test_a_refused_explicit_tail_is_not_replaced(long_tail, monkeypatch):
+    scan, counts, options, _, _ = long_tail
+    tried = []
+    refused = {8.0: engine.FitRefused('All selected detector elements failed calibration.')}
+    monkeypatch.setattr(engine, '_extract_fixed',
+                        _refused_default(engine._extract_fixed, tried, refused))
+    with pytest.raises(engine.FitRefused):
+        engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 8.}))
+    assert tried == [8.0]
+
+
+def test_a_lost_target_line_is_refused_without_a_tail_search(long_tail, monkeypatch):
+    """A runaway calibration axis is not the mark of a wrong peak shape: no
+    evidence a longer tail helps, and four more full fits before the same
+    refusal. It stays a plain refusal, as before automatic tails."""
+    scan, counts, options, _, _ = long_tail
+    _fail_default_fit(monkeypatch, 'lost_line')
+    tried, original = [], engine._extract_fixed
+
+    def recorded(scan, counts, request, *args, **kwargs):
+        tried.append(request.scatter_beta)
+        return original(scan, counts, request, *args, **kwargs)
+    monkeypatch.setattr(engine, '_extract_fixed', recorded)
+    with pytest.raises(ScientificError, match='lost the') as error:
+        engine.extract(scan, counts, options)
+    assert tried == [0.5] and not isinstance(error.value, engine.FitRefused)
