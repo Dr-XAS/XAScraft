@@ -364,10 +364,12 @@ def frame(cube: dict, window: np.ndarray, options: XrfViewOptions) -> dict:
     raster = cube['raster']
     if raster is not None:
         image = roi.reshape(raster['rows'], raster['columns'])
+        fast = cube['axes'][raster['fast']].reshape(raster['rows'], raster['columns'])
         if raster['serpentine']:
-            image = image.copy()
-            image[1::2] = image[1::2, ::-1]
-        fast = cube['axes'][raster['fast']].reshape(raster['rows'], raster['columns'])[0]
+            # Sort each row's intensities with its coordinates, whichever
+            # direction the first row was scanned.
+            image = np.take_along_axis(image, np.argsort(fast, axis=1), axis=1)
+        fast = fast[0]
         slow = cube['axes'][raster['slow']][::raster['columns']]
         result['map'] = dict(
             rows=raster['rows'], columns=raster['columns'],
