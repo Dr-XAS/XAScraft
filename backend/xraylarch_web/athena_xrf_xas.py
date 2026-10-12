@@ -1821,15 +1821,17 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     detector used, never more than the full budget: a longer tail that cannot
     calibrate within that is not a better description of the scan, and without
     the cap a scan whose candidates never converge pays the full budget four
-    times. The search stops at the first candidate that cannot be fitted at all,
-    since longer tails depart further from the default's peak shape.
+    times. Every candidate is tried: convergence is not monotonic in the tail.
     A candidate must converge on every detector, retain every upward edge,
     pass edge-direction/post-edge checks, and not worsen either detector RMS
-    or mean calibration redchi relative to 0.5. Among admissible candidates
-    and the default, prefer a passing null check, then the smallest maximum
-    of |mean|/limit, |scan drift|/limit and detrended RMS/limit; break ties by
-    detector RMS, calibration redchi and shorter tail. These are selection
-    criteria, not new quality checks or evidence of accuracy above the edge.
+    or mean calibration redchi relative to 0.5; and it must pass the pre-edge
+    null check, as the documented manual remedy (raise the tail until the check
+    passes) requires. A longer tail that still fails the check is no evidence
+    of a better spectrum and can move the edge step further from the truth.
+    Among such candidates take the smallest maximum of |mean|/limit, |scan
+    drift|/limit and detrended RMS/limit; break ties by detector RMS,
+    calibration redchi and shorter tail. These are selection criteria, not
+    new quality checks or evidence of accuracy above the edge.
     """
     automatic = options.scatter_beta is None and options.engine == 'larch'
     fixed = options.model_copy(update={'scatter_beta': 0.5}) if automatic else options
@@ -1859,7 +1861,7 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
                 # discard the default extraction or a candidate already accepted.
                 trials.append(dict(beta=beta, eligible=False,
                                    error=f'{type(exc).__name__}: {exc}'))
-                break
+                continue
             evidence = _tail_evidence(candidate, beta)
             reasons = []
             if not evidence['fits_converged']:
@@ -1871,6 +1873,8 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
                 reasons.append('edge-direction or post-edge check did not pass')
             if evidence['null_score'] is None:
                 reasons.append('pre-edge evidence unavailable')
+            elif evidence['checks']['pre_edge_null'] is not True:
+                reasons.append('pre-edge null check did not pass')
             if evidence['detector_rms'] > baseline['detector_rms']:
                 reasons.append('detector agreement worsened')
             if evidence['calibration_redchi'] > baseline['calibration_redchi']:
@@ -1881,32 +1885,24 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
                 best, result = evidence, candidate
 
     searched = len(trials) > 1
-    tried = [trial['beta'] for trial in trials[1:]]
     if searched and best['beta'] == 0.5:
         # The search ran and nothing it tried was acceptable: say so, without
         # claiming a different tail, so a saved group keeps the record too.
-        stopped = ('error' in trials[-1] and len(tried) < 4)
         result['metadata']['warnings'].append(
-            f'Automatic scatter tail: tried {_listed(tried)} peak widths after the pre-edge '
-            'null check found a positive offset' +
-            (f', stopping at {tried[-1]:g}, which could not be fitted' if stopped else '') +
-            '; none was acceptable, so the default 0.5 was kept. The extracted spectrum may '
-            'be unreliable. Review the detector spectra and fit settings before analysis.')
+            'Automatic scatter tail: tried 2, 4, 8 and 16 peak widths after the pre-edge '
+            'null check found a positive offset; none passed that check with converged, '
+            'no less consistent detector fits, so the default 0.5 was kept. The extracted '
+            'spectrum may be unreliable. Review the detector spectra and fit settings '
+            'before analysis.')
     if best['beta'] != 0.5:
         # A changed tail changes the result, so the user is told.
         null = best['null_test']
         message = (f'Automatic scatter tail: selected {best["beta"]:g} peak widths '
-                   f'after trying 0.5, {_listed(tried, "")}. Pre-edge mean '
+                   f'after trying 0.5, 2, 4, 8, 16. Pre-edge mean '
                    f'{null["mean_frac_of_jump"]:.4g}, drift over scan '
                    f'{null["drift_over_scan_frac_of_jump"]:.4g}, detrended RMS '
-                   f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump.')
-        if best['checks']['pre_edge_null'] is False:
-            message += (' The pre-edge null check still fails; no acceptable tail cleared it. '
-                        'The extracted spectrum may be unreliable. Review the detector '
-                        'spectra and fit settings before analysis.')
-        else:
-            message += (' The pre-edge null check passes; this does not establish '
-                        'accuracy above the edge.')
+                   f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump. The pre-edge '
+                   'null check passes; this does not establish accuracy above the edge.')
         result['metadata']['warnings'].append(message)
 
     result['metadata']['request']['scatter_beta'] = None
@@ -1914,14 +1910,6 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
         automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials,
         candidate_calibration_evaluations=budget if searched else None)
     return result
-
-
-def _listed(betas, last=' and '):
-    """2, 4, 8 and 16 -- or, with last='', 2, 4, 8, 16."""
-    names = [f'{beta:g}' for beta in betas]
-    if len(names) < 2 or not last:
-        return ', '.join(names)
-    return ', '.join(names[:-1]) + last + names[-1]
 
 
 def _tail_evidence(result, beta):

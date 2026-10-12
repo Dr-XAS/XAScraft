@@ -38,22 +38,49 @@ def test_a_passing_default_is_not_refitted_or_numerically_changed(monkeypatch):
 
 
 @pytest.fixture(scope='module')
-def long_tail():
-    # Only the generating tail differs from the existing synthetic Mn scan.
-    # Selection sees counts, not generating amplitudes or target yields.
+def tail_runtime():
+    runtime = XrfRuntime(1)
+    yield runtime
+    runtime.close()
+
+
+@pytest.fixture(scope='module')
+def long_tail(tail_runtime):
+    # Only the generating tail differs from the existing synthetic Mn scan; at
+    # this length a longer fitted tail passes the pre-edge check. Selection
+    # sees counts, not generating amplitudes or target yields.
     scan, counts, options, _ = synthetic_scan(
-        points=32, detectors=1, calibration_points=3, scatter_beta=8.)
+        points=32, detectors=1, calibration_points=3, scatter_beta=16.)
     automatic_options = options.model_copy(update={'scatter_beta': None})
     # The server's fit cache lets the search reuse the explicit default's fit.
     resolved, windows = engine.resolve_windows(scan, automatic_options)
-    runtime = XrfRuntime(1)
-    try:
-        fixed = runtime.extract(scan, counts, resolved.model_copy(update={'scatter_beta': 0.5}),
-                                windows, 'long-tail-one-detector')
-        automatic = runtime.extract(scan, counts, resolved, windows, 'long-tail-one-detector')
-    finally:
-        runtime.close()
+    fixed = tail_runtime.extract(scan, counts, resolved.model_copy(update={'scatter_beta': 0.5}),
+                                 windows, LONG_TAIL)
+    automatic = tail_runtime.extract(scan, counts, resolved, windows, LONG_TAIL)
     return scan, counts, automatic_options, fixed, automatic
+
+
+LONG_TAIL = 'long-tail-one-detector'
+
+
+def test_a_budget_limited_candidate_fit_is_never_served_to_an_explicit_request(
+        long_tail, tail_runtime, monkeypatch):
+    """The search fitted each tail under a lowered calibration budget and cached
+    it; an explicit request for the chosen tail must get a full-budget fit."""
+    scan, counts, options, _, automatic = long_tail
+    chosen = automatic['metadata']['scatter_tail']['selected_beta']
+    budgets = []
+    original = engine.fit_detector
+
+    def recorded(*args):
+        budgets.append(args[5] if len(args) > 5 else None)
+        return original(*args)
+
+    monkeypatch.setattr(engine, 'fit_detector', recorded)
+    resolved, windows = engine.resolve_windows(scan, options)
+    tail_runtime.extract(scan, counts, resolved.model_copy(update={'scatter_beta': chosen}),
+                         windows, LONG_TAIL)
+    assert budgets == [None]
 
 
 def test_an_unmodelled_long_tail_is_not_left_in_the_pre_edge(long_tail):
@@ -68,9 +95,9 @@ def test_an_unmodelled_long_tail_is_not_left_in_the_pre_edge(long_tail):
     assert selected['null_test'] == automatic['quality']['fit']['null_test']
     assert selected['fits_converged'] and selected['eligible']
     assert automatic['metadata']['request']['scatter_beta'] is None
-    assert any('Automatic scatter tail' in text for text in automatic['metadata']['warnings'])
-    if automatic['quality']['fit']['checks']['pre_edge_null'] is False:
-        assert any('still fails' in text for text in automatic['metadata']['warnings'])
+    assert automatic['quality']['fit']['checks']['pre_edge_null'] is True
+    assert any('Automatic scatter tail: selected' in text
+               for text in automatic['metadata']['warnings'])
 
 
 def test_an_explicit_tail_is_not_replaced_even_when_its_check_fails(long_tail):
@@ -106,16 +133,35 @@ def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(lon
     assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
     assert all('error' in trial and not trial['eligible']
                for trial in result['metadata']['scatter_tail']['candidates'][1:])
-    # The shortest longer tail was really tried and could not be fitted, so the
-    # search stopped there rather than paying for three more failing fits; the
-    # default is kept, the failed check still shows, and the user is told.
+    # Every longer tail was really tried and failed; the default is kept, the failed
+    # check still shows, and the user is told the repair was attempted without success.
     tried = result['metadata']['scatter_tail']['candidates'][1:]
-    assert [trial['beta'] for trial in tried] == [2.0]
+    assert [trial['beta'] for trial in tried] == [2.0, 4.0, 8.0, 16.0]
     assert result['quality']['fit']['checks']['pre_edge_null'] is False
-    assert any('stopping at 2, which could not be fitted; none was acceptable' in text
-               for text in result['metadata']['warnings'])
+    assert any('none passed that check' in text for text in result['metadata']['warnings'])
     assert not any('selected' in text and 'Automatic scatter tail' in text
                    for text in result['metadata']['warnings'])
+
+
+def test_a_candidate_that_cannot_be_fitted_does_not_end_the_search(long_tail, monkeypatch):
+    """Convergence is not monotonic in the tail: a longer tail can fit where a
+    shorter one failed, so one failure must not stop the search."""
+    scan, counts, options, fixed, automatic = long_tail
+    original = engine._extract_fixed
+
+    def first_fails(scan, counts, request, *args, **kwargs):
+        if request.scatter_beta == 0.5:
+            return copy.deepcopy(fixed)
+        if request.scatter_beta == 2.0:
+            raise ScientificError('All selected detector elements failed calibration')
+        return original(scan, counts, request, *args, **kwargs)
+
+    monkeypatch.setattr(engine, '_extract_fixed', first_fails)
+    result = engine.extract(scan, counts, options)
+    assert [row['beta'] for row in result['metadata']['scatter_tail']['candidates']] == \
+        [0.5, 2.0, 4.0, 8.0, 16.0]
+    assert result['metadata']['scatter_tail']['selected_beta'] == \
+        automatic['metadata']['scatter_tail']['selected_beta'] > 2.0
 
 
 def two_copies(scan, counts):
