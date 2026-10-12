@@ -75,12 +75,12 @@ const SYMBOL=/^[A-Z][a-z]?$/
 const SHIFT=/^\s*(\d+)\s*:\s*([+-]?\d+)\s*$/
 const INTEGERS=['calibration_points','point_stride','preview_detector','nnorm'] as const
 const OPTIONAL_INTEGERS=['channel_lo','channel_hi','roi_lo','roi_hi','preview_point'] as const
-const REQUIRED=[...INTEGERS,'thickness','compton_angle','scatter_beta','pre1','pre2','norm1','norm2'] as const
-// Empty means: read from the file.
-const OPTIONAL_NUMBERS=['cal_offset','cal_slope'] as const
+const REQUIRED=[...INTEGERS,'thickness','compton_angle','pre1','pre2','norm1','norm2'] as const
+// Empty means: read the calibration from the file, or choose the scatter tail automatically.
+const OPTIONAL_NUMBERS=['cal_offset','cal_slope','scatter_beta'] as const
 const palette=['#16736b','#b76d37','#6a4fa3','#2c7fb8','#c0392b','#7f8c2a','#a0338e','#4d6b8a']
 const blank={target:'',matrix:'',shifts:'',channel_lo:'',channel_hi:'',roi_lo:'',roi_hi:'',thickness:'1',cal_offset:'',
-  cal_slope:'',compton_angle:'110',scatter_beta:'0.5',calibration_points:'6',point_stride:'1',preview_point:'',preview_detector:'0',
+  cal_slope:'',compton_angle:'110',scatter_beta:'',calibration_points:'6',point_stride:'1',preview_point:'',preview_detector:'0',
   e0:'',pre1:'-170',pre2:'-40',norm1:'100',norm2:'700',nnorm:'2'}
 const labels:Record<string,string>={channel_lo:'Fit window first channel',channel_hi:'Fit window end channel (exclusive)',
   roi_lo:'Comparison window first channel',roi_hi:'Comparison window end channel (exclusive)',e0:'Edge energy E₀ (eV)',
@@ -216,7 +216,7 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
     &&(optional('cal_offset')===null||Math.abs(optional('cal_offset')!)<=0.5)
     &&(optional('cal_slope')===null||(optional('cal_slope')!>0.0001&&optional('cal_slope')!<=0.1))
     &&value('compton_angle')>=30&&value('compton_angle')<=180
-    &&value('scatter_beta')>0&&value('scatter_beta')<=20
+    &&(optional('scatter_beta')===null||(optional('scatter_beta')!>0&&optional('scatter_beta')!<=20))
   const scanRanges=value('calibration_points')>=2&&value('calibration_points')<=32
     &&value('point_stride')>=1&&value('point_stride')<=64
     &&(optional('preview_point')===null||(optional('preview_point')!>=0&&optional('preview_point')!<(inspection?.points??0)))
@@ -245,7 +245,7 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
     channel_shifts:shiftsValid?shifts as number[][]:[],
     channel_range:fitAuto?null:fit,roi_range:roiAuto?null:roi,
     detector_material:material,detector_thickness:value('thickness'),
-    cal_offset:optional('cal_offset'),cal_slope:optional('cal_slope'),compton_angle:value('compton_angle'),scatter_beta:value('scatter_beta'),
+    cal_offset:optional('cal_offset'),cal_slope:optional('cal_slope'),compton_angle:value('compton_angle'),scatter_beta:optional('scatter_beta'),
     calibration_points:value('calibration_points'),point_stride:value('point_stride'),background,engine,
     e0:form.e0.trim()===''?null:value('e0'),pre1:value('pre1'),pre2:value('pre2'),
     norm1:value('norm1'),norm2:value('norm2'),nnorm:value('nnorm'),
@@ -457,7 +457,7 @@ export function AthenaXrfXas({project,onSaved,setBusy,initialFile,onViewRaw}: {
           <label className="ath-field"><span>Energy offset (keV) <SectionHelp label="Energy offset (keV)">Initial intercept for detected energy = offset + slope × channel. Calibration refines it; the starting value also places automatic channel windows. Leave it empty to use the calibration read from the file.</SectionHelp></span><input type="number" min="-0.5" max="0.5" step="any" placeholder={fileCalibration?`From the file: ${fileCalibration.cal_offset.toFixed(3)}`:'From the file'} value={form.cal_offset} onChange={e=>edit('cal_offset',e.target.value)} /></label>
           <label className="ath-field"><span>Energy per channel (keV) <SectionHelp label="Energy per channel (keV)">Initial detector gain in keV per channel; 0.01 means 10 eV per channel. Calibration refines it. Leave it empty to use the calibration read from the file.</SectionHelp></span><input type="number" min="0.0001" max="0.1" step="any" placeholder={fileCalibration?`From the file: ${fileCalibration.cal_slope.toFixed(5)}`:'From the file'} value={form.cal_slope} onChange={e=>edit('cal_slope',e.target.value)} /></label>
           <label className="ath-field"><span>Compton scattering angle (°) <SectionHelp label="Compton scattering angle (°)">Starting angle used to locate the Compton scattering contribution. It is refined during detector calibration along with line-shape parameters.</SectionHelp></span><input type="number" min="30" max="180" step="any" value={form.compton_angle} onChange={e=>edit('compton_angle',e.target.value)} /></label>
-          <label className="ath-field"><span>Scatter tail length (peak widths) <SectionHelp label="Scatter tail length (peak widths)">Set the fixed low-energy scatter-tail length relative to peak width. This is held during calibration; use the residual and pre-edge quality checks to judge changes.</SectionHelp></span><input type="number" step="any" min={0} max={20} disabled={mapstorch} value={form.scatter_beta} onChange={e=>edit('scatter_beta',e.target.value)} /></label>
+          <label className="ath-field"><span>Scatter tail length (peak widths) <SectionHelp label="Scatter tail length (peak widths)">Leave empty to start at 0.5 peak widths and, only if the pre-edge check fails, let the fit try longer tails and keep the one its own checks support; the choice is reported with the extraction. A number fixes the low-energy scatter-tail length relative to peak width, held during calibration.</SectionHelp></span><input type="number" step="any" min={0} max={20} disabled={mapstorch} value={form.scatter_beta} placeholder="automatic" onChange={e=>edit('scatter_beta',e.target.value)} /></label>
           <label className="ath-field"><span>Calibration scan points <SectionHelp label="Calibration scan points">Number of representative scan points used to calibrate each detector element. More points provide more spectral evidence but cost more computation.</SectionHelp></span><input type="number" step={1} min={2} max={32} value={form.calibration_points} onChange={e=>edit('calibration_points',e.target.value)} /></label>
           <label className="ath-field"><span>Continuum background <SectionHelp label="Continuum background">Fit a smooth continuum together with fluorescence lines, or omit it when justified. The continuum is not subtracted from counts before the line fit.</SectionHelp></span><select value={background} onChange={e=>setBackground(e.target.value)}><option value="smooth">Fitted with the lines</option><option value="none">None</option></select></label>
           <label className="ath-field"><span>Preview point stride <SectionHelp label="Preview point stride">Draw every nth scan point in the extracted-XAS preview. All scan points are still fitted and saved when you make a data item.</SectionHelp></span><input type="number" step={1} min={1} max={64} value={form.point_stride} onChange={e=>edit('point_stride',e.target.value)} /></label>
