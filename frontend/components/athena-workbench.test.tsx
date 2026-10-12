@@ -5168,17 +5168,89 @@ describe("AthenaWorkbench group selection and drafts", () => {
     expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
   })
 
-  it.each(["blur", "Enter"] as const)("waits for a focused numeric field to commit with %s before starting the debounce", async commit => {
+  it.each([
+    [/^E₀/, "e0", 8985],
+    [/^Pre-edge start/, "pre1", -175],
+    [/^Pre-edge end/, "pre2", -20],
+    [/^Post-edge start/, "norm1", 120],
+    [/^Post-edge end/, "norm2", 350],
+  ] as const)("processes a valid focused %s edit after the debounce and refreshes the plotted result", async (label, key, value) => {
     const project = await openSaved()
-    const next = nextProject(project, { foil: { parameters: { ...parameters, rbkg: 2.3 } } })
+    const saved = project.groups[0]
+    const next = nextProject(project, { foil: {
+      parameters: { ...saved.parameters, [key]: value },
+      result: { ...saved.result!, effective: { ...saved.result!.effective, [key]: value } },
+    } })
     api.mockResolvedValueOnce(next)
     vi.useFakeTimers()
-    const input = screen.getByRole("spinbutton", { name: /^Rbkg/ })
+    const input = screen.getByRole("spinbutton", { name: label })
 
     act(() => input.focus())
-    editNumber(/^Rbkg/, 2.3)
+    editNumber(label, value)
+    await act(async () => { await vi.advanceTimersByTimeAsync(399) })
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(plotProps("current").active).toEqual(saved)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "parameters", group_ids: ["foil"], options: { [key]: value },
+    })
+    expect(plotProps("current").groups[0]).toEqual(next.groups[0])
+    expect(input).toHaveFocus()
+    expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
+  })
+
+  it.each([8990, 8979])("preserves a newer focused edit to %s while the previous calculation is running", async value => {
+    const project = await openSaved()
+    const first = deferred<AthenaProject>()
+    const second = deferred<AthenaProject>()
+    const saved = project.groups[0]
+    const afterFirst = nextProject(project, { foil: {
+      parameters: { ...saved.parameters, e0: 8985 },
+      result: { ...saved.result!, effective: { ...saved.result!.effective, e0: 8985 } },
+    } })
+    const afterSecond = nextProject(afterFirst, { foil: {
+      parameters: { ...saved.parameters, e0: value },
+      result: { ...saved.result!, effective: { ...saved.result!.effective, e0: value } },
+    } })
+    api.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    vi.useFakeTimers()
+    const input = screen.getByRole("spinbutton", { name: /^E₀/ })
+    act(() => input.focus())
+    editNumber(/^E₀/, 8985)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(input).toBeEnabled()
+    expect(input).toHaveFocus()
+
+    editNumber(/^E₀/, value)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenCalledTimes(2)
+    await act(async () => { first.resolve(afterFirst); await Promise.resolve() })
+    expect(input).toHaveValue(value)
+    expect(plotProps("current").groups[0].result!.effective.e0).toBe(8985)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: afterFirst.version, action: "parameters", group_ids: ["foil"], options: { e0: value },
+    })
+    await act(async () => { second.resolve(afterSecond); await Promise.resolve() })
+    expect(input).toHaveFocus()
+    expect(plotProps("current").groups[0].result!.effective.e0).toBe(value)
+    expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
+  })
+
+  it.each(["blur", "Enter"] as const)("waits for a cleared numeric field to commit with %s before restoring automatic processing", async commit => {
+    const project = await openSaved()
+    const next = nextProject(project, { foil: { parameters: { ...parameters, e0: null } } })
+    api.mockResolvedValueOnce(next)
+    vi.useFakeTimers()
+    const input = screen.getByRole("spinbutton", { name: /^E₀/ })
+
+    act(() => input.focus())
+    editNumber(/^E₀/, "")
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
     expect(api.mock.calls).toEqual([[`/projects/${project.id}`]])
+    expect(input).toHaveValue(null)
 
     if (commit === "Enter") fireEvent.keyDown(input, { key: "Enter" })
     else fireEvent.blur(input)
@@ -5187,7 +5259,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1) })
 
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
-      version: project.version, action: "parameters", group_ids: ["foil"], options: { rbkg: 2.3 },
+      version: project.version, action: "parameters", group_ids: ["foil"], options: { e0: null },
     })
     expect(plotProps().active).toEqual(next.groups[0])
   })
@@ -5286,6 +5358,76 @@ describe("AthenaWorkbench group selection and drafts", () => {
     expect(screen.getByRole("spinbutton", { name: /^Energy shift/ })).toHaveValue(5)
     expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toBeDisabled()
     expect(plotProps().active).toEqual(project.groups[2])
+  })
+
+  it.each([false, true])("copies a newer edit back to the source's original value while marked processing runs (source marked: %s)", async sourceMarked => {
+    const initial = projectFixture()
+    initial.groups[0].marked = sourceMarked
+    const project = await openSaved(initial)
+    const first = deferred<AthenaProject>()
+    const second = deferred<AthenaProject>()
+    const source = project.groups[0]
+    const targetIds = project.groups.filter(group => group.marked).map(group => group.id)
+    const copied = { ...source.parameters, rbkg: 2.2 }
+    const afterFirst = nextProject(project, Object.fromEntries(targetIds.map(id => [id, { parameters: copied }])))
+    const afterSecond = nextProject(afterFirst, Object.fromEntries(targetIds.map(id => [id, { parameters: source.parameters }])))
+    api.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Apply to marked (?:groups|data)/i }))
+    vi.useFakeTimers()
+    const input = screen.getByRole("spinbutton", { name: /^Rbkg/ })
+    act(() => input.focus())
+    editNumber(/^Rbkg/, copied.rbkg)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "copy_parameters", group_ids: targetIds,
+      options: { source_id: source.id, section: "all", values: copied },
+    })
+    expect(input).toBeEnabled()
+
+    editNumber(/^Rbkg/, source.parameters.rbkg)
+    await act(async () => { first.resolve(afterFirst); await Promise.resolve() })
+    expect(input).toHaveValue(source.parameters.rbkg)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: afterFirst.version, action: "copy_parameters", group_ids: targetIds,
+      options: { source_id: source.id, section: "all", values: source.parameters },
+    })
+    await act(async () => { second.resolve(afterSecond); await Promise.resolve() })
+    expect(api).toHaveBeenCalledTimes(3)
+    expect(plotProps().groups.map(group => group.parameters.rbkg)).toEqual(targetIds.map(() => source.parameters.rbkg))
+    expect(input).toHaveFocus()
+    expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
+  })
+
+  it.each(["retry", "current"] as const)("keeps a failed marked copy with values equal to its source reviewable via %s", async recovery => {
+    const project = await openSaved()
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Apply to marked (?:groups|data)/i }))
+    api.mockRejectedValueOnce(new Error("Processing unavailable"))
+    vi.useFakeTimers()
+    editNumber(/^Rbkg/, 2.2)
+    editNumber(/^Rbkg/, project.groups[0].parameters.rbkg)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(screen.getByRole("alert")).toHaveTextContent("Processing unavailable")
+    expect(screen.getByRole("button", { name: "Retry processing" })).toBeEnabled()
+    if (recovery === "current") {
+      fireEvent.click(screen.getByRole("checkbox", { name: /^Apply to marked (?:groups|data)/i }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+      expect(api).toHaveBeenCalledTimes(2)
+      expect(screen.queryByRole("button", { name: "Retry processing" })).not.toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
+      return
+    }
+    const copied = nextProject(project, Object.fromEntries(project.groups.filter(group => group.marked)
+      .map(group => [group.id, { parameters: project.groups[0].parameters }])))
+    api.mockResolvedValueOnce(copied)
+    fireEvent.click(screen.getByRole("button", { name: "Retry processing" }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "copy_parameters", group_ids: ["sample", "oxide"],
+      options: { source_id: "foil", section: "all", values: project.groups[0].parameters },
+    })
+    expect(screen.queryByRole("button", { name: "Retry processing" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /discard parameter changes/i })).not.toBeInTheDocument()
   })
 
   it("retains a failed draft without a retry loop and retries it explicitly without another edit", async () => {

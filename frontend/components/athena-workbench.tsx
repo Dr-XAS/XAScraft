@@ -119,6 +119,7 @@ const parameterSections = {
 type ParameterSection = "all" | keyof typeof parameterSections
 type ParameterSelection = { section: ParameterSection } | { parameter: keyof Parameters }
 type AutoApplyPlan = { token: number; projectId: string; sourceId: string; mode: "current" | "marked"; targetIds: string[]; status: "queued" | "failed" }
+type ParameterSubmission = { sourceId: string; parameters: Parameters }
 type GroupDropTarget = { id: string; position: "before" | "after" }
 type SpectrumDropTarget = GroupDropTarget | { folderId: string }
 type GroupReorderFocus = { id: string; handle: HTMLButtonElement }
@@ -245,10 +246,10 @@ function ContextLabel({ label, children, open }: { label: string; children: Reac
   }}>⋯</button></span>
 }
 
-function NumberField({ label, visibleLabel = label, value, onChange, unit, effective, optional = false, step = "any", pick, contextMenu, disabled = false, onEditingChange, help, range = {} }: {
+function NumberField({ label, visibleLabel = label, value, onChange, unit, effective, optional = false, step = "any", pick, contextMenu, disabled = false, onIncompleteChange, help, range = {} }: {
   label: string; visibleLabel?: string; value: number | null; onChange: (v: number | null) => void; unit?: string
   effective?: unknown; optional?: boolean; step?: string; pick?: ReactNode; disabled?: boolean; contextMenu?: (event: ContextEvent) => void
-  onEditingChange?: (editing: boolean) => void; help?: string; range?: NumericRange
+  onIncompleteChange?: (incomplete: boolean) => void; help?: string; range?: NumericRange
 }) {
   const inputId = useId()
   const [emptyWhileEditing, setEmptyWhileEditing] = useState(false)
@@ -258,10 +259,13 @@ function NumberField({ label, visibleLabel = label, value, onChange, unit, effec
   // explicit override. Clearing stays blank until blur so typing still works.
   const displayedValue = value ?? (!emptyWhileEditing ? automaticValue : null) ?? ""
   const problem = numericRangeProblem(value, range, label, optional)
-  const input = (descriptionId?: string, helpIcon?: ReactNode) => <label className="ath-field" htmlFor={inputId}>{contextMenu ? <ContextLabel label={label} open={contextMenu}><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</ContextLabel> : <span><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</span>}<input ref={node => { node?.setCustomValidity(problem ?? "") }} id={inputId} disabled={disabled} aria-invalid={!!problem} aria-describedby={[descriptionId, problem ? `${inputId}-range-error` : undefined, optional && value === null ? `${inputId}-calculated` : undefined].filter(Boolean).join(" ") || undefined} aria-label={`${label}${unit ? ` ${unit}` : ""}`} type="number" min={range.min} max={range.max} step={range.integer ? 1 : step} value={displayedValue} onFocus={() => onEditingChange?.(true)} onChange={e => {
+  const input = (descriptionId?: string, helpIcon?: ReactNode) => <label className="ath-field" htmlFor={inputId}>{contextMenu ? <ContextLabel label={label} open={contextMenu}><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</ContextLabel> : <span><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</span>}<input ref={node => { node?.setCustomValidity(problem ?? "") }} id={inputId} disabled={disabled} aria-invalid={!!problem} aria-describedby={[descriptionId, problem ? `${inputId}-range-error` : undefined, optional && value === null ? `${inputId}-calculated` : undefined].filter(Boolean).join(" ") || undefined} aria-label={`${label}${unit ? ` ${unit}` : ""}`} type="number" min={range.min} max={range.max} step={range.integer ? 1 : step} value={displayedValue} onFocus={() => onIncompleteChange?.(emptyWhileEditing)} onChange={e => {
     setEmptyWhileEditing(e.target.value === "")
+    // A valid value can process while focused. Hold a cleared/partial number
+    // until blur or Enter so it is not submitted as an automatic (null) value.
+    onIncompleteChange?.(e.target === document.activeElement && e.target.value === "")
     onChange(e.target.value === "" ? null : Number(e.target.value))
-  }} onBlur={() => { setEmptyWhileEditing(false); onEditingChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{problem && <em id={`${inputId}-range-error`}>{problem}</em>}{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}{optional && value !== null && typeof effective === 'number' && value !== effective && <em>Used in saved result: {Number(effective.toPrecision(10))}</em>}</label>
+  }} onBlur={() => { setEmptyWhileEditing(false); onIncompleteChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{problem && <em id={`${inputId}-range-error`}>{problem}</em>}{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}{optional && value !== null && typeof effective === 'number' && value !== effective && <em>Used in saved result: {Number(effective.toPrecision(10))}</em>}</label>
   const content = (descriptionId?: string, helpIcon?: ReactNode) => pick ? <div className="ath-pick-field">{input(descriptionId, helpIcon)}{pick}</div> : input(descriptionId, helpIcon)
   return help ? <ParameterHelp label={label} help={help}>{content}</ParameterHelp> : content()
 }
@@ -464,8 +468,8 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   const [drafts, setDrafts] = useState<Record<string, Parameters>>({})
   const [autoApplyPlans, setAutoApplyPlans] = useState<Record<string, AutoApplyPlan>>({})
   const autoApplySerial = useRef(0)
-  const autoApplyInFlight = useRef<number | null>(null)
-  const [parameterFieldEditing, setParameterFieldEditing] = useState(false)
+  const autoApplyInFlight = useRef<(ParameterSubmission & { token: number }) | null>(null)
+  const [parameterInputIncomplete, setParameterInputIncomplete] = useState(false)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [analysisVisible, setAnalysisVisible] = useState(false)
   const [inspection, setInspection] = useState<InspectionResponse | null>(null)
@@ -670,11 +674,13 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     row.querySelector<HTMLButtonElement>(".ath-group-select")?.focus({ preventScroll: true })
   })
   const parameters = active && (drafts[active.id] ?? active.parameters)
-  const dirty = active && parameters && !sameParameters(parameters, active.parameters)
   const activeAutoApplyPlan = active ? autoApplyPlans[active.id] : undefined
+  const dirty = active && parameters && (!sameParameters(parameters, active.parameters) || activeAutoApplyPlan?.mode === "marked")
   const parameterUpdatePending = Object.keys(autoApplyPlans).length > 0
   const currentFitResult = !dirty && !parameterUpdatePending && artemisResult?.project_id === project?.id && (artemisResult?.archive || artemisResult?.version === project?.version) && artemisResult?.group_id === active?.id ? artemisResult : null
   const parameterUpdateRunning = Object.values(autoApplyPlans).some(plan => plan.status === "queued")
+  const automaticParameterProcessing = busy === "Processing spectra" && autoApplyInFlight.current !== null
+  useEffect(() => { setParameterInputIncomplete(false) }, [active?.id, parameterTab])
   const undoDisabled = !project?.undo.length || !!busy || parameterUpdatePending || !canCommand("undo")
   const redoDisabled = !project?.redo.length || !!busy || parameterUpdatePending || !canCommand("redo")
   useEffect(() => {
@@ -993,7 +999,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     })
   }
 
-  function accept(p: AthenaProject, preservePlotData = false) {
+  function accept(p: AthenaProject, preservePlotData = false, submission?: ParameterSubmission & { sourceApplied: boolean }) {
     if (!preservePlotData) setPlotDataVersion(p.version)
     if (p.import_preferences_warning && !preferenceWarnings.current.includes(p.import_preferences_warning)) preferenceWarnings.current.push(p.import_preferences_warning)
     const previous = projectRef.current
@@ -1004,7 +1010,15 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       setDrafts(current => {
         const updated: Record<string, Parameters> = {}
         for (const [id, draft] of Object.entries(current)) {
-          const before = previous.groups.find(group => group.id === id)?.parameters
+          // An unmarked/skipped source is an editor for the copied values, not
+          // a target. Keep its latest copy intent even if it matches its saved values.
+          if (submission?.sourceId === id && !submission.sourceApplied) {
+            updated[id] = draft
+            continue
+          }
+          // Live edits can arrive during processing, including a return to the
+          // old saved value. Rebase those edits against what was submitted.
+          const before = submission?.sourceId === id ? submission.parameters : previous.groups.find(group => group.id === id)?.parameters
           const saved = p.groups.find(group => group.id === id)?.parameters
           if (!before || !saved) continue
           const rebased = rebaseParameterDraft(draft, before, saved)
@@ -1118,7 +1132,10 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     }
     skippedCount.current = next.last_operation?.action === action ? next.last_operation.skipped_group_ids.length : 0
     if (next.last_operation?.action === action && next.last_operation.warnings) preferenceWarnings.current.push(...next.last_operation.warnings)
-    accept(next, selectionUpdate || organizationOnly)
+    const submission = action === "parameters" || action === "copy_parameters" ? autoApplyInFlight.current : null
+    const sourceApplied = submission &&
+      group_ids.includes(submission.sourceId) && !next.last_operation?.skipped_group_ids.includes(submission.sourceId)
+    accept(next, selectionUpdate || organizationOnly, submission ? { ...submission, sourceApplied: !!sourceApplied } : undefined)
     return next
   }
   function act(action: string, ids = active ? [active.id] : [], opts: Record<string, unknown> = {}) {
@@ -1239,7 +1256,11 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     }
     const source = active
     const next = { ...parameters, [key]: value }
-    const changed = !sameParameters(next, source.parameters)
+    const submission = autoApplyInFlight.current
+    // Copying to marked data is an explicit intent even when these values equal
+    // the source: other targets may still hold the previous copied values.
+    const changed = applyMarked || !sameParameters(next, source.parameters) ||
+      (submission?.sourceId === source.id && !sameParameters(next, submission.parameters))
     const token = changed ? ++autoApplySerial.current : 0
     setDrafts(current => {
       const updated = { ...current }
@@ -1312,7 +1333,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   }
   function changeApplyMarked(checked: boolean) {
     setApplyMarked(checked)
-    if (!active || !drafts[active.id] || sameParameters(drafts[active.id], active.parameters)) return
+    if (!active || !drafts[active.id] || (sameParameters(drafts[active.id], active.parameters) && !autoApplyPlans[active.id])) return
     const token = ++autoApplySerial.current
     setAutoApplyPlans(current => ({ ...current, [active.id]: {
       token,
@@ -1389,31 +1410,31 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     else failAutoApply(plan)
   }
   useEffect(() => {
-    if (busy || parameterFieldEditing || autoApplyInFlight.current !== null) return
+    if (busy || parameterInputIncomplete || autoApplyInFlight.current !== null) return
     const plan = Object.values(autoApplyPlans).filter(candidate => candidate.status === "queued").sort((left, right) => left.token - right.token)[0]
     if (!plan) return
     const source = project?.groups.find(group => group.id === plan.sourceId)
     const draft = drafts[plan.sourceId]
-    if (!source || plan.projectId !== project?.id || !draft || sameParameters(draft, source.parameters)) {
+    if (!source || plan.projectId !== project?.id || !draft || (plan.mode === "current" && sameParameters(draft, source.parameters))) {
       finishAutoApply(plan)
       return
     }
     const timer = window.setTimeout(() => {
       if (autoApplyInFlight.current !== null) return
-      autoApplyInFlight.current = plan.token
+      autoApplyInFlight.current = { token: plan.token, sourceId: plan.sourceId, parameters: { ...draft } }
       void autoApplyParameters(plan, { ...draft }).finally(() => {
-        if (autoApplyInFlight.current === plan.token) autoApplyInFlight.current = null
+        if (autoApplyInFlight.current?.token === plan.token) autoApplyInFlight.current = null
       })
     }, parameterAutoApplyDelay)
     return () => window.clearTimeout(timer)
-  }, [autoApplyPlans, busy, drafts, parameterFieldEditing, project]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoApplyPlans, busy, drafts, parameterInputIncomplete, project]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!project) return
     setAutoApplyPlans(current => {
       const updated = Object.fromEntries(Object.entries(current).filter(([id, plan]) => {
         if (plan.status !== "failed") return true
         const group = project.groups.find(item => item.id === id)
-        return !!group && !!drafts[id] && !sameParameters(drafts[id], group.parameters)
+        return !!group && !!drafts[id] && (plan.mode === "marked" || !sameParameters(drafts[id], group.parameters))
       }))
       return Object.keys(updated).length === Object.keys(current).length ? current : updated
     })
@@ -1477,12 +1498,12 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   function field(key: keyof Parameters, label: string, unit?: string, optional = false, visibleLabel = label) {
     if (!parameters || !active) return null
     const value = parameters[key] === undefined ? ({ bkg_dk: 1, nclamp: 5 } as Partial<Parameters>)[key] : parameters[key]
-    return <NumberField key={`${active.id}:${key}`} label={label} visibleLabel={visibleLabel} range={(parameterRanges as Partial<Record<keyof Parameters, NumericRange>>)[key]} help={parameterHelp[key]} disabled={active.frozen} contextMenu={event => showContext(event, { kind: "field", field: key })} value={value as number | null} unit={unit} optional={optional} effective={active.result?.effective[key === "step" ? "edge_step" : key]} onEditingChange={setParameterFieldEditing} onChange={v => changeParameter(key, v)} pick={key in pickFields ? pickButton(key as PickKey, label) : undefined} />
+    return <NumberField key={`${active.id}:${key}`} label={label} visibleLabel={visibleLabel} range={(parameterRanges as Partial<Record<keyof Parameters, NumericRange>>)[key]} help={parameterHelp[key]} disabled={active.frozen} contextMenu={event => showContext(event, { kind: "field", field: key })} value={value as number | null} unit={unit} optional={optional} effective={active.result?.effective[key === "step" ? "edge_step" : key]} onIncompleteChange={setParameterInputIncomplete} onChange={v => changeParameter(key, v)} pick={key in pickFields ? pickButton(key as PickKey, label) : undefined} />
   }
   function splineEnergyField(key: "bkg_kmin" | "bkg_kmax", label: string, visibleLabel = label) {
     const k = parameters?.[key]
     const effective = active?.result?.effective[key]
-    return <NumberField label={label} visibleLabel={visibleLabel} range={{ min: 0, max: 100 ** 2 * ktoe, exclusiveMin: key === "bkg_kmax" }} help={additionalParameterHelp[key === "bkg_kmin" ? "spline_energy_min" : "spline_energy_max"]} disabled={active?.frozen} contextMenu={event => showContext(event, { kind: "field", field: "spline_energy" })} unit="E − E₀ (eV)" value={typeof k === "number" ? k * k * ktoe : null} optional={key === "bkg_kmax"} effective={typeof effective === "number" ? effective * effective * ktoe : undefined} pick={pickButton(key, label, true)} onEditingChange={setParameterFieldEditing} onChange={value => {
+    return <NumberField label={label} visibleLabel={visibleLabel} range={{ min: 0, max: 100 ** 2 * ktoe, exclusiveMin: key === "bkg_kmax" }} help={additionalParameterHelp[key === "bkg_kmin" ? "spline_energy_min" : "spline_energy_max"]} disabled={active?.frozen} contextMenu={event => showContext(event, { kind: "field", field: "spline_energy" })} unit="E − E₀ (eV)" value={typeof k === "number" ? k * k * ktoe : null} optional={key === "bkg_kmax"} effective={typeof effective === "number" ? effective * effective * ktoe : undefined} pick={pickButton(key, label, true)} onIncompleteChange={setParameterInputIncomplete} onChange={value => {
       if (value !== null && (!Number.isFinite(value) || value < 0)) { cancelPick(); setError("Spline energy relative to E₀ must be nonnegative. Correct the value to continue."); return }
       setError(""); changeParameter(key, value === null ? key === "bkg_kmin" ? 0 : null : Math.sqrt(value / ktoe))
     }} />
@@ -2538,7 +2559,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
           : <ArtemisFitResultViewer projectId={can("plot") ? project?.id : undefined} version={project?.version} group={active} pending={!!busy || !!dirty || parameterUpdatePending} result={currentFitResult} />}
         </div>)}</div>
       </section>}
-      processing={<aside id="athena-processing-parameters" className="ath-parameters"><div className="ath-panel-heading" onContextMenu={parameterTab === "processing" ? event => showContext(event, { kind: "processing" }) : undefined}><h2 aria-label={parameterTab === "processing" ? "Processing parameters" : undefined}>{parameterTab === "processing" ? <ContextLabel label="Processing parameters" open={event => showContext(event, { kind: "processing" })}>Processing parameters</ContextLabel> : "EXAFS fitting"}</h2><Settings2 size={16} /></div><AthenaParameterTabs tab={parameterTab} select={tab => { cancelPick(); setParameterTab(tab) }} onProcessingContextMenu={event => showContext(event, { kind: "processing" })} processing={<>{!active ? <div className="ath-param-empty"><Settings2 size={30} strokeWidth={1} /><p>No current group.<SectionHelp label="Processing parameters">Parameters follow the selected group. Import a spectrum to begin normalization and background removal.</SectionHelp></p></div> : <><div className="ath-param-current"><span className="ath-green-dot" /><strong><ContextLabel label="Group parameters" open={event => showContext(event, { kind: "section", section: "group" })}>{active.label}</ContextLabel></strong><button aria-label="Spectrum processing settings" title="Processing settings" disabled={!!busy} onClick={() => openTool('datatype')}><Settings2 size={14} />Processing</button><button aria-label={active.frozen ? "Unfreeze group" : "Freeze group"} disabled={!!busy} onClick={() => act("metadata", [active.id], { frozen: !active.frozen })}><LockKeyhole size={14} />{active.frozen ? "Frozen" : "Freeze"}</button></div><fieldset disabled={!!busy || !can("parameters")} className="ath-param-fields">
+      processing={<aside id="athena-processing-parameters" className="ath-parameters"><div className="ath-panel-heading" onContextMenu={parameterTab === "processing" ? event => showContext(event, { kind: "processing" }) : undefined}><h2 aria-label={parameterTab === "processing" ? "Processing parameters" : undefined}>{parameterTab === "processing" ? <ContextLabel label="Processing parameters" open={event => showContext(event, { kind: "processing" })}>Processing parameters</ContextLabel> : "EXAFS fitting"}</h2><Settings2 size={16} /></div><AthenaParameterTabs tab={parameterTab} select={tab => { cancelPick(); setParameterTab(tab) }} onProcessingContextMenu={event => showContext(event, { kind: "processing" })} processing={<>{!active ? <div className="ath-param-empty"><Settings2 size={30} strokeWidth={1} /><p>No current group.<SectionHelp label="Processing parameters">Parameters follow the selected group. Import a spectrum to begin normalization and background removal.</SectionHelp></p></div> : <><div className="ath-param-current"><span className="ath-green-dot" /><strong><ContextLabel label="Group parameters" open={event => showContext(event, { kind: "section", section: "group" })}>{active.label}</ContextLabel></strong><button aria-label="Spectrum processing settings" title="Processing settings" disabled={!!busy} onClick={() => openTool('datatype')}><Settings2 size={14} />Processing</button><button aria-label={active.frozen ? "Unfreeze group" : "Freeze group"} disabled={!!busy} onClick={() => act("metadata", [active.id], { frozen: !active.frozen })}><LockKeyhole size={14} />{active.frozen ? "Frozen" : "Freeze"}</button></div><fieldset disabled={(!!busy && !automaticParameterProcessing) || !can("parameters")} className="ath-param-fields">
         <details open><ParameterSectionHeading icon={NormalizationIcon}><ContextLabel label="Normalization" open={event => showContext(event, { kind: "section", section: "background" })}>Normalization <small>μ(E)</small></ContextLabel><SectionHelp label="Calculated normalization values">Calculated values come from this spectrum. Edit a value to override it; clear it to use the calculated value again.</SectionHelp></ParameterSectionHeading><fieldset className="ath-e0-fields" disabled={active.data_type === "chi" || active.data_type === "detector"}><div className="ath-fields"><div className="ath-e0-control">{field("e0", "E₀", "eV", true)}{active.data_type !== "chi" && active.data_type !== "detector" && e0SelectionButton()}</div>{field("step", "Edge step", undefined, true)}{field("pre1", "Pre-edge start", "eV relative", true)}{field("pre2", "Pre-edge end", "eV relative", true)}{field("norm1", "Post-edge start", "eV relative", true)}{field("norm2", "Post-edge end", "eV relative", true)}<ParameterHelp label="Polynomial degree" help={parameterHelp.nnorm}>{(descriptionId, helpIcon) => <label className="ath-field" htmlFor="ath-polynomial-degree"><ContextLabel label="Polynomial degree" open={event => showContext(event, { kind: "field", field: "nnorm" })}><span className="ath-field-title">Polynomial degree{helpIcon}</span></ContextLabel><select aria-describedby={descriptionId} id="ath-polynomial-degree" disabled={active.frozen} aria-label="Polynomial degree" value={parameters?.nnorm ?? ""} onChange={e => changeParameter("nnorm", e.target.value === "" ? null : Number(e.target.value))}><option value="" hidden>{typeof active.result?.effective.nnorm === "number" && [0, 1, 2, 3].includes(active.result.effective.nnorm) ? active.result.effective.nnorm : "—"}</option>{[0, 1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}</select></label>}</ParameterHelp>{active.data_type !== "detector" && field("energy_shift", "Energy shift", "eV")}</div><ParameterHelp label="Flatten normalized data" help={parameterHelp.flatten}>{(descriptionId, helpIcon) => <label className="ath-check"><input aria-describedby={descriptionId} type="checkbox" disabled={active.frozen} aria-label="Flatten normalized data" checked={parameters?.flatten} onChange={e => changeParameter("flatten", e.target.checked)} /><ContextLabel label="Flatten normalized data" open={event => showContext(event, { kind: "field", field: "flatten" })}>Flatten normalized data{helpIcon}</ContextLabel></label>}</ParameterHelp><ParameterHelp label="Fix edge step" help={additionalParameterHelp.fix_step}>{(descriptionId, helpIcon) => <label className="ath-check"><input aria-describedby={descriptionId} type="checkbox" aria-label="Fix edge step" disabled={active.frozen || typeof (parameters?.step ?? active.result?.effective.edge_step) !== "number"} checked={parameters?.step !== null} onChange={event => changeParameter("step", event.target.checked ? Number(active.result?.effective.edge_step) : null)} /><ContextLabel label="Fix edge step" open={event => showContext(event, { kind: "field", field: "fix_step" })}>Fix edge step{helpIcon}</ContextLabel></label>}</ParameterHelp></fieldset>{(active.data_type === "chi" || active.data_type === "detector") && e0SelectionButton()}{active.data_type === "detector" && <div className="ath-fields">{field("energy_shift", "Energy shift", "eV")}</div>}</details>
         <fieldset className="ath-e0-fields" disabled={active.data_type === "xanes" || active.data_type === "chi" || active.data_type === "detector"}><details open><ParameterSectionHeading icon={BackgroundRemovalIcon}><ContextLabel label="Background removal" open={event => showContext(event, { kind: "section", section: "background" })}>Background removal <small>AUTOBK</small></ContextLabel><SectionHelp label="Background removal ranges">Spline energy is relative to E₀; energy and k limits update each other. Use ⌖ to pick a plotted x value or type either limit. Changes process automatically.</SectionHelp></ParameterSectionHeading><div className="ath-fields">{field("rbkg", "Rbkg", "Å")}{field("bkg_kweight", "Spline k-weight", undefined, false, "k-weight")}</div>
           <fieldset className="ath-spline-group"><legend>Spline range in k</legend><div className="ath-fields">{field("bkg_kmin", "Spline k min", "Å⁻¹", false, "min")}{field("bkg_kmax", "Spline k max", "Å⁻¹", true, "max")}</div></fieldset>
@@ -2551,7 +2572,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
         <fieldset className="ath-e0-fields" disabled={active.data_type === "xanes" || active.data_type === "detector"}><details open><ParameterSectionHeading icon={ForwardTransformIcon}><ContextLabel label="Forward Fourier transform" open={event => showContext(event, { kind: "section", section: "forward" })}>Forward Fourier transform <small>k → R</small></ContextLabel></ParameterSectionHeading><div className="ath-fields">{field("kmin", "FT k min", "Å⁻¹")}{field("kmax", "FT k max", "Å⁻¹", true)}{field("dk", "dk", "Å⁻¹")}{field("kweight", "FT k-weight")}{selectParameter("window", "Window")}</div></details>
         <details><ParameterSectionHeading icon={BackwardTransformIcon}><ContextLabel label="Backward Fourier transform" open={event => showContext(event, { kind: "section", section: "reverse" })}>Backward Fourier transform <small>R → q</small></ContextLabel></ParameterSectionHeading><div className="ath-fields">{field("rmin", "R min", "Å")}{field("rmax", "R max", "Å")}{field("dr", "dR", "Å")}{selectParameter("rwindow", "Window")}</div></details>
         <details><ParameterSectionHeading icon={TransformGridIcon}><ContextLabel label="Transform grid" open={event => showContext(event, { kind: "processing", section: "grid" })}>Transform grid</ContextLabel></ParameterSectionHeading><div className="ath-fields">{field("nfft", "FFT points")}{field("kstep", "k step", "Å⁻¹")}</div></details></fieldset>
-      </fieldset><div className="ath-apply"><label className="ath-check"><input type="checkbox" aria-label={`Apply to marked groups (${marked.length})`} aria-describedby="ath-auto-apply-hint" checked={applyMarked} disabled={!!busy || parameterUpdateRunning || !can("parameters")} onChange={e => changeApplyMarked(e.target.checked)} />Apply to marked groups ({marked.length})<SectionHelp label="Automatic processing" id="ath-auto-apply-hint">{applyMarked ? "Changes automatically copy to the marked groups when you finish editing; the current group changes only if it is marked. Frozen groups are skipped and energy shifts are preserved." : "Changes apply automatically to the current group when you finish editing."}</SectionHelp></label>{dirty && activeAutoApplyPlan?.status === "failed" && <button className="ath-primary" disabled={!!busy || active.frozen} onClick={() => retryParameterChanges(activeAutoApplyPlan)}>Retry processing</button>}{active.processing_error && <button className="ath-primary" disabled={!!busy || active.frozen || !!activeAutoApplyPlan} onClick={() => { void reprocessActive() }}>{busy === "Reprocessing spectrum" ? "Reprocessing…" : "Reprocess spectrum"}</button>}{active.processing_error && active.frozen && <p className="ath-hint">Unfreeze this group to reprocess it.</p>}<button disabled={!!busy || parameterUpdatePending || (!can("copy_parameters") && !can("reset_parameters"))} className="ath-reset" onClick={openParameterControls}>Copy / reset parameters…</button>{dirty && <button disabled={!!busy} className="ath-reset" onClick={() => discardParameterChanges(active.id)}>Discard parameter changes</button>}</div></>}</>} fitting={integrated ? null : <ArtemisFittingPanel exampleSetup={readyCupriteExample} projectId={project?.id} projectName={project?.name} version={project?.version} group={active} groups={project?.groups} onActionsChange={setArtemisActions} pending={!!busy || !!dirty || parameterUpdatePending} onFitResult={receiveFitResult} onDirtyChange={(groupId, dirty) => { const key = `${project?.id}:${groupId}`; setArtemisDirty(previous => !!previous[key] === dirty ? previous : { ...previous, [key]: dirty }) }} onPathsChange={receiveFeffPaths} onProjectChange={acceptArtemisProject} onViewStructure={(attachmentId, siteIndex) => setCifSelection({ projectId: project?.id, attachmentId, siteIndex })} />} /></aside>}
+      </fieldset><div className="ath-apply"><label className="ath-check"><input type="checkbox" aria-label={`Apply to marked groups (${marked.length})`} aria-describedby="ath-auto-apply-hint" checked={applyMarked} disabled={!!busy || parameterUpdateRunning || !can("parameters")} onChange={e => changeApplyMarked(e.target.checked)} />Apply to marked groups ({marked.length})<SectionHelp label="Automatic processing" id="ath-auto-apply-hint">{applyMarked ? "Valid changes automatically copy to the marked groups after a short pause; the current group changes only if it is marked. Frozen groups are skipped and energy shifts are preserved." : "Valid changes apply automatically to the current group after a short pause, even while the field is focused. Clear a field and press Enter or leave it to restore its calculated value."}</SectionHelp></label>{dirty && activeAutoApplyPlan?.status === "failed" && <button className="ath-primary" disabled={!!busy || active.frozen} onClick={() => retryParameterChanges(activeAutoApplyPlan)}>Retry processing</button>}{active.processing_error && <button className="ath-primary" disabled={!!busy || active.frozen || !!activeAutoApplyPlan} onClick={() => { void reprocessActive() }}>{busy === "Reprocessing spectrum" ? "Reprocessing…" : "Reprocess spectrum"}</button>}{active.processing_error && active.frozen && <p className="ath-hint">Unfreeze this group to reprocess it.</p>}<button disabled={!!busy || parameterUpdatePending || (!can("copy_parameters") && !can("reset_parameters"))} className="ath-reset" onClick={openParameterControls}>Copy / reset parameters…</button>{dirty && <button disabled={!!busy} className="ath-reset" onClick={() => discardParameterChanges(active.id)}>Discard parameter changes</button>}</div></>}</>} fitting={integrated ? null : <ArtemisFittingPanel exampleSetup={readyCupriteExample} projectId={project?.id} projectName={project?.name} version={project?.version} group={active} groups={project?.groups} onActionsChange={setArtemisActions} pending={!!busy || !!dirty || parameterUpdatePending} onFitResult={receiveFitResult} onDirtyChange={(groupId, dirty) => { const key = `${project?.id}:${groupId}`; setArtemisDirty(previous => !!previous[key] === dirty ? previous : { ...previous, [key]: dirty }) }} onPathsChange={receiveFeffPaths} onProjectChange={acceptArtemisProject} onViewStructure={(attachmentId, siteIndex) => setCifSelection({ projectId: project?.id, attachmentId, siteIndex })} />} /></aside>}
     />
     <footer className="ath-status" role="status"><span><i className={error ? "error" : ""} />{busy || message}</span><span>{project ? `${project.groups.length} groups · revision ${project.version} · ` : ""}Powered by Larch<button type="button" className="ath-report-link" onClick={() => setReportOpen(true)}><Bug size={12} />Report bug</button></span></footer>
     {reportOpen && <ReportBugDialog projectId={project?.id ?? null} projectState={reportProjectState()} onClose={() => setReportOpen(false)} onSubmitted={text => { setError(""); setMessage(text) }} />}

@@ -159,6 +159,10 @@ Each normalization-line toggle also marks its interval's start and end on
 μ(E). Hover a marker to see its energy and offset from E₀.
 Single-spectrum energy plots also mark the processed E₀ with a vertical dotted
 line and its value in eV, including normalized and derivative views.
+Valid processing edits automatically recalculate after a short pause, including
+when the input remains focused or its arrow controls are used. E₀ and interval
+markers then follow the effective values returned with the new result. Clearing
+an automatic field waits for Enter or leaving the field before recalculating.
 Use **⌖** beside a processing parameter, then click a point on the curve in
 the **Single spectrum viewer** to update it and process automatically. Relative
 energy limits use E − E₀. Press Escape or **Cancel pick** to leave picking mode.
