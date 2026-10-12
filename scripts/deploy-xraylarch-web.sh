@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 
 APP_SLUG="xraylarch-web"
-REPOSITORY="https://github.com/Dr-XAS/xraylarch-web.git"
+REPOSITORY="https://github.com/Dr-XAS/XAScraft.git"
 APPROVED_BRANCH="master"
 APP_ROOT="/local/apps/${APP_SLUG}"
 RELEASES_ROOT="${APP_ROOT}/releases"

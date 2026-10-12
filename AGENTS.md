@@ -10,8 +10,8 @@ Prefer working, committing, and pushing directly on our `master` branch. Use a
 separate branch only when the user asks for one or the work needs isolation, and
 bring completed changes back to `master`.
 
-The only permitted repository for remote writes is `Dr-XAS/xraylarch-web`.
-Explicitly target `origin` for pushes and `Dr-XAS/xraylarch-web` for GitHub writes.
+The only permitted repository for remote writes is `Dr-XAS/XAScraft`.
+Explicitly target `origin` for pushes and `Dr-XAS/XAScraft` for GitHub writes.
 Never push or create pull requests, issues, or comments in `xraypy/xraylarch`.
 An instruction to commit and push does not authorize creating a pull request.
 

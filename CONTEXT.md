@@ -1,4 +1,4 @@
-# XAS spectrum processing (xraylarch-web)
+# XAS spectrum processing (XAScraft)
 
 A browser implementation of desktop Athena's XAS workflows, built on this checkout of the `xraylarch` scientific library. It exists so that Athena's multi-spectrum processing can run as a web service and hand results back to Dr.XAS, without a wxPython desktop install.
 
@@ -150,7 +150,7 @@ _Avoid_: classic project, legacy project
 
 ## Cross-repo vocabulary
 
-Five repos share this domain: `Dr.XAS`, `DrXAS_Database`, `DrXASDemo`, `xraylarch-web`,
+Five repos share this domain: `Dr.XAS`, `DrXAS_Database`, `DrXASDemo`, `XAScraft`,
 and `xray-sample-db`. The decisions in this section are binding across all five, so that
 the same concept is not called two things depending on which repo you opened.
 
@@ -160,7 +160,7 @@ bearing and changing it is a code change with tests, not a glossary edit.
 
 ### Project names in prose
 
-Write **Dr.XAS**, **Dr.XAS Database**, **Dr.XAS Demo**, **xraylarch-web**, **xray-sample-db**.
+Write **Dr.XAS**, **Dr.XAS Database**, **Dr.XAS Demo**, **XAScraft**, **xray-sample-db**.
 Directory and repository names keep their own spelling (`DrXAS_Database`, `DrXASDemo`).
 _Avoid_: DrXAS Database, Dr.XAS_Database, DrXAS Demo, drxas-database
 

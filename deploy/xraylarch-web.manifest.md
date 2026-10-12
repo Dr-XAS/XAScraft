@@ -6,7 +6,7 @@
 | --- | --- |
 | Application | `xraylarch-web` |
 | Owner and rollback authority | Jeffrey Huang |
-| Repository | `https://github.com/Dr-XAS/xraylarch-web.git` |
+| Repository | `https://github.com/Dr-XAS/XAScraft.git` |
 | Authorized branch | `master` |
 | Deploy host | `drxas.xray.aps.anl.gov` (since 2026-09-16; see below) |
 | Public route | Dr.XAS ingress at `/advanced-xas/app` |
