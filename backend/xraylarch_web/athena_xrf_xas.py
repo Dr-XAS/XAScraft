@@ -43,6 +43,8 @@ MAX_CALIBRATION_POINTS = 32
 # the counts it reads, and the basis it builds for one detector element.
 MAX_COUNTS_VALUES = 20_000_000
 MAX_BASIS_VALUES = 20_000_000
+# Stage-A calibration budget in residual evaluations, per detector element.
+CALIBRATION_EVALUATIONS = 12000
 
 DEADTIME_PATTERN = re.compile(r'^(?P<detector>.+)-element(?P<index>\d+)-deadtime_factor$')
 
@@ -1558,7 +1560,7 @@ class Fitter:
         return solved['areas'][:, self.target_indices].sum(axis=1)
 
 
-def calibrate(fitter, counts, indices, *, max_nfev=12000):
+def calibrate(fitter, counts, indices, *, max_nfev=CALIBRATION_EVALUATIONS):
     """Stage A: fit the shared detector parameters on a few scan points.
 
     The linear amplitudes are never lmfit parameters. At each iteration the
@@ -1776,9 +1778,11 @@ def chosen_elements(scan: dict, options: XrfXasOptions) -> list[int]:
     return chosen
 
 
-def fit_detector(fitter, spectra, indices, batch_size, preview_index):
-    """Independent calibration and full-scan solve for one detector element."""
-    values, report = calibrate(fitter, spectra, indices)
+def fit_detector(fitter, spectra, indices, batch_size, preview_index, max_nfev=None):
+    """Independent calibration and full-scan solve for one detector element.
+    `max_nfev` lowers the calibration budget; None keeps the full one."""
+    budget = {} if max_nfev is None else dict(max_nfev=max_nfev)
+    values, report = calibrate(fitter, spectra, indices, **budget)
     report['calibration_unconverged_points'] = report['unconverged_points']
     areas = np.empty(len(spectra))
     preview = None
@@ -1813,6 +1817,12 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     unmodelled scatter tail leaves in the target column. A failure of the drift
     or noise criteria alone is not that mark and does not start a search.
     Otherwise try 2, 4, 8, 16 (five full extractions at most, no warm starts).
+    A candidate's calibration gets twice the evaluations the default's slowest
+    detector used, never more than the full budget: a longer tail that cannot
+    calibrate within that is not a better description of the scan, and without
+    the cap a scan whose candidates never converge pays the full budget four
+    times. The search stops at the first candidate that cannot be fitted at all,
+    since longer tails depart further from the default's peak shape.
     A candidate must converge on every detector, retain every upward edge,
     pass edge-direction/post-edge checks, and not worsen either detector RMS
     or mean calibration redchi relative to 0.5. Among admissible candidates
@@ -1837,17 +1847,19 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     leak = baseline['null_test'] is not None and \
         baseline['null_test']['mean_frac_of_jump'] > NULL_MEAN_LIMIT
     if baseline['checks']['pre_edge_null'] is False and leak:
+        budget = min(CALIBRATION_EVALUATIONS,
+                     2 * max(report['nfev'] for report in result['detector_reports']))
         for beta in (2.0, 4.0, 8.0, 16.0):
             candidate_options = options.model_copy(update={'scatter_beta': beta})
             try:
                 candidate = _extract_fixed(scan, counts, candidate_options, windows,
-                                           fit_provider=fit_provider)
+                                           fit_provider=fit_provider, max_nfev=budget)
             except (ScientificError, np.linalg.LinAlgError, ValueError, FloatingPointError) as exc:
                 # A candidate that cannot be solved is rejected and recorded; it must not
                 # discard the default extraction or a candidate already accepted.
                 trials.append(dict(beta=beta, eligible=False,
                                    error=f'{type(exc).__name__}: {exc}'))
-                continue
+                break
             evidence = _tail_evidence(candidate, beta)
             reasons = []
             if not evidence['fits_converged']:
@@ -1869,19 +1881,22 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
                 best, result = evidence, candidate
 
     searched = len(trials) > 1
+    tried = [trial['beta'] for trial in trials[1:]]
     if searched and best['beta'] == 0.5:
         # The search ran and nothing it tried was acceptable: say so, without
         # claiming a different tail, so a saved group keeps the record too.
+        stopped = ('error' in trials[-1] and len(tried) < 4)
         result['metadata']['warnings'].append(
-            'Automatic scatter tail: tried 2, 4, 8 and 16 peak widths after the pre-edge '
-            'null check found a positive offset; none was acceptable, so the default 0.5 '
-            'was kept. The extracted spectrum may be unreliable. Review the detector '
-            'spectra and fit settings before analysis.')
+            f'Automatic scatter tail: tried {_listed(tried)} peak widths after the pre-edge '
+            'null check found a positive offset' +
+            (f', stopping at {tried[-1]:g}, which could not be fitted' if stopped else '') +
+            '; none was acceptable, so the default 0.5 was kept. The extracted spectrum may '
+            'be unreliable. Review the detector spectra and fit settings before analysis.')
     if best['beta'] != 0.5:
         # A changed tail changes the result, so the user is told.
         null = best['null_test']
         message = (f'Automatic scatter tail: selected {best["beta"]:g} peak widths '
-                   f'after trying 0.5, 2, 4, 8, 16. Pre-edge mean '
+                   f'after trying 0.5, {_listed(tried, "")}. Pre-edge mean '
                    f'{null["mean_frac_of_jump"]:.4g}, drift over scan '
                    f'{null["drift_over_scan_frac_of_jump"]:.4g}, detrended RMS '
                    f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump.')
@@ -1896,8 +1911,17 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
 
     result['metadata']['request']['scatter_beta'] = None
     result['metadata']['scatter_tail'] = dict(
-        automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials)
+        automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials,
+        candidate_calibration_evaluations=budget if searched else None)
     return result
+
+
+def _listed(betas, last=' and '):
+    """2, 4, 8 and 16 -- or, with last='', 2, 4, 8, 16."""
+    names = [f'{beta:g}' for beta in betas]
+    if len(names) < 2 or not last:
+        return ', '.join(names)
+    return ', '.join(names[:-1]) + last + names[-1]
 
 
 def _tail_evidence(result, beta):
@@ -1926,7 +1950,7 @@ def _tail_rank(evidence):
 
 
 def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
-                   windows: dict | None = None, *, fit_provider=None) -> dict:
+                   windows: dict | None = None, *, fit_provider=None, max_nfev=None) -> dict:
     """Run the three stages over the chosen detector elements and assemble
     mu(E) in each yield's own edge-step units. `counts` holds those elements
     only, in order, already shifted;
@@ -1987,10 +2011,12 @@ def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
     per_detector, parameters, reports, lost = [], [], [], []
     warnings, failed_elements = [], []
     preview = None
-    fits = (fit_provider(fitter, counts, indices, batch_size, preview_index, preview_detector)
+    budget = {} if max_nfev is None else dict(max_nfev=max_nfev)
+    fits = (fit_provider(fitter, counts, indices, batch_size, preview_index, preview_detector,
+                         **budget)
             if fit_provider is not None else
             (fit_detector(fitter, counts[:, detector, :], indices, batch_size,
-                          preview_index if detector == preview_detector else None)
+                          preview_index if detector == preview_detector else None, max_nfev)
              for detector in range(ndet)))
     for detector, fitted_detector in enumerate(fits):
         values, areas = fitted_detector['values'], fitted_detector['areas']

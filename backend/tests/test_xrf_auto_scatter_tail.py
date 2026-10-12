@@ -43,15 +43,16 @@ def long_tail():
     # Selection sees counts, not generating amplitudes or target yields.
     scan, counts, options, _ = synthetic_scan(
         points=32, detectors=1, calibration_points=3, scatter_beta=8.)
-    # Identical detector copies isolate tail selection from inter-detector
-    # noise and also exercise real multi-process candidate dispatch below.
-    counts = np.repeat(counts, 2, axis=1)
-    scan['deadtime']['ge'] = np.repeat(scan['deadtime']['ge'], 2, axis=1)
-    scan['detectors']['ge'] = counts.shape
-    scan['deadtime_corrected']['ge'] = 2
     automatic_options = options.model_copy(update={'scatter_beta': None})
-    fixed = engine.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}))
-    automatic = engine.extract(scan, counts, automatic_options)
+    # The server's fit cache lets the search reuse the explicit default's fit.
+    resolved, windows = engine.resolve_windows(scan, automatic_options)
+    runtime = XrfRuntime(1)
+    try:
+        fixed = runtime.extract(scan, counts, resolved.model_copy(update={'scatter_beta': 0.5}),
+                                windows, 'long-tail-one-detector')
+        automatic = runtime.extract(scan, counts, resolved, windows, 'long-tail-one-detector')
+    finally:
+        runtime.close()
     return scan, counts, automatic_options, fixed, automatic
 
 
@@ -105,21 +106,34 @@ def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(lon
     assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
     assert all('error' in trial and not trial['eligible']
                for trial in result['metadata']['scatter_tail']['candidates'][1:])
-    # Every longer tail was really tried and failed; the default is kept, the failed
-    # check still shows, and the user is told the repair was attempted without success.
+    # The shortest longer tail was really tried and could not be fitted, so the
+    # search stopped there rather than paying for three more failing fits; the
+    # default is kept, the failed check still shows, and the user is told.
     tried = result['metadata']['scatter_tail']['candidates'][1:]
-    assert [trial['beta'] for trial in tried] == [2.0, 4.0, 8.0, 16.0]
+    assert [trial['beta'] for trial in tried] == [2.0]
     assert result['quality']['fit']['checks']['pre_edge_null'] is False
-    assert any('none was acceptable' in text for text in result['metadata']['warnings'])
+    assert any('stopping at 2, which could not be fitted; none was acceptable' in text
+               for text in result['metadata']['warnings'])
     assert not any('selected' in text and 'Automatic scatter tail' in text
                    for text in result['metadata']['warnings'])
 
 
-@pytest.mark.parametrize('workers', [1, 2])
-def test_cached_tail_candidates_cannot_reuse_the_default_fit(long_tail, workers):
+def two_copies(scan, counts):
+    """Identical detector copies: one detector's tail selection, but real
+    multi-process candidate dispatch."""
+    scan = copy.deepcopy(scan)
+    counts = np.repeat(counts, 2, axis=1)
+    scan['deadtime']['ge'] = np.repeat(scan['deadtime']['ge'], 2, axis=1)
+    scan['detectors']['ge'] = counts.shape
+    scan['deadtime_corrected']['ge'] = 2
+    return scan, counts
+
+
+def test_cached_tail_candidates_cannot_reuse_the_default_fit(long_tail):
     scan, counts, options, fixed, expected = long_tail
+    scan, counts = two_copies(scan, counts)
     options, windows = engine.resolve_windows(scan, options)
-    runtime = XrfRuntime(workers)
+    runtime = XrfRuntime(2)
     dispatched = []
     original = runtime._parallel_fits
 
@@ -133,17 +147,23 @@ def test_cached_tail_candidates_cannot_reuse_the_default_fit(long_tail, workers)
         # Prepopulate the same cache with an explicit default before searching.
         baseline = runtime.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}),
                                    windows, 'long-tail-counts')
-        np.testing.assert_array_equal(baseline['fit_counts'], fixed['fit_counts'])
+        np.testing.assert_allclose(baseline['fit_counts'], 2 * np.asarray(fixed['fit_counts']),
+                                   rtol=1e-12)
         result = runtime.extract(scan, counts, options, windows, 'long-tail-counts')
-        if workers > 1:
-            # Workers must receive each candidate's own tail, never the outer null
-            # request (which a worker would fit at 0.5 for every candidate).
-            if not dispatched or not all(ran for _, ran in dispatched):
-                pytest.skip('process pool unavailable; the parallel branch did not run')
-            tails = {beta for betas, _ in dispatched for beta in betas}
-            assert None not in tails and tails > {0.5}
-        assert result['metadata']['scatter_tail'] == expected['metadata']['scatter_tail']
-        np.testing.assert_array_equal(result['fit_counts'], expected['fit_counts'])
+        # A candidate served from the default's cached fit would select 0.5 here,
+        # whether the fits ran in workers or, without a pool, serially.
+        chosen, single = result['metadata']['scatter_tail'], expected['metadata']['scatter_tail']
+        assert chosen['selected_beta'] == single['selected_beta'] > 0.5
+        assert [row['beta'] for row in chosen['candidates']] == \
+            [row['beta'] for row in single['candidates']]
+        np.testing.assert_allclose(result['fit_counts'], 2 * np.asarray(expected['fit_counts']),
+                                   rtol=1e-12)
         assert runtime.extract(scan, counts, options, windows, 'long-tail-counts') == result
+        # Workers must receive each candidate's own tail, never the outer null
+        # request (which a worker would fit at 0.5 for every candidate).
+        if not dispatched or not all(ran for _, ran in dispatched):
+            pytest.skip('process pool unavailable; the parallel branch did not run')
+        tails = {beta for betas, _ in dispatched for beta in betas}
+        assert None not in tails and tails > {0.5}
     finally:
         runtime.close()
