@@ -491,7 +491,14 @@ class FeffPathGroup(Group):
             isinstance(self.params, dict)):
             self.params = dict2params(self.params)
 
-        symtab = self.params._asteval.symtable
+        aeval = self.params._asteval
+        sigma2_debye = aeval.symtable.get('sigma2_debye', None)
+        if getattr(sigma2_debye, '__asteval__', aeval) is not aeval:
+            # lmfit copies Parameters into a new interpreter but carries the
+            # sigma2 procedures over, still bound to the old one: they would read
+            # the path stored there, giving every path the same sigma2. Rebind.
+            add_sigma2funcs(self.params)
+        symtab = aeval.symtable
         symtab['feffpath'] = self._feffdat
         for attr in FEFFDAT_VALUES:
             symtab[attr] = getattr(self._feffdat, attr)
