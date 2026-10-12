@@ -105,10 +105,14 @@ def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(lon
     assert result['metadata']['scatter_tail']['selected_beta'] == 0.5
     assert all('error' in trial and not trial['eligible']
                for trial in result['metadata']['scatter_tail']['candidates'][1:])
-    # The default is kept, so nothing changed: the failed pre-edge check still shows,
-    # and no warning claims a different tail.
+    # Every longer tail was really tried and failed; the default is kept, the failed
+    # check still shows, and the user is told the repair was attempted without success.
+    tried = result['metadata']['scatter_tail']['candidates'][1:]
+    assert [trial['beta'] for trial in tried] == [2.0, 4.0, 8.0, 16.0]
     assert result['quality']['fit']['checks']['pre_edge_null'] is False
-    assert not any('Automatic scatter tail' in text for text in result['metadata']['warnings'])
+    assert any('none was acceptable' in text for text in result['metadata']['warnings'])
+    assert not any('selected' in text and 'Automatic scatter tail' in text
+                   for text in result['metadata']['warnings'])
 
 
 @pytest.mark.parametrize('workers', [1, 2])
