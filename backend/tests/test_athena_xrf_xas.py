@@ -764,8 +764,7 @@ def test_a_scatter_tail_longer_than_the_peak_inflates_the_target_until_told():
 
     told = solved(matched)
     # The identical extraction, with only the tail slope left at the default.
-    default = make_options(points=points, calibration_points=3)
-    assert default.scatter_beta == 0.5
+    default = make_options(points=points, calibration_points=3, scatter_beta=0.5)
     untold = solved(make_fitter(default, energy_ev))
 
     pre = energy_ev < E0 - 60.0

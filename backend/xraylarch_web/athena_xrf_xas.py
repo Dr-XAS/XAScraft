@@ -115,17 +115,20 @@ class XrfXasOptions(BaseModel):
     # right for a fluorescence line, whose tail comes from charge lost at the
     # edges of the pixel, but a scatter peak also carries intensity from
     # scattering inside the sample and inside the cryostat, which can run much
-    # further down. If the pre-edge null test fails and the detector spectrum
-    # shows the model falling away faster than the data below the elastic
-    # line, raise this: the tail has to go somewhere, and otherwise it goes
-    # into the target element's column as a false pre-edge signal.
+    # further down. An unmodelled scatter tail can land in the target column
+    # as a false pre-edge signal. None starts at 0.5 and, only if the pre-edge
+    # null check fails, selects among longer fixed tails (see extract).
+    # A number always means exactly that fixed length, with no search.
     #
     # Held fixed rather than fitted. The free parameter trades against
     # compton_angle -- intensity below the elastic line can be there either
     # because the Compton peak moved down or because the tail runs long -- and
     # on a real eight-element scan the fit took the wrong branch and lost half
     # the edge step. See docs/athena-xrf-xas-reference.md.
-    scatter_beta: float = Field(default=0.5, gt=0.0, le=20.0)
+    scatter_beta: float | None = Field(
+        default=None, gt=0.0, le=20.0,
+        description='Fixed scatter-tail length in peak widths; null selects automatically '
+                    'after a failed pre-edge null check (Larch engine only).')
 
     calibration_points: int = Field(default=6, ge=2, le=MAX_CALIBRATION_POINTS)
     point_stride: int = Field(default=1, ge=1, le=64)
@@ -1418,7 +1421,10 @@ class Fitter:
         self.incident = np.asarray(incident_kev, dtype=float)
         self.target = target
         self.symbols = [target, *matrix_elements]
-        self.options = options
+        # A single fitter always has a fixed tail; automatic selection needs
+        # full-scan quality evidence and is owned by extract(), not calibration.
+        self.options = (options.model_copy(update={'scatter_beta': 0.5})
+                        if options.scatter_beta is None else options)
         low, high = float(self.incident.min()), float(self.incident.max())
 
         edges = {symbol: subshell_edges(symbol) for symbol in self.symbols}
@@ -1800,6 +1806,108 @@ def detector_preview(solved, local):
 
 def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             windows: dict | None = None, *, fit_provider=None) -> dict:
+    """Choose a fixed Larch scatter tail using only extraction diagnostics.
+
+    Keep 0.5 without another fit unless its pre-edge null check is False.
+    Otherwise try 2, 4, 8, 16 (five full extractions at most, no warm starts).
+    A candidate must converge on every detector, retain every upward edge,
+    pass edge-direction/post-edge checks, and not worsen either detector RMS
+    or mean calibration redchi relative to 0.5. Among admissible candidates
+    and the default, prefer a passing null check, then the smallest maximum
+    of |mean|/limit, |scan drift|/limit and detrended RMS/limit; break ties by
+    detector RMS, calibration redchi and shorter tail. These are selection
+    criteria, not new quality checks or evidence of accuracy above the edge.
+    """
+    automatic = options.scatter_beta is None and options.engine == 'larch'
+    fixed = options.model_copy(update={'scatter_beta': 0.5}) if automatic else options
+    result = _extract_fixed(scan, counts, fixed, windows, fit_provider=fit_provider)
+    if not automatic:
+        result['metadata']['scatter_tail'] = dict(
+            automatic=False, applicable=options.engine == 'larch',
+            selected_beta=options.scatter_beta if options.engine == 'larch' else None,
+            candidates=[])
+        return result
+
+    baseline = _tail_evidence(result, 0.5)
+    trials = [baseline]
+    best = baseline
+    if baseline['checks']['pre_edge_null'] is False:
+        for beta in (2.0, 4.0, 8.0, 16.0):
+            candidate_options = options.model_copy(update={'scatter_beta': beta})
+            try:
+                candidate = _extract_fixed(scan, counts, candidate_options, windows,
+                                           fit_provider=fit_provider)
+            except ScientificError as exc:
+                trials.append(dict(beta=beta, eligible=False, error=str(exc)))
+                continue
+            evidence = _tail_evidence(candidate, beta)
+            reasons = []
+            if not evidence['fits_converged']:
+                reasons.append('detector fit did not converge')
+            if evidence['elements_without_edge']:
+                reasons.append('detector without an upward edge')
+            if not (evidence['checks']['edge_direction']
+                    and evidence['checks']['post_edge_positive'] is True):
+                reasons.append('edge-direction or post-edge check did not pass')
+            if evidence['null_score'] is None:
+                reasons.append('pre-edge evidence unavailable')
+            if evidence['detector_rms'] > baseline['detector_rms']:
+                reasons.append('detector agreement worsened')
+            if evidence['calibration_redchi'] > baseline['calibration_redchi']:
+                reasons.append('calibration residual worsened')
+            evidence.update(eligible=not reasons, rejected_reasons=reasons)
+            trials.append(evidence)
+            if evidence['eligible'] and _tail_rank(evidence) < _tail_rank(best):
+                best, result = evidence, candidate
+
+        null = best['null_test']
+        message = (f'Automatic scatter tail: selected {best["beta"]:g} peak widths '
+                   f'after trying 0.5, 2, 4, 8, 16. Pre-edge mean '
+                   f'{null["mean_frac_of_jump"]:.4g}, drift over scan '
+                   f'{null["drift_over_scan_frac_of_jump"]:.4g}, detrended RMS '
+                   f'{null["detrended_rms_frac_of_jump"]:.4g} of the edge jump.')
+        if best['checks']['pre_edge_null'] is False:
+            message += (' The pre-edge null check still fails; no acceptable tail cleared it. '
+                        'The extracted spectrum may be unreliable. Review the detector '
+                        'spectra and fit settings before analysis.')
+        else:
+            message += (' The pre-edge null check passes; this does not establish '
+                        'accuracy above the edge.')
+        result['metadata']['warnings'].append(message)
+
+    result['metadata']['request']['scatter_beta'] = None
+    result['metadata']['scatter_tail'] = dict(
+        automatic=True, applicable=True, selected_beta=best['beta'], candidates=trials)
+    return result
+
+
+def _tail_evidence(result, beta):
+    quality = result['quality']
+    null = quality['fit']['null_test']
+    agreement = quality['detector_agreement']
+    reports = result['detector_reports']
+    score = None if null is None else max(
+        abs(null['mean_frac_of_jump']) / NULL_MEAN_LIMIT,
+        abs(null['drift_over_scan_frac_of_jump']) / NULL_DRIFT_LIMIT,
+        null['detrended_rms_frac_of_jump'] / NULL_RMS_LIMIT)
+    return dict(beta=beta, null_test=null, null_score=score,
+                checks=quality['fit']['checks'], detector_agreement=agreement,
+                detector_rms=0.0 if agreement is None else agreement['worst_pairwise_rms'],
+                elements_without_edge=quality['elements_without_edge'],
+                fits_converged=all(report['success'] and not report['unconverged_points']
+                                   and not report.get('calibration_unconverged_points', 0)
+                                   for report in reports),
+                calibration_redchi=float(np.mean([report['redchi'] for report in reports])),
+                eligible=True, rejected_reasons=[])
+
+
+def _tail_rank(evidence):
+    return (evidence['checks']['pre_edge_null'] is not True, evidence['null_score'],
+            evidence['detector_rms'], evidence['calibration_redchi'], evidence['beta'])
+
+
+def _extract_fixed(scan: dict, counts: np.ndarray, options: XrfXasOptions,
+                   windows: dict | None = None, *, fit_provider=None) -> dict:
     """Run the three stages over the chosen detector elements and assemble
     mu(E) in each yield's own edge-step units. `counts` holds those elements
     only, in order, already shifted;

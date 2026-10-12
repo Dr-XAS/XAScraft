@@ -186,15 +186,18 @@ class XrfRuntime:
                       json.dumps([recipe, windows], sort_keys=True))
         fit_recipe = {key: value for key, value in recipe.items() if key not in
                       ('point_stride', 'preview_point', 'preview_detector', 'include_window_sum')}
-        fit_key = ('detectors', digest, json.dumps(fit_recipe, sort_keys=True))
 
         def provide(fitter, ordered_counts, indices, batch_size, preview_index, preview_detector):
+            # Automatic extraction calls this provider for several fixed tails.
+            # Key and dispatch the actual candidate, not the outer null request.
+            fixed_recipe = dict(fit_recipe, scatter_beta=fitter.options.scatter_beta)
+            fit_key = ('detectors', digest, json.dumps(fixed_recipe, sort_keys=True))
             fits = self._get(fit_key)
             if fits is not None:
                 return fits
             ndet = ordered_counts.shape[1]
             if self.workers > 1 and ndet > 1:
-                tasks = [(fitter.channels, fitter.incident, options,
+                tasks = [(fitter.channels, fitter.incident, fitter.options,
                           ordered_counts[:, detector, :], indices, batch_size,
                           preview_index if detector == preview_detector else None)
                          for detector in range(ndet)]
