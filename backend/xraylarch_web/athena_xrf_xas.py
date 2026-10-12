@@ -1837,8 +1837,11 @@ def extract(scan: dict, counts: np.ndarray, options: XrfXasOptions,
             try:
                 candidate = _extract_fixed(scan, counts, candidate_options, windows,
                                            fit_provider=fit_provider)
-            except ScientificError as exc:
-                trials.append(dict(beta=beta, eligible=False, error=str(exc)))
+            except (ScientificError, np.linalg.LinAlgError, ValueError, FloatingPointError) as exc:
+                # A candidate that cannot be solved is rejected and recorded; it must not
+                # discard the default extraction or a candidate already accepted.
+                trials.append(dict(beta=beta, eligible=False,
+                                   error=f'{type(exc).__name__}: {exc}'))
                 continue
             evidence = _tail_evidence(candidate, beta)
             reasons = []

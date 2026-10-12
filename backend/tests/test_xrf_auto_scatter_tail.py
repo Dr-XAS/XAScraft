@@ -85,13 +85,18 @@ def test_an_explicit_tail_is_not_replaced_even_when_its_check_fails(long_tail):
     assert result['fit_counts'] != fixed['fit_counts']
 
 
-def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(long_tail, monkeypatch):
+@pytest.mark.parametrize('error', [
+    ScientificError('All selected detector elements failed calibration'),
+    np.linalg.LinAlgError('Singular matrix'),
+    ValueError('array must not contain infs or NaNs'),
+])
+def test_failed_tail_trials_preserve_the_original_result_and_failure_warning(long_tail, monkeypatch, error):
     scan, counts, options, fixed, _ = long_tail
 
     def failed_trial(scan, counts, request, *args, **kwargs):
         if request.scatter_beta == 0.5:
             return copy.deepcopy(fixed)
-        raise ScientificError('All selected detector elements failed calibration')
+        raise error
 
     monkeypatch.setattr(engine, '_extract_fixed', failed_trial)
     result = engine.extract(scan, counts, options)
@@ -108,12 +113,28 @@ def test_cached_tail_candidates_cannot_reuse_the_default_fit(long_tail, workers)
     scan, counts, options, fixed, expected = long_tail
     options, windows = engine.resolve_windows(scan, options)
     runtime = XrfRuntime(workers)
+    dispatched = []
+    original = runtime._parallel_fits
+
+    def spy(tasks):
+        fits = original(tasks)
+        dispatched.append(([task[2].scatter_beta for task in tasks], fits is not None))
+        return fits
+
+    runtime._parallel_fits = spy
     try:
         # Prepopulate the same cache with an explicit default before searching.
         baseline = runtime.extract(scan, counts, options.model_copy(update={'scatter_beta': 0.5}),
                                    windows, 'long-tail-counts')
         np.testing.assert_array_equal(baseline['fit_counts'], fixed['fit_counts'])
         result = runtime.extract(scan, counts, options, windows, 'long-tail-counts')
+        if workers > 1:
+            # Workers must receive each candidate's own tail, never the outer null
+            # request (which a worker would fit at 0.5 for every candidate).
+            if not dispatched or not all(ran for _, ran in dispatched):
+                pytest.skip('process pool unavailable; the parallel branch did not run')
+            tails = {beta for betas, _ in dispatched for beta in betas}
+            assert None not in tails and tails > {0.5}
         assert result['metadata']['scatter_tail'] == expected['metadata']['scatter_tail']
         np.testing.assert_array_equal(result['fit_counts'], expected['fit_counts'])
         assert runtime.extract(scan, counts, options, windows, 'long-tail-counts') == result
