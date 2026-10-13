@@ -107,15 +107,17 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
     for (const value of curve.y) { low = Math.min(low, value); high = Math.max(high, value) }
     return Math.max(span, high - low)
   }, 0)
-  const automaticSpacing = largestSpan > 0 && Number.isFinite(largestSpan * 0.07) ? Number((largestSpan * 0.07).toPrecision(4)) : 1
+  // Simulations can contain many paths; keep them on a shared baseline by default.
+  const automaticSpacing = isTheory ? 0 : largestSpan > 0 && Number.isFinite(largestSpan * 0.07) ? Number((largestSpan * 0.07).toPrecision(4)) : 1
   const offsetText = offsetDraft && offsetDraft.result === plotted && offsetDraft.space === space && offsetDraft.componentKey === componentKey ? offsetDraft.value : String(automaticSpacing)
   const validSpacing = offsetText.trim() !== "" && Number.isFinite(Number(offsetText)) && Number(offsetText) >= 0 && Number(offsetText) <= Number.MAX_VALUE / Math.max(curves.length, 1)
   const spacing = validSpacing ? Number(offsetText) : automaticSpacing
+  const offsetsApplied = offsetPlot && spacing > 0
   // Match the spectrum viewers' right-side legend and label wrapping.
   // Only display names wrap; hover labels retain the original full name.
   const legendLineLength = Math.max(10, Math.floor((plotWidth * 0.4 - 48) / 7))
   const traces = x ? curves.map(curve => {
-    const offset = offsetPlot && !(separatePhase && curve.component === "pha") ? -curve.tier * spacing : 0
+    const offset = offsetsApplied && !(separatePhase && curve.component === "pha") ? -curve.tier * spacing : 0
     const characters = Array.from(curve.name)
     const lines: string[] = []
     if (plotWidth) {
@@ -138,8 +140,8 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
     {visible && <>{!isTheory && (space === "r" && components.includes("mag") ? "Residual is |FT(data − model)|, not the difference of magnitudes. " : "Residual = data − model. ")}
       {!isTheory && space === "r" && components.includes("pha") && "Residual phase is the phase of FT(data − model), not the difference of phases. "}
       {pathsShown && space === "r" && components.includes("mag") && (isTheory ? "Individual path magnitudes do not add to the total magnitude; the complex path contributions add before taking the magnitude. " : "Individual path magnitudes do not add to the model magnitude; the complex path contributions add before taking the magnitude. ")}
-      {offsetPlot && (isTheory ? "Offsets affect display only: Total theory stays at zero offset and each path uses a successively lower baseline. " : "Offsets affect display only: Data and Model share zero offset; Residual and each path use successively lower baselines. ")}
-      {offsetPlot && separatePhase && "Phase curves on the radians axis are not offset. "}
+      {offsetsApplied && (isTheory ? "Offsets affect display only: Total theory stays at zero offset and each path uses a successively lower baseline. " : "Offsets affect display only: Data and Model share zero offset; Residual and each path use successively lower baselines. ")}
+      {offsetsApplied && separatePhase && "Phase curves on the radians axis are not offset. "}
       Plot k-weight {plottedWeight}{fit && <>; fit weights {fit.transform.kweight.join(", ")}</>}.</>}
   </>} actions={<div className={styles.resultActions}>
     {theoryGroup && matchingFit && <div className={styles.choice} role="group" aria-label="EXAFS result type">
@@ -167,7 +169,7 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
               layout={{ autosize: true, margin: { l: 65, r: separatePhase ? 72 : 22, t: 18, b: 56 }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff",
                 font: { color: "#52665b" },
                 xaxis: { title: { text: space === "k" ? "k (Å⁻¹)" : "R (Å, not phase corrected)" }, gridcolor: "#e6ece4", ...(space === "r" ? { range: [0, Math.max(6, visible.transform.rmax + 1)] } : {}) },
-                yaxis: { title: { text: yTitle + (offsetPlot ? " + display offset" : "") }, gridcolor: "#e6ece4", zerolinecolor: "#cbd7cf", automargin: true },
+                yaxis: { title: { text: yTitle + (offsetsApplied ? " + display offset" : "") }, gridcolor: "#e6ece4", zerolinecolor: "#cbd7cf", automargin: true },
                 ...(separatePhase ? { yaxis2: { title: { text: "Phase χ(R) (rad)" }, overlaying: "y", side: "right", showgrid: false, automargin: true } } : {}),
                 legend: { orientation: "v", x: 0.99, xanchor: "right", y: 0.99, yanchor: "top", maxheight: 1, bgcolor: "rgba(0,0,0,0)" }, uirevision: `${visible.project_id}:${visible.group_id}:${visible.version}:${space}:${componentKey}:${pathsShown}:${offsetPlot}:${offsetPlot ? spacing : 0}:${plottedWeight}`,
                 shapes: isTheory && space === "r" ? [] : [{ type: "rect", xref: "x", yref: "paper", x0: space === "k" ? visible.transform.kmin : visible.transform.rmin,
@@ -180,7 +182,7 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
           {offsetPlot && <>
             <ViewerControlField label="Spacing" help="Set the nonnegative vertical distance between curves, or use Auto to restore automatic spacing. This does not change the calculated amplitudes."><input type="number" min="0" step="any" aria-label="Offset spacing" aria-invalid={!validSpacing} value={offsetText}
               onChange={event => setOffsetDraft({ result: plotted!, space, componentKey, value: event.target.value })} /></ViewerControlField>
-            <button type="button" onClick={() => setOffsetDraft(null)} title="Use automatic spacing for the visible curves">Auto</button>
+            <button type="button" onClick={() => setOffsetDraft(null)} title={isTheory ? "Reset all theory offsets to zero" : "Use automatic spacing for the visible curves"}>Auto</button>
           </>}
         </ViewerControlGroup>
         <ViewerControlGroup>

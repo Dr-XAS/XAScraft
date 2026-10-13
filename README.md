@@ -140,6 +140,8 @@ S₀² defaults to 0.85. After simulation, **Add to data list** saves χ(k) with
 **theory** tag, its Fourier parameters, and the exact CIF/FEFF sources in the
 project. Simulated spectra use the CIF's custom name or uploaded filename before
 falling back to its chemical formula, followed by the element, edge, and **theory**.
+The **EXAFS theory** viewer defaults to zero display offset for the total and all
+paths in k and R space. Manual spacing remains available; **Auto** resets it to zero.
 Disorder-model inputs are assumptions; inequivalent sites are not averaged automatically.
 
 The **Single spectrum viewer** plots the highlighted group, independently of
@@ -227,6 +229,8 @@ recognizes FEFF `xmu.dat` tables, selecting photon energy (`omega`) and `mu`
 while preserving the supplied normalization. Detector choices and previewed
 signals can be reviewed before import; successful import choices are remembered
 for subsequent matching files.
+After spectra or project imports finish and the import dialog closes, the page
+automatically returns to the top for analysis.
 
 EXAFS processing is automatic for new absorption imports. Short near-edge scans
 retain their normalized spectrum and explain why EXAFS was not calculated;
