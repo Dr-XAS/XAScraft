@@ -5,17 +5,22 @@ import copy
 import hashlib
 import json
 import math
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 import larch
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from pydantic import Field, ValidationError, field_validator, model_validator
 
-from .artemis import FitPath, FitRequest, PathInput, StrictModel, fit_group, inspect_path
+from .artemis import FitPath, FitRequest, FitRouteRequest, PathInput, StrictModel, fit_group, inspect_path
 from .artemis_attachments import local_project
 from .errors import WebInputError
+from .artemis_provenance import FeffSource, add_fit_provenance, text_sha256
+from .agent_views import project_view
+
+ProjectView = Literal["full", "summary", "parameters"]
 
 MAX_HISTORY = 10
 MAX_PROJECT_BYTES = 20_000_000
@@ -65,6 +70,7 @@ class PathMetadata(StrictModel):
     kmax: float = Field(gt=0)
     viewerCluster: ViewerCluster | None = None
     sourceCif: SourceCif | None = None
+    feff: FeffSource | None = None
 
 
 class DraftPath(FitPath):
@@ -220,6 +226,25 @@ def validate_result(value):
         raise ValueError("Invalid saved fit k weight.")
     if not isinstance(value["paths"], list) or not 1 <= len(value["paths"]) <= 24:
         raise ValueError("Invalid saved fit paths.")
+    metadata = value["metadata"]
+    if not isinstance(metadata, dict):
+        raise ValueError("Invalid saved fit metadata.")
+    if "engine" in metadata and (not isinstance(metadata["engine"], str) or len(metadata["engine"]) > 100):
+        raise ValueError("Invalid saved fit engine.")
+    for key in ("input_sha256", "model_sha256"):
+        if key in metadata and (not isinstance(metadata[key], str) or len(metadata[key]) != 64
+                                or any(char not in "0123456789abcdef" for char in metadata[key])):
+            raise ValueError("Invalid saved fit fingerprint.")
+    seconds = metadata.get("seconds", {})
+    if (not isinstance(seconds, dict) or len(seconds) > 10
+            or any(type(v) not in (int, float) or v < 0 for v in seconds.values())):
+        raise ValueError("Invalid saved fit timings.")
+    sources = metadata.get("feff_sources", {})
+    if (not isinstance(sources, dict) or len(sources) > 24
+            or set(sources) - {path.get("id") for path in value["paths"] if isinstance(path, dict)}):
+        raise ValueError("Invalid saved FEFF source identities.")
+    for source in sources.values():
+        FeffSource.model_validate(source)
     for path in value["paths"]:
         if not isinstance(path, dict) or set(path) - {"sigma2_expression"} != {"id", "label", "filename", "metadata", "values", "k", "r"}:
             raise ValueError("Incomplete saved fit path.")
@@ -259,6 +284,11 @@ class FitOrigin(StrictModel):
     larch_version: str = Field(max_length=100)
 
 
+class FitReceipt(StrictModel):
+    key_sha256: Digest
+    body_sha256: Digest
+
+
 class FitArchive(StrictModel):
     id: Identifier
     created: str = Field(max_length=60)
@@ -267,6 +297,7 @@ class FitArchive(StrictModel):
     imported: bool = False
     model: ModelDraft
     result: dict
+    receipt: FitReceipt | None = None
 
     @field_validator("created")
     @classmethod
@@ -320,6 +351,7 @@ def imported_state(value):
     state.pop("current_input_sha256", None)
     for record in state["history"]:
         record["imported"] = True
+        record.pop("receipt", None)
     return state
 
 
@@ -334,6 +366,14 @@ class RemoveFitRequest(StrictModel):
 
 
 async def bounded_model_request(request: Request) -> SaveModelRequest:
+    return await _bounded_request(request, SaveModelRequest)
+
+
+async def bounded_fit_request(request: Request) -> FitRouteRequest:
+    return await _bounded_request(request, FitRouteRequest)
+
+
+async def _bounded_request(request, model):
     # Bound streamed JSON before parsing, including requests with no length header.
     body = bytearray()
     async for chunk in request.stream():
@@ -341,7 +381,7 @@ async def bounded_model_request(request: Request) -> SaveModelRequest:
         if len(body) > 8_000_000:
             _fail("An Artemis model request must not exceed 8 MB.")
     try:
-        return SaveModelRequest.model_validate_json(body)
+        return model.model_validate_json(body)
     except (ValidationError, ValueError, TypeError, OverflowError) as exc:
         _fail(f"Invalid Artemis model request: {exc}")
 
@@ -351,12 +391,17 @@ def prepared_model(model):
     for path in value["paths"]:
         cluster = path["metadata"].get("viewerCluster")
         source_cif = path["metadata"].get("sourceCif")
+        feff = path["metadata"].get("feff")
         # Saved metadata never substitutes for reading the supplied FEFF text.
         path["metadata"] = inspect_path(PathInput(filename=path["filename"], content=path["content"]))["metadata"]
         if cluster is not None:
             path["metadata"]["viewerCluster"] = cluster
         if source_cif is not None:
             path["metadata"]["sourceCif"] = source_cif
+        if feff is not None:
+            if feff["path_sha256"] != text_sha256(path["content"]):
+                _fail("The FEFF provenance does not match the path contents. Reimport the path.")
+            path["metadata"]["feff"] = feff
     return value
 
 
@@ -376,7 +421,45 @@ def request_from_model(model, version):
         _fail(f"Complete the model before fitting: {exc}")
 
 
-def build_persistence_router(store):
+def draft_from_request(request: FitRequest, sources):
+    """The server owns browser row IDs, strings and inspected path metadata."""
+    body = request.model_dump()
+    return prepared_model(ModelDraft.model_validate(dict(
+        revision=0,
+        parameters=[dict(row, id=f"parameter-{i}", value=str(row["value"]),
+                         min="" if row["min"] is None else str(row["min"]),
+                         max="" if row["max"] is None else str(row["max"]))
+                    for i, row in enumerate(body["parameters"])],
+        paths=[dict(row, metadata=inspect_path(PathInput(filename=row["filename"], content=row["content"]))["metadata"]
+                    | ({"feff": sources[row["id"]]} if row["id"] in sources else {})) for row in body["paths"]],
+        transform={key: str(value) if key in ("kmin", "kmax", "dk", "rmin", "rmax", "dr") else value
+                   for key, value in body["transform"].items()},
+    )))
+
+
+def model_fingerprint(model):
+    # Revision, display metadata and row IDs are not part of the numerical fit.
+    return request_fingerprint(request_from_model(model, 0))
+
+
+def request_fingerprint(request):
+    body = request.model_dump(exclude={"version"})
+    for path in body["paths"]:
+        for key in ("id", "label", "filename"):
+            path.pop(key, None)
+    return hashlib.sha256(_json(body)).hexdigest()
+
+
+def archive_summary(record, current_input):
+    from .agent_fit import fit_summary
+    result = fit_summary(record["result"], saved=True)
+    return dict(id=record["id"], created=record["created"], imported=record.get("imported", False),
+                origin=record["origin"], input_sha256=record["input_sha256"],
+                model_sha256=record["result"].get("metadata", {}).get("model_sha256") or model_fingerprint(record["model"]),
+                stale=record["input_sha256"] != current_input, result=result)
+
+
+def build_persistence_router(store, jobs=None):
     router = APIRouter(tags=["Artemis project models"])
 
     @router.get("/projects/{ident}/groups/{group_id}/export")
@@ -397,7 +480,8 @@ def build_persistence_router(store):
         return Response(content=content, media_type="application/octet-stream", headers=headers)
 
     @router.post("/projects/{ident}/groups/{group_id}/model")
-    def save_model(ident: str, group_id: str, request: SaveModelRequest = Depends(bounded_model_request)):
+    def save_model(ident: str, group_id: str, request: SaveModelRequest = Depends(bounded_model_request),
+                   view: ProjectView = "full"):
         with store.storage.lock(ident):
             old = local_project(store, ident)
             store.check(old, request.version)
@@ -409,38 +493,121 @@ def build_persistence_router(store):
             project = copy.deepcopy(old)
             group = store.group(project, group_id)
             if group.get("artemis", {}).get("model") == model:
-                return old
+                return project_view(old, view)
             group["artemis"] = {"schema_version": 1, "model": model,
                                 "history": group.get("artemis", {}).get("history", [])}
-            return store.save(project, old, f"Saved EXAFS model: {group['label']}")
+            return project_view(store.save(project, old, f"Saved EXAFS model: {group['label']}"), view)
 
-    @router.post("/projects/{ident}/groups/{group_id}/fit-saved")
-    def fit_saved(ident: str, group_id: str, request: SaveModelRequest = Depends(bounded_model_request)):
+    def save_fit(ident, group_id, request, view, idempotency_key):
+        body_hash = hashlib.sha256(_json(dict(group_id=group_id, body=request.model_dump(exclude={"version"})))).hexdigest()
+        key_hash = text_sha256(idempotency_key) if idempotency_key is not None else None
+        receipt_file = f"artemis-fit-{key_hash}.json" if key_hash else None
+
+        def reply(project, fit_id, replay=False):
+            group = store.group(project, group_id)
+            record = next((r for r in group.get("artemis", {}).get("history", []) if r["id"] == fit_id), None)
+            output = dict(project=project_view(project, view), fit_id=fit_id)
+            if view != "full":
+                output["fit"] = archive_summary(record, input_fingerprint(group)) if record else None
+            if replay:
+                output["idempotent_replay"] = True
+                output["fit_present"] = record is not None
+            return output
+
+        def replay(project):
+            if receipt_file is None:
+                return None
+            try:
+                receipt = store.storage.read_json(ident, receipt_file)
+            except FileNotFoundError:
+                receipt = next((dict(r["receipt"], fit_id=r["id"], group_id=g["id"]) for g in project["groups"]
+                                for r in g.get("artemis", {}).get("history", [])
+                                if r.get("receipt", {}).get("key_sha256") == key_hash), None)
+            if receipt is None:
+                return None
+            if receipt["body_sha256"] != body_hash or receipt["group_id"] != group_id:
+                _fail("This Idempotency-Key was already used for different fit inputs. Use a new key.")
+            return reply(project, receipt["fit_id"], True)
+
         with store.storage.lock(ident):
             old = local_project(store, ident)
+            if (previous := replay(old)) is not None:
+                return previous
             store.check(old, request.version)
             source = copy.deepcopy(store.group(old, group_id))
             if len(source.get("artemis", {}).get("history", [])) >= MAX_HISTORY:
                 _fail("This spectrum already has 10 saved fits. Export an archive or remove a saved fit before fitting again.")
-        model = prepared_model(request.model)
-        fit_request = request_from_model(model, request.version)
+        if isinstance(request, FitRouteRequest):
+            sources = {}
+            fit_request = request.resolve(jobs, sources=sources)
+            model = draft_from_request(fit_request, sources)
+        else:
+            model = prepared_model(request.model)
+            fit_request = request_from_model(model, request.version)
         result = dict(project_id=ident, version=request.version, **fit_group(source, fit_request))
+        add_fit_provenance(result, {path["id"]: path["metadata"]["feff"] for path in model["paths"]
+                                    if path.get("enabled", True) and "feff" in path["metadata"]})
+        result["metadata"].update(input_sha256=input_fingerprint(source), model_sha256=model_fingerprint(model))
         record = {"id": uuid.uuid4().hex, "created": datetime.now(timezone.utc).isoformat(),
                   "input_sha256": input_fingerprint(source), "model": model, "result": result, "imported": False,
                   "origin": {"project_id": ident, "group_id": group_id, "project_version": request.version,
                              "larch_version": larch.__version__}}
+        if key_hash is not None:
+            record["receipt"] = dict(key_sha256=key_hash, body_sha256=body_hash)
         with store.storage.lock(ident):
             old = local_project(store, ident)
+            if (previous := replay(old)) is not None:
+                return previous
             store.check(old, request.version)
             project = copy.deepcopy(old)
             group = store.group(project, group_id)
             group["artemis"] = {"schema_version": 1, "model": model,
                                 "history": [*group.get("artemis", {}).get("history", []), record]}
             saved = store.save(project, old, f"Saved EXAFS fit: {group['label']}")
-            return {"project": saved, "fit_id": record["id"]}
+            if receipt_file is not None:
+                try:
+                    store.storage.write_json(ident, receipt_file, dict(body_sha256=body_hash, group_id=group_id, fit_id=record["id"]))
+                except OSError:
+                    logging.getLogger(__name__).warning("Could not write fit receipt for %s", ident, exc_info=True)
+            return reply(saved, record["id"])
+
+    @router.post("/projects/{ident}/groups/{group_id}/fit-saved")
+    def fit_saved(ident: str, group_id: str, request: SaveModelRequest = Depends(bounded_model_request),
+                  view: ProjectView = "full",
+                  idempotency_key: str | None = Header(default=None, min_length=1, max_length=200, alias="Idempotency-Key")):
+        return save_fit(ident, group_id, request, view, idempotency_key)
+
+    @router.post("/projects/{ident}/groups/{group_id}/fits")
+    def fit_numeric(ident: str, group_id: str, request: FitRouteRequest = Depends(bounded_fit_request),
+                    view: ProjectView = "summary",
+                    idempotency_key: str | None = Header(default=None, min_length=1, max_length=200, alias="Idempotency-Key")):
+        return save_fit(ident, group_id, request, view, idempotency_key)
+
+    @router.get("/projects/{ident}/groups/{group_id}/fits")
+    def fit_history(ident: str, group_id: str):
+        with store.storage.lock(ident):
+            project = local_project(store, ident)
+            group = store.group(project, group_id)
+            current = input_fingerprint(group)
+            history = group.get("artemis", {}).get("history", [])
+            return dict(project_id=ident, group_id=group_id, version=project["version"], count=len(history),
+                        limit=MAX_HISTORY, current_input_sha256=current,
+                        fits=[archive_summary(record, current) for record in history])
+
+    @router.get("/projects/{ident}/groups/{group_id}/fits/{fit_id}")
+    def fit_detail(ident: str, group_id: str, fit_id: str, view: Literal["summary", "full"] = "summary"):
+        with store.storage.lock(ident):
+            project = local_project(store, ident)
+            group = store.group(project, group_id)
+            record = next((r for r in group.get("artemis", {}).get("history", []) if r["id"] == fit_id), None)
+            if record is None:
+                _fail("The saved fit was not found. Query this spectrum's fits history for available IDs.")
+            summary = archive_summary(record, input_fingerprint(group))
+            return dict(project_id=ident, group_id=group_id, version=project["version"],
+                        fit=summary if view == "summary" else dict(record, stale=summary["stale"]))
 
     @router.post("/projects/{ident}/groups/{group_id}/remove-fit")
-    def remove_fit(ident: str, group_id: str, request: RemoveFitRequest):
+    def remove_fit(ident: str, group_id: str, request: RemoveFitRequest, view: ProjectView = "full"):
         with store.storage.lock(ident):
             old = local_project(store, ident)
             store.check(old, request.version)
@@ -450,6 +617,6 @@ def build_persistence_router(store):
             if state is None or not any(record["id"] == request.fit_id for record in state["history"]):
                 _fail("The saved fit was not found. Reload the project history.")
             state["history"] = [record for record in state["history"] if record["id"] != request.fit_id]
-            return store.save(project, old, f"Removed saved EXAFS fit: {group['label']}")
+            return project_view(store.save(project, old, f"Removed saved EXAFS fit: {group['label']}"), view)
 
     return router

@@ -176,7 +176,7 @@ class FitRouteRequest(FitRequest):
     paths: list[Annotated[Union[Annotated[FitPath, Tag("file")], Annotated[FeffJobPath, Tag("job")]],
                           Discriminator(_path_source)]] = Field(min_length=1, max_length=24)
 
-    def resolve(self, jobs) -> FitRequest:
+    def resolve(self, jobs, *, sources=None) -> FitRequest:
         """Read each named path's file out of its job, once per job."""
         records, paths = {}, []
         for path in self.paths:
@@ -188,11 +188,15 @@ class FitRouteRequest(FitRequest):
                 if record["status"] != "complete":
                     _fail(f"FEFF job {path.feff_job} is {record['status']}, not complete; poll it until "
                           "status is 'complete'.", "feff_job")
-                records[path.feff_job] = {item["id"]: item for item in record["paths"]}
+                from .artemis_provenance import path_source
+                records[path.feff_job] = {item["id"]: (item, path_source(record, item)) for item in record["paths"]}
             source = records[path.feff_job].get(path.feff_path)
             if source is None:
                 _fail(f"FEFF job {path.feff_job} has no path {path.feff_path}; it has "
                       f"{', '.join(sorted(records[path.feff_job])) or 'none'}.", "feff_path")
+            source, provenance = source
+            if sources is not None:
+                sources[path.id] = provenance
             paths.append(FitPath(filename=source["filename"], content=source["content"],
                                  **path.model_dump(exclude={"feff_job", "feff_path"})))
         return FitRequest(version=self.version, parameters=self.parameters, paths=paths, transform=self.transform)
@@ -883,7 +887,15 @@ def build_artemis_router(store) -> APIRouter:
         if project.get("integration") is True:
             _fail("Import the integration draft into a local project before fitting.", "project")
         store.check(project, request.version)
-        result = backend(store.group(project, group_id), request.resolve(jobs))
+        from .artemis_provenance import add_fit_provenance
+        from .artemis_persistence import input_fingerprint, request_fingerprint
+        sources = {}
+        resolved = request.resolve(jobs, sources=sources)
+        source = store.group(project, group_id)
+        result = backend(source, resolved)
+        active_ids = {path.id for path in resolved.paths if path.enabled}
+        add_fit_provenance(result, {key: value for key, value in sources.items() if key in active_ids})
+        result["metadata"].update(input_sha256=input_fingerprint(source), model_sha256=request_fingerprint(resolved))
         store.check(store.load(ident), request.version)
         reply = dict(project_id=ident, version=request.version, **result)
         if view == "summary":
@@ -928,7 +940,7 @@ def build_artemis_router(store) -> APIRouter:
     router.include_router(build_structures_router(store, jobs))
     from .artemis_persistence import build_persistence_router
 
-    router.include_router(build_persistence_router(store))
+    router.include_router(build_persistence_router(store, jobs))
     from .artemis_plot import build_plot_router
 
     router.include_router(build_plot_router(store))

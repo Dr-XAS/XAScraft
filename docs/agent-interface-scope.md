@@ -447,3 +447,48 @@ the catalog generates itself, build the six-tool MCP server, build the eval harn
    35 cheap enough that scoping it down would have saved nothing. The question returns
    for Phase 3: the discriminated union is per-action work that does *not* collapse this
    way, so knowing the task suite would genuinely bound it.
+
+## Saved EXAFS fits and compact mutation replies
+
+`POST /api/artemis/projects/{id}/groups/{gid}/fits?view=summary` takes the
+same numeric `{version, parameters, paths, transform}` body as the read-only
+`/fit` route. Paths can be FEFF job references. The server inspects and embeds
+the complete path text, constructs the model draft, and saves one fit archive.
+The reply contains `project`, `fit_id`, and a compact `fit` with input/model
+hashes, provenance, warnings, bounds, correlations, concerns and timings.
+`/fits` defaults to summary; the original browser `/fit-saved {version, model}`
+keeps its full default response and also accepts `view=summary`.
+
+Send `Idempotency-Key` when saving. A retry of the same body (excluding version)
+returns the same fit ID and current project before checking an expired job or
+stale version. A changed body under the same key is refused. Concurrent retries
+commit one archive; they may compute concurrently before the first commit.
+`idempotent_replay` and `fit_present` identify a replay and whether its archive
+still exists. Removing or undoing the fit does not authorize repeating the save
+under that key. Use a new key for a new fit.
+
+- `GET .../groups/{gid}/fits` lists all retained fit summaries, oldest first,
+  with the current project version and input hash. The limit remains 10.
+- `GET .../groups/{gid}/fits/{fit_id}?view=summary` reads one saved fit.
+- `GET .../groups/{gid}/fits/{fit_id}?view=full` includes model, path files,
+  reports and curves. Neither query reruns FEFF or the optimizer.
+- `stale` compares scientific chi(k) inputs, independently of renaming and
+  unrelated project edits. `imported` separately identifies an imported archive.
+- Model hashes exclude display labels, filenames, row IDs and draft revision;
+  they include FEFF contents, numerical parameters and transform settings.
+
+Athena import, column reimport, project restore and restore-upload now honor
+`view=summary|parameters`. Artemis model/save/remove-fit and CIF attachment
+mutations honor the same views; defaults remain full for existing browser clients.
+Project summary includes compact Artemis state and attachment IDs, without path
+text or fit curves. The full project and individual full fit remain available
+for artifact downloads.
+
+FEFF summaries include native diagnostics and actual input geometry, not only
+exit status. Native potential inconsistencies make a new job fail. Path-radius
+warnings are retained even when they disagree with the measured ATOMS extent;
+the service reports that discrepancy rather than silently suppressing them.
+Warnings, raw diagnostic excerpts, input/CIF hashes, generator version and FEFF
+binary hashes travel with selected path metadata into saved fits and project
+exchange, so they survive temporary job expiry. Existing legacy jobs are labeled
+with unverified stoichiometry and should be regenerated.

@@ -1,5 +1,6 @@
 """Native AMCSD/site fidelity and bounded asynchronous FEFF execution."""
 import json
+import hashlib
 import os
 import stat
 import subprocess
@@ -288,7 +289,10 @@ def _finished_job(jobs, ident, created=None, status="complete", **changes):
     directory.mkdir(mode=0o700)
     record = dict(id=ident, status=status, stage=status, message="Generated 1 FEFF paths.",
                   created=created or time.time(), elapsed_seconds=1.0,
-                  request=request().model_dump() | changes, log="", provenance={}, paths=[],
+                  request=request().model_dump() | changes, log="", provenance={"input_generator": structures.INPUT_GENERATOR,
+                  "converter": f"larixite {structures.larixite.__version__}",
+                  "executable_sha256": {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                                        for name, path in structures._executables().items()}}, paths=[],
                   total_paths=1, truncated=False, warnings=[])
     (directory / "status.json").write_text(json.dumps(record))
     (directory / "paths.json").write_text(json.dumps([{"id": "feff0001", "filename": "feff0001.dat"}]))
@@ -379,3 +383,91 @@ def test_every_bundled_cell_reads_as_numbers():
         rows = connection.execute(structures._SELECT).fetchall()
     cells = [structures._summary(row)["cell"] for row in rows]
     assert len(cells) > 9000 and all(isinstance(value, float) for cell in cells for value in cell.values())
+
+
+@pytest.mark.parametrize('ident,absorber,site,expected', [
+    (7469, 'Co', 1, {27: 3, 8: 4}), (7469, 'Co', 2, {27: 3, 8: 4}),
+    (17487, 'Ag', 1, {47: 2, 8: 1}), (163, 'Ba', 1, {56: 1, 16: 1, 8: 4}),
+])
+def test_potential_weights_follow_full_cell_not_cluster_or_unique_sites(ident, absorber, site, expected):
+    params = FeffJobRequest(amcsd_id=ident, absorber=absorber, site_index=site)
+    text = structures._prepare_input(params, structure_details(ident))
+    rows = [r for _, r in structures._input_rows(text, 'POTENTIALS')]
+    assert float(rows[0][5]) == 0.01
+    assert {int(r[1]): float(r[5]) for r in rows[1:]} == expected
+
+
+def test_isolated_absorber_uses_finite_stoichiometry_and_omits_hydrogen():
+    # A synthetic molecular input, following FEFF's documented SF6 example.
+    text = 'POTENTIALS\n0 16 S -1 -1 0.01\n1 9 F -1 -1\nATOMS\n0 0 0 0 S\n1.5 0 0 1 F\nEND\n'
+    fixed = structures._complete_potentials(text, {'S': 1, 'F': 6, 'H': 2})
+    rows = structures._input_rows(fixed, 'POTENTIALS')
+    assert [float(row[5]) for _, row in rows] == [1, 6]
+    assert structures._input_diagnostics(fixed, 3)['actual_cluster_radius'] == 1.5
+    with pytest.raises(WebInputError, match='stoichiometry'):
+        structures._complete_potentials(text.replace('1.5 0 0 1 F', '1.5 0 0 2 F'), {'S': 1, 'F': 6})
+
+
+def test_log_warnings_distinguish_native_diagnostic_from_actual_geometry():
+    log = '''Inconsistency in POTENTIAL card: 1
+ Results might be meaningless.
+ WARNING: rmax > distance to most distant atom.
+ Some paths may be missing.
+ rmax, ratx = 3.8 0.0
+ Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+'''
+    small = structures._log_diagnostics(log, dict(actual_cluster_radius=3.5, requested_path_radius=3.8))
+    assert small[0]['code'] == 'feff_potential_inconsistent'
+    assert 'paths may be missing' in small[2]['message']
+    assert 'ratx' in small[2]['raw']
+    assert small[-1]['severity'] == 'info'
+    large = structures._log_diagnostics(log, dict(actual_cluster_radius=4.5, requested_path_radius=3.8))
+    assert 'disagrees' in large[2]['message'] and large[2]['severity'] == 'warning'
+    invalid = structures._log_diagnostics('IEEE_INVALID_FLAG IEEE_OVERFLOW_FLAG', {})
+    assert invalid[0]['severity'] == 'warning'
+
+
+def test_old_generator_jobs_are_not_reused(tmp_path, monkeypatch):
+    _never_runs(monkeypatch)
+    jobs = FeffJobs(tmp_path)
+    directory = _finished_job(jobs, 'a' * 32)
+    record = json.loads((directory / 'status.json').read_text())
+    record['provenance'].pop('input_generator')
+    jobs._save(directory, record)
+    job = _settled(jobs, jobs.start(request()))
+    assert job['id'] != 'a' * 32 and 'reused' not in job
+
+
+def test_native_feff_reads_correct_co3o4_stoichiometry(tmp_path):
+    jobs = FeffJobs(tmp_path)
+    params = FeffJobRequest(amcsd_id=7469, absorber='Co', site_index=1, path_radius=3, max_legs=2)
+    job = jobs.start(params)
+    deadline = time.monotonic() + 60
+    while job['status'] == 'running' and time.monotonic() < deadline:
+        time.sleep(0.1)
+        job = jobs.get(job['id'])
+    assert job['status'] == 'complete', job
+    assert not any('meaningless' in w or 'Inconsistency' in w for w in job['warnings'])
+    pot = json.loads((jobs.root / job['id'] / 'pot.json').read_text())
+    weights = {row['z']: row['stoichiometry'] for row in job['provenance']['potentials'][1:]}
+    assert weights == {8: 4, 27: 3}
+    assert sorted(pot['xnatph'][:pot['nph'] + 1]) == [1, 300, 400]
+    assert job['paths'][0]['metadata']['feff']['input_generator'] == structures.INPUT_GENERATOR
+    assert job['paths'][0]['metadata']['feff']['diagnostics'] == job['diagnostics']
+
+
+def test_diagnostic_failure_still_releases_capacity(tmp_path, monkeypatch):
+    jobs = FeffJobs(tmp_path)
+    class Slot:
+        closed = False
+        def close(self): self.closed = True
+    slot = Slot()
+    record = dict(id='a' * 32, provenance={}, warnings=[])
+    jobs.running.add(record['id'])
+    (tmp_path / 'feff.log').write_text('WARNING: test')
+    def failed(*_): raise OSError('log read failed')
+    monkeypatch.setattr(structures, '_log_diagnostics', failed)
+    monkeypatch.setattr(structures, '_prepare_input', lambda *_: 'TITLE synthetic')
+    jobs._run(tmp_path, record, request(), {'cif': 'data_test'}, {}, slot)
+    assert slot.closed and not jobs.running
+    assert record['status'] == 'failed' and 'diagnostics' in record['message']

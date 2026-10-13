@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
 
 from .errors import WebInputError
+from .agent_views import project_view
 
 MAX_STRUCTURES = 20
 MAX_STRUCTURE_BYTES = 4_000_000
@@ -331,15 +332,15 @@ def build_attachments_router(store):
                     structures=validate_attachments(project.get(PROJECT_FIELD, [])))
 
     @router.post("/projects/{ident}/structures")
-    def attach(ident: str, request: AttachRequest):
-        return attach_structure(store, ident, request)
+    def attach(ident: str, request: AttachRequest, view: Literal["full", "summary", "parameters"] = "full"):
+        return project_view(attach_structure(store, ident, request), view)
 
     @router.post("/projects/{ident}/structures/{attachment_id}/remove")
-    def remove(ident: str, attachment_id: str, request: RemoveRequest):
-        return remove_structure(store, ident, attachment_id, request)
+    def remove(ident: str, attachment_id: str, request: RemoveRequest, view: Literal["full", "summary", "parameters"] = "full"):
+        return project_view(remove_structure(store, ident, attachment_id, request), view)
 
     @router.post("/projects/{ident}/structures/{attachment_id}/rename")
-    def rename(ident: str, attachment_id: str, request: RenameRequest):
-        return rename_structure(store, ident, attachment_id, request)
+    def rename(ident: str, attachment_id: str, request: RenameRequest, view: Literal["full", "summary", "parameters"] = "full"):
+        return project_view(rename_structure(store, ident, attachment_id, request), view)
 
     return router

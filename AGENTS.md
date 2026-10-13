@@ -212,6 +212,22 @@ default and bounds. The summary gives statistics, each parameter with its stderr
 correlations of 0.1 or more, and per path its scatterers, degeneracy, reff, r and
 sigma2. The fit saves nothing.
 
+To save the same numeric request, use `POST .../groups/{gid}/fits?view=summary`.
+It embeds FEFF job paths and diagnostics into the project, returns `fit_id` and
+the compact saved `fit`, and advances the version. Send `Idempotency-Key` for
+retries; a changed body under the same key is refused. `GET .../groups/{gid}/fits`
+lists retained history; `GET .../fits/{fit_id}?view=summary|full` reads one archive
+without running FEFF or fitting. Full detail carries curves and path files even
+after job expiry. `stale` compares chi(k) inputs; `imported` is a separate flag.
+The original browser `/fit-saved` body remains supported.
+
+Import, reimport, restore, restore-upload, model, fit-saved, remove-fit and CIF
+attachment mutations accept `view=summary`. Project summary includes fit counts,
+the latest fit's identity and staleness, and attached CIF IDs. Read FEFF
+`diagnostics` and `input` in its summary: potential stoichiometry, actual cluster
+extent, and native warnings are explicit. Selected paths retain these warnings
+and input/executable fingerprints in saved models and fit history.
+
 **"Fit succeeded" means the minimiser stopped.** Read `concerns`: an R-factor above
 0.05 (under about 0.02 is good), more variables than independent points, a correlation
 above 0.9, or a parameter `at_bound`, whose stderr then means nothing.

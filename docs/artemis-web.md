@@ -1344,3 +1344,32 @@ Neither engine is in `backend/requirements.txt`. Deployment scripts install
 that file explicitly, not a requirements-file glob, so a standard deployment
 still omits the engines and `tests/test_artemis_fast.py` skips. After installing
 the engines, restart the server so availability is checked again.
+
+## FEFF potential stoichiometry and diagnostic provenance
+
+The application completes every POTENTIALS `xnatph` column using the
+symmetry-expanded CIF cell's reduced elemental composition. This includes site
+multiplicity once, and avoids relying on the composition of a truncated sphere.
+The upstream converter's absorber-only value is not passed to FEFF unchanged:
+FEFF treats any explicit `xnatph` as disabling automatic counts for all potentials.
+For a crystal with a background potential for the absorbing element, the central
+potential keeps `0.01`. If no background absorber potential exists, the central
+potential receives that element's full stoichiometric count, with a finite-model
+warning. See the [FEFF POTENTIALS reference](https://feff.phys.washington.edu/feff/Docs/feff8/feff85/feff85/POTENTIALS.html).
+Hydrogen remains omitted; partial occupancy/disorder remains unsupported.
+Inequivalent sites of the same element still share a background potential in the
+converter. Correct stoichiometry does not establish a sample's chemical phase,
+coordination number or oxidation-state-specific electronic potentials.
+
+Input generation is versioned (`xascraft-feff-input/v2`). Jobs from older
+versions, different converter versions or different FEFF executables cannot be
+reused as current cached calculations. Full job provenance retains the exact CIF,
+input and executable fingerprints; summary includes potential weights and actual
+cluster radius. Native warnings appear in the existing warning list and in a
+structured diagnostics list. Underflow/denormal flags are informational; other
+native warnings are preserved. A successful process exit alone does not prove a
+scientifically valid calculation.
+
+Generated path metadata carries this provenance through browser model saves and
+numeric Agent fits. Saved fit history can be queried without loading the full
+project; see [the Agent interface](agent-interface-scope.md#saved-exafs-fits-and-compact-mutation-replies).

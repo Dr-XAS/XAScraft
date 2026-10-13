@@ -58,7 +58,8 @@ def test_summary_is_a_fraction_of_the_full_record(client, example):
     summary_bytes = len(json.dumps(summary))
     assert full_bytes > 300_000, "the copper example should still be the large payload"
     assert summary_bytes < full_bytes / 100
-    assert summary_bytes / len(summary["groups"]) < 700
+    # Includes compact Artemis state and CIF attachment identities.
+    assert summary_bytes / len(summary["groups"]) < 800
 
 
 def test_summary_tags_cannot_leak_imported_arrays_or_arbitrary_metadata(example):

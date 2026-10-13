@@ -32,6 +32,10 @@ export interface ArtemisPathMetadata {
   viewerCluster?: FeffViewerCluster
   /** CIF snapshot used to calculate this path; retained even if its attachment is removed. */
   sourceCif?: { sha256: string; label: string; siteIndex: number; attachmentId?: string }
+  /** Portable native diagnostics; retained when the temporary FEFF job expires. */
+  feff?: { job_id: string; path_sha256: string; input_sha256: string; cif_sha256: string;
+    input_generator: string; engine: string; executable_sha256?: Record<string, string>; warnings: string[];
+    diagnostics: { code: string; severity: "warning" | "info"; message: string; raw: string }[] }
   kmin: number
   kmax: number
 }

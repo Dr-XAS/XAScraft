@@ -18,7 +18,7 @@ NOTE = (
     "nothing and the bound is doing the fitting. Correlations below 0.1 are left "
     "out; above about 0.9 they mean the pair is not separately determined by this data. "
     "concerns lists what a plot of the fit would have shown at a glance; success only "
-    "means the minimiser stopped. Nothing was saved: the fit route reads the group and returns."
+    "means the minimiser stopped."
 )
 
 # How close to a bound counts as on it, as a fraction of the allowed span.
@@ -43,12 +43,12 @@ def _round(value):
 
 def _at_bound(row: dict) -> str | None:
     low, high = row.get("min"), row.get("max")
-    if row.get("kind") != "guess" or low is None or high is None or high <= low:
+    if row.get("kind") != "guess":
         return None
-    margin = (high - low) * _AT_BOUND
-    if row["value"] <= low + margin:
+    margin = (high - low) * _AT_BOUND if low is not None and high is not None else 1e-6 * max(1, abs(row["value"]))
+    if low is not None and row["value"] <= low + margin:
         return "min"
-    if row["value"] >= high - margin:
+    if high is not None and row["value"] >= high - margin:
         return "max"
     return None
 
@@ -89,10 +89,10 @@ def _concerns(result: dict, parameters: list[dict]) -> list[str]:
     return concerns
 
 
-def fit_summary(result: dict) -> dict:
+def fit_summary(result: dict, *, saved=False) -> dict:
     parameters = []
     for row in result["parameters"]:
-        entry = {key: row[key] for key in ("name", "kind", "value", "stderr", "initial")}
+        entry = {key: row[key] for key in ("name", "kind", "value", "stderr", "initial", "min", "max") if key in row}
         if row.get("expression"):
             entry["expression"] = row["expression"]
         if bound := _at_bound(row):
@@ -112,6 +112,12 @@ def fit_summary(result: dict) -> dict:
             **{key: values[key] for key in ("s02", "sigma2", "e0", "deltar") if key in values},
             **({"sigma2_expression": record["sigma2_expression"]} if "sigma2_expression" in record else {}),
         })
+    metadata = result.get("metadata") or {}
+    feff_jobs = {}
+    for path_id, source in metadata.get("feff_sources", {}).items():
+        job = feff_jobs.setdefault(source["job_id"], {key: value for key, value in source.items()
+                                                   if key not in ("path_sha256", "warnings")})
+        job.setdefault("path_ids", []).append(path_id)
     return _round({
         **{key: result[key] for key in ("project_id", "version", "group_id", "group_label",
                                         "success", "message", "warnings", "statistics",
@@ -122,7 +128,10 @@ def fit_summary(result: dict) -> dict:
                          if abs(row["value"]) >= _CORRELATION_FLOOR],
         "paths": paths,
         "concerns": _concerns(result, parameters),
-        "note": NOTE,
+        "metadata": {key: metadata[key] for key in ("engine", "seconds", "input_sha256", "model_sha256") if key in metadata},
+        **({"feff_jobs": list(feff_jobs.values())} if feff_jobs else {}),
+        "saved": saved,
+        "note": NOTE + (" This fit is saved in the project history." if saved else " Nothing was saved: this route only reads the group."),
     })
 
 
@@ -134,7 +143,10 @@ def feff_job_summary(record: dict) -> dict:
     A run that polled while fitting twenty times read 445 KB of it.
     """
     summary = {key: record[key] for key in ("id", "status", "stage", "message", "elapsed_seconds",
-                                            "total_paths", "truncated", "reused", "warnings") if key in record}
+                                            "total_paths", "truncated", "reused", "warnings", "diagnostics") if key in record}
+    provenance = record.get("provenance") or {}
+    summary["input"] = {key: provenance[key] for key in ("input_generator", "input_sha256", "source_cif_sha256",
+                        "stoichiometry_source", "potentials", "atom_count", "actual_cluster_radius", "requested_path_radius") if key in provenance}
     if "paths" in record:
         summary["paths"] = [{
             "id": path.get("id"), "filename": path.get("filename"),
@@ -228,5 +240,13 @@ def capabilities() -> dict:
             ],
         },
         "simulation": "/api/artemis/capabilities/simulation",
+        "saved_fits": {
+            "post": "/api/artemis/projects/{id}/groups/{gid}/fits?view=summary",
+            "body": "Same numeric body as fit, including FEFF job references. Saves model, paths, warnings and result; advances version.",
+            "idempotency": "Send Idempotency-Key. Same key/body replays before version or job checks; changed body is rejected. Version is excluded from the body hash.",
+            "list": "GET /api/artemis/projects/{id}/groups/{gid}/fits",
+            "detail": "GET /api/artemis/projects/{id}/groups/{gid}/fits/{fit_id}?view=summary|full",
+            "notes": "History is limited to 10 fits per spectrum. Full detail includes model and curves, survives FEFF job expiry. Stale compares chi(k) inputs, not project version. Browser fit-saved remains supported. Model, fit-saved, remove-fit and structure mutations accept view=summary.",
+        },
         "fit_reply": NOTE,
     }

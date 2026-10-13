@@ -40,6 +40,7 @@ from .artemis_coordination import FirstShellRequest, first_shell
 from .artemis_shells import RadialShellRequest, radial_shells
 from .errors import WebInputError
 from .structure_search import formula_match_rank, parse_formula
+from .artemis_provenance import INPUT_GENERATOR, path_source, text_sha256
 
 _DATABASE = Path(larixite.__file__).parent / "amcsd_cif1.db"
 _SOURCE = "Bundled curated AMCSD database (larixite amcsd_cif1.db; not the full online archive)"
@@ -392,9 +393,103 @@ def _prepare_input(request: FeffJobRequest, details: dict):
                           extra_titles=[f"Materials Project {details['id']} (DFT-relaxed)" if details.get("provider") == "materials_project"
                                         else f"Uploaded CIF {details['filename']}" if details.get("provider") == "uploaded"
                                         else f"AMCSD structure {details['id']}"])
+    composition = cluster.struct.composition.element_composition.reduced_composition.get_el_amt_dict()
+    text = _complete_potentials(text, composition)
     text = re.sub(r"(?m)^RPATH\s+.*$", f"RPATH     {request.path_radius:.3f}", text)
     text = re.sub(r"(?m)^NLEG\s+.*$", f"NLEG      {request.max_legs}", text)
     return text
+
+
+def _input_rows(text, card):
+    rows, active = [], False
+    for index, line in enumerate(text.splitlines()):
+        clean = line.split("*", 1)[0].strip()
+        if not clean:
+            continue
+        if clean.upper() == card:
+            active = True
+        elif active:
+            if not re.match(r"^[+\-.0-9]", clean):
+                break
+            rows.append((index, clean.split()))
+    return rows
+
+
+def _complete_potentials(text, composition):
+    """Give every potential a cell stoichiometry, not just the absorber.
+
+    FEFF treats ANY explicit xnatph as an instruction to skip auto-counting
+    ALL potentials. Larixite's lone 0.01 therefore leaves all other species at
+    zero. Use the symmetry-expanded cell, never the finite sphere's counts.
+    https://feff.phys.washington.edu/feff/Docs/feff8/feff85/feff85/POTENTIALS.html
+    """
+    rows = _input_rows(text, "POTENTIALS")
+    atoms = _input_rows(text, "ATOMS")
+    counts = {atomic_number(symbol): float(count) for symbol, count in composition.items() if symbol != "H"}
+    try:
+        potentials = {int(row[0]): int(row[1]) for _, row in rows}
+        if not rows or len(potentials) != len(rows) or set(potentials) != set(range(len(rows))):
+            raise ValueError("nonconsecutive potentials")
+        if any(len(row) < 5 or int(row[1]) not in counts for _, row in rows):
+            raise ValueError("unknown potential species")
+        if len(set(list(potentials.values())[1:])) != len(rows) - 1:
+            raise ValueError("multiple background potentials for one element")
+        if not atoms or {int(row[3]) for _, row in atoms} != set(potentials):
+            raise ValueError("ATOMS/POTENTIALS mismatch")
+        if any(not math.isfinite(value) or value <= 0 for value in counts.values()):
+            raise ValueError("invalid composition")
+        background_absorber = potentials[0] in [z for ipot, z in potentials.items() if ipot != 0]
+        lines = text.splitlines()
+        for index, row in rows:
+            count = 0.01 if int(row[0]) == 0 and background_absorber else counts[int(row[1])]
+            # Preserve any future spin column while replacing xnatph uniformly.
+            lines[index] = "  " + "  ".join([*row[:5], f"{count:.12g}", *row[6:]])
+        return "\n".join(lines) + "\n"
+    except (IndexError, ValueError, KeyError) as exc:
+        _fail(f"Cannot assign consistent FEFF potential stoichiometry: {exc}.", "potentials")
+
+
+def _input_diagnostics(text, path_radius):
+    atoms, potentials = _input_rows(text, "ATOMS"), _input_rows(text, "POTENTIALS")
+    radius = max((math.sqrt(sum(float(v) ** 2 for v in row[:3])) for _, row in atoms), default=0)
+    weights = [{"ipot": int(row[0]), "z": int(row[1]), "stoichiometry": float(row[5])} for _, row in potentials]
+    return dict(input_generator=INPUT_GENERATOR, input_sha256=text_sha256(text),
+                stoichiometry_source="symmetry-expanded CIF cell; hydrogen omitted",
+                potentials=weights, atom_count=len(atoms), actual_cluster_radius=round(radius, 6),
+                requested_path_radius=path_radius)
+
+
+def _log_diagnostics(log, provenance):
+    """Keep native warnings even when FEFF exits successfully."""
+    diagnostics, seen = [], set()
+    lines = log.splitlines()
+    for index, line in enumerate(lines):
+        clean = line.strip()
+        lower = clean.lower()
+        if not any(token in lower for token in ("warning", "inconsistency in potential", "results might be meaningless", "ieee_")):
+            continue
+        raw = clean
+        if "inconsistency in potential" in lower or "rmax >" in lower:
+            raw = "\n".join(lines[index:index + 3]).strip()
+        if clean in seen:
+            continue
+        seen.add(clean)
+        code, severity, message = "feff_native_warning", "warning", raw
+        if "inconsistency in potential" in lower or "results might be meaningless" in lower:
+            code = "feff_potential_inconsistent"
+        elif "rmax >" in lower:
+            code = "feff_path_radius"
+            actual, requested = provenance.get("actual_cluster_radius"), provenance.get("requested_path_radius")
+            if actual is not None and requested is not None:
+                message = (f"FEFF reported a path-radius warning. ATOMS reaches {actual:g} Å; requested RPATH is {requested:g} Å. "
+                           + ("The native diagnostic disagrees with the input geometry; retain the log for review."
+                              if actual + 1e-5 >= requested else "The supplied cluster ends inside RPATH; paths may be missing."))
+        elif "ieee_" in lower:
+            code = "feff_floating_point"
+            if not any(token in lower for token in ("invalid", "zero", "overflow")):
+                severity = "info"
+        diagnostics.append(dict(code=code, severity=severity, message=message[:2000], raw=raw[:2000]))
+    return diagnostics[:100]
 
 
 def _executables():
@@ -526,9 +621,10 @@ class FeffJobs:
         if xray_edge(absorber, request.edge) is None:
             _fail("The selected absorption edge is unavailable for this element.", "edge")
         request = request.model_copy(update={"absorber": absorber})
-        if (finished := self._finished(request, source_provenance.get("cif_sha256"))) is not None:
-            return finished
         executables = _executables()
+        executable_hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in executables.items()}
+        if (finished := self._finished(request, source_provenance.get("cif_sha256"), executable_hashes)) is not None:
+            return finished
         slot = self._slot()
         ident = uuid.uuid4().hex
         directory = self._directory(ident)
@@ -538,6 +634,8 @@ class FeffJobs:
                       provenance=dict(cif=details["cif"], feff_input="", structure={key: value for key, value in details.items()
                                       if key not in ("cif", "sites", "cell", "warnings")},
                                       converter=f"larixite {larixite.__version__}", engine="FEFF8L",
+                                      input_generator=INPUT_GENERATOR,
+                                      executable_sha256=executable_hashes,
                                       s02=1.0, with_h=False, source=details["source"], **source_provenance), paths=[], total_paths=0, truncated=False,
                       warnings=["Hydrogen atoms are omitted from the FEFF cluster (with_h=False)."] if "H" in details["elements"] else [])
         try:
@@ -555,7 +653,7 @@ class FeffJobs:
             raise
         return self.get(ident)
 
-    def _finished(self, request: FeffJobRequest, cif_sha256: str | None):
+    def _finished(self, request: FeffJobRequest, cif_sha256: str | None, executable_hashes: dict):
         """The newest complete job that ran this same request, marked reused.
 
         FEFF's paths follow from its input alone, so a second identical request
@@ -571,6 +669,9 @@ class FeffJobs:
                         continue
                     record = json.loads((directory / "status.json").read_text())
                     if (record.get("status") != "complete" or record.get("request") != wanted
+                            or record.get("provenance", {}).get("input_generator") != INPUT_GENERATOR
+                            or record.get("provenance", {}).get("converter") != f"larixite {larixite.__version__}"
+                            or record.get("provenance", {}).get("executable_sha256") != executable_hashes
                             or record.get("provenance", {}).get("cif_sha256") != cif_sha256
                             or time.time() - float(record["created"]) > _REUSE_SECONDS
                             or not (directory / "paths.json").exists()):
@@ -613,6 +714,11 @@ class FeffJobs:
                 record["paths"] = json.loads((directory / "paths.json").read_text())
             except FileNotFoundError:
                 _fail("This FEFF job is unavailable or expired (jobs are retained up to 24 hours).", "job")
+            if record.get("provenance", {}).get("input_generator") != INPUT_GENERATOR:
+                record.setdefault("warnings", []).append("This FEFF job used a legacy input generator with unverified potential stoichiometry. Regenerate the paths before interpreting a new fit.")
+            for path in record["paths"]:
+                if "content" in path:
+                    path.setdefault("metadata", {})["feff"] = path_source(record, path)
         return record
 
     def _run_module(self, executable, directory, log, deadline):
@@ -658,6 +764,15 @@ class FeffJobs:
             self._write_private_text(directory / "source.cif", details["cif"])
             self._write_private_text(directory / "feff.inp", feff_input)
             record["provenance"]["feff_input"] = feff_input
+            record["provenance"].update(_input_diagnostics(feff_input, request.path_radius))
+            record["provenance"]["source_cif_sha256"] = text_sha256(details["cif"])
+            potentials = record["provenance"]["potentials"]
+            absent = [element for element in details.get("elements", []) if element != "H"
+                      and atomic_number(element) not in {p["z"] for p in potentials}]
+            if absent:
+                record["warnings"].append("The finite FEFF cluster omits CIF elements: " + ", ".join(absent) + ". Increase the cluster radius or verify the local model.")
+            if potentials and not any(p["ipot"] and p["z"] == potentials[0]["z"] for p in potentials):
+                record["warnings"].append("The cluster has no background absorber potential. The central potential uses its full cell stoichiometry; check that this finite local model represents the sample.")
             with (directory / "feff.log").open("wb") as log:
                 os.chmod(directory / "feff.log", 0o600)
                 for module, executable in executables.items():
@@ -688,8 +803,23 @@ class FeffJobs:
         except Exception as exc:
             record.update(status="failed", stage="failed", message=str(exc)[:1000])
         finally:
-            record["elapsed_seconds"] = round(time.monotonic() - start, 2)
             try:
+                try:
+                    log_path = directory / "feff.log"
+                    if log_path.exists():
+                        with log_path.open("rb") as stream:
+                            # Bound diagnostic parsing as well as the public log tail.
+                            log_text = stream.read(_MAX_DISK_BYTES).decode("utf-8", errors="replace")
+                        record["diagnostics"] = _log_diagnostics(log_text, record.get("provenance", {}))
+                        for diagnostic in record["diagnostics"]:
+                            if diagnostic["severity"] == "warning":
+                                record.setdefault("warnings", []).append(diagnostic["message"])
+                            if diagnostic["code"] == "feff_potential_inconsistent":
+                                record.update(status="failed", stage="failed", message="FEFF reported inconsistent potentials. Regenerate the input before fitting.")
+                        record["warnings"] = list(dict.fromkeys(record.get("warnings", [])))
+                except Exception as exc:
+                    record.update(status="failed", stage="failed", message=f"Could not read FEFF diagnostics: {exc}"[:1000])
+                record["elapsed_seconds"] = round(time.monotonic() - start, 2)
                 with self.lock:
                     self._save(directory, record)
             finally:

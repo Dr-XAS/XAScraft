@@ -5371,12 +5371,13 @@ def build_athena_router(
 
     @router.post("/projects/{ident}/import")
     def import_data(ident: str, request: ImportRequest, capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability"),
-                    idempotency_key: str | None = Header(default=None, max_length=200, alias="Idempotency-Key")):
+                    idempotency_key: str | None = Header(default=None, max_length=200, alias="Idempotency-Key"),
+                    view: ProjectView = "full"):
         authority = integration_draft(ident, capability, "import")
-        return integrated_mutation(
+        return project_view(integrated_mutation(
             ident, capability, "import", authority,
             lambda: guarded(lambda: store.import_data(ident, request, idempotency_key=idempotency_key)),
-        )
+        ), view)
 
     @router.get('/projects/{ident}/uploads/{upload_id}/inspection')
     def inspected_columns(ident: str, upload_id: str):
@@ -5389,10 +5390,11 @@ def build_athena_router(
             lambda: guarded(lambda: store.inspect_group_columns(ident, group_id)))
 
     @router.post('/projects/{ident}/groups/{group_id}/reimport')
-    def reimport_group(ident: str, group_id: str, request: ImportRequest, capability: str | None = Header(default=None, alias='X-XrayLarch-Draft-Capability')):
+    def reimport_group(ident: str, group_id: str, request: ImportRequest, capability: str | None = Header(default=None, alias='X-XrayLarch-Draft-Capability'),
+                       view: ProjectView = "full"):
         authority = integration_draft(ident, capability, 'import', group_ids=[group_id])
-        return integrated_mutation(ident, capability, 'import', authority,
-            lambda: guarded(lambda: store.import_data(ident, request, replace_group_id=group_id)))
+        return project_view(integrated_mutation(ident, capability, 'import', authority,
+            lambda: guarded(lambda: store.import_data(ident, request, replace_group_id=group_id))), view)
 
     @router.get('/projects/{ident}/uploads/{upload_id}/file')
     def inspected_file(ident: str, upload_id: str, variant: Literal['source', 'converted'] = 'source'):
@@ -5652,13 +5654,14 @@ def build_athena_router(
         return previewed(ident, request, lambda: store.preview_smoothing(ident, request), view)
 
     @router.post("/projects/{ident}/restore")
-    def restore(ident: str, version: int, file: UploadFile = File(...), capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability")):
+    def restore(ident: str, version: int, file: UploadFile = File(...), capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability"),
+                view: ProjectView = "full"):
         authority = integration_draft(ident, capability, "restore")
         data = _read_bounded_upload(file, settings.max_upload_bytes)
-        return integrated_mutation(
+        return project_view(integrated_mutation(
             ident, capability, "restore", authority,
             lambda: guarded(lambda: store.restore(ident, version, data, file.filename or "project.prj")),
-        )
+        ), view)
 
     @router.post("/projects/{ident}/preview-project")
     def preview_project(ident: str, file: UploadFile = File(...), capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability")):
@@ -5682,12 +5685,13 @@ def build_athena_router(
             headers={'Content-Disposition': f"attachment; filename*=UTF-8''{quote(filename, safe='')}"})
 
     @router.post("/projects/{ident}/restore-upload")
-    def restore_upload(ident: str, request: RestoreUploadRequest, capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability")):
+    def restore_upload(ident: str, request: RestoreUploadRequest, capability: str | None = Header(default=None, alias="X-XrayLarch-Draft-Capability"),
+                       view: ProjectView = "full"):
         authority = integration_draft(ident, capability, "restore")
-        return integrated_mutation(
+        return project_view(integrated_mutation(
             ident, capability, "restore", authority,
             lambda: guarded(lambda: store.restore_upload(ident, request)),
-        )
+        ), view)
 
     @router.get("/projects/{ident}/export")
     def export(ident: str, format: Literal["json", "prj"] = "json",

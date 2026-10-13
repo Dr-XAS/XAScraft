@@ -175,7 +175,8 @@ def test_the_cli_refuses_a_scan_it_cannot_run(cli, argv, message):
 
 def test_capabilities_describe_the_bodies_the_blind_arms_had_to_guess(http):
     response = http.get("/api/artemis/capabilities")
-    assert response.status_code == 200 and len(response.content) < 6000
+    # Includes discovery of numeric saved fits and history; still a bounded synopsis.
+    assert response.status_code == 200 and len(response.content) < 7000
     described = response.json()
     assert "default [0, 1, 2, 3]" in described["fit"]["transform"]["kweight"]
     assert "ge 1" in described["feff_job"]["body"]["site_index"]

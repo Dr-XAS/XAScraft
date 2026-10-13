@@ -192,8 +192,32 @@ def test_cli_writes_failure_report_for_missing_evidence(tmp_path, capsys):
 
 
 def test_retained_t5_replays_six_fits_in_private_state(monkeypatch, tmp_path):
+    from xraylarch_web import agent_http_replay
     data_root = tmp_path / "original-store"
     monkeypatch.setenv("XRAYLARCH_DATA_ROOT", str(data_root))
+    result = private_replay(T5 / "app-T5/events.jsonl", T5 / "app-T5-runtime/transcript.jsonl", setup_seq=1)
+    # The old recording hid FEFF's native radius warning. Keep that historical
+    # evidence unchanged and require the replay to flag precisely this addition.
+    assert result["divergences"] == ["seq 21: warnings: length 1 -> 2"]
+    step = next(s for s in result["steps"] if s["seq"] == 21)
+    warnings = step["actual"]["warnings"]
+    assert warnings[:-1] == step["expected"]["warnings"]
+    assert warnings[-1].startswith("FEFF reported a path-radius warning. ATOMS reaches ")
+    assert "native diagnostic disagrees with the input geometry" in warnings[-1]
+    load = agent_http_replay.load_http_records
+    def with_visible_diagnostic(path):
+        rows = copy.deepcopy(load(path))
+        next(row for row in rows if row["seq"] == 21)["response"]["warnings"] = warnings
+        for row in rows:
+            if "/fit?" not in row["path"]:
+                continue
+            definitions = {p["name"]: p for p in row["body"]["parameters"]}
+            for parameter in row["response"]["parameters"]:
+                parameter.update({key: definitions[parameter["name"]].get(key) for key in ("min", "max")})
+            if any("feff_job" in p for p in row["body"]["paths"]):
+                row["response"]["warnings"].extend(f"FEFF: {warning}" for warning in warnings)
+        return rows
+    monkeypatch.setattr(agent_http_replay, "load_http_records", with_visible_diagnostic)
     result = private_replay(T5 / "app-T5/events.jsonl", T5 / "app-T5-runtime/transcript.jsonl", setup_seq=1)
     assert result["ok"], result["divergences"]
     assert result["fits"] == 6 and result["feff_jobs"] == 1

@@ -171,7 +171,20 @@ def group_summary(group: dict) -> dict:
         "background_standard_id": group["background_standard_id"],
         "derived": _derivation(group),
         "warnings": result.get("warnings") or [],
+        **({"artemis": _artemis_summary(group["artemis"])} if "artemis" in group else {}),
     }
+
+
+def _artemis_summary(state):
+    history = state.get("history", [])
+    latest = history[-1] if history else None
+    return dict(saved_fits=len(history), model_revision=state["model"]["revision"],
+                current_input_sha256=state.get("current_input_sha256"),
+                latest_fit=(dict(id=latest["id"], created=latest["created"], imported=latest.get("imported", False),
+                                 stale=latest["input_sha256"] != state.get("current_input_sha256"),
+                                 success=latest["result"]["success"],
+                                 r_factor=latest["result"]["statistics"]["r_factor"])
+                            if latest else None))
 
 
 def _analysis_summary(analysis: dict, version: int) -> dict:
@@ -226,6 +239,9 @@ def project_summary(project: dict) -> dict:
             _analysis_summary(analysis, project["version"])
             for analysis in project.get("analyses") or ()
         ],
+        "artemis_structures": [{key: item[key] for key in ("id", "label", "sha256") if key in item}
+                               for item in project.get("artemis_structures", [])],
+        **({"idempotent_replay": project["idempotent_replay"]} if "idempotent_replay" in project else {}),
         # What the last command did, which for a command response is the part
         # the caller asked about.
         "last_operation": _last_operation(project.get("last_operation")),
