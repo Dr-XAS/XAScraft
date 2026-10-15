@@ -497,7 +497,7 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
   }
   function simulateButton(attachment: ArtemisStructureAttachment) {
     const name = attachmentName(attachment)
-    return <button type="button" disabled={controlsDisabled || !attachment.structure.supported}
+    return <button type="button" className={styles.primaryButton} disabled={controlsDisabled || !attachment.structure.supported}
       aria-label={`Simulate EXAFS from ${name} CIF`}
       title={attachment.structure.supported ? `Simulate EXAFS from ${name} CIF` : "EXAFS simulation requires an ordered structure with supported atomic sites."}
       onClick={() => openAttachment(attachment, "simulation")}>Simulate EXAFS</button>
