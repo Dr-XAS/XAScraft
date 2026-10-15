@@ -42,7 +42,7 @@ function CellRepeatInput({ axis, value, onChange }: { axis: string; value: numbe
     }} /></label>
 }
 
-export function CifViewer({ structure, collapsible = false, structureControls, selectedSite, onSiteChange, analysis, radialAnalysis }: {
+export function CifViewer({ structure, collapsible = false, structureControls, selectedSite, onSiteChange, analysis, radialAnalysis, displayRadius, onDisplayRadiusChange, radiusDisabled = false }: {
   structure: ArtemisStructure
   collapsible?: boolean
   structureControls?: ReactNode
@@ -50,6 +50,9 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
   onSiteChange?: (site: number) => void
   analysis?: FirstShellState
   radialAnalysis?: RadialShellState
+  displayRadius?: number
+  onDisplayRadiusChange?: (radius: number) => void
+  radiusDisabled?: boolean
 }) {
   const container = useRef<HTMLDivElement>(null)
   const viewer = useRef<GLViewer | null>(null)
@@ -62,7 +65,9 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
   const [ready, setReady] = useState(false)
   const [error, setError] = useState("")
   const [attempt, setAttempt] = useState(0)
-  const [radius, setRadius] = useState(CIF_VIEWER_DEFAULT_RADIUS)
+  const [localRadius, setLocalRadius] = useState(CIF_VIEWER_DEFAULT_RADIUS)
+  const radius = displayRadius ?? localRadius
+  const setRadius = (value: number) => { setLocalRadius(value); onDisplayRadiusChange?.(value) }
   const [cellRepeats, setCellRepeats] = useState<CifVector>([1, 1, 1])
   const centerKey = `${structure.cif}:${selectedSite ?? "default"}`
   const defaultCenter = selectedSite ?? structure.sites[0]?.index
@@ -274,7 +279,8 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
     <button type="button" aria-pressed={measuring} disabled={!ready || !!error} onClick={() => { setMeasuring(value => !value); clearMeasurement(); clearHover() }}>Measure</button>
     {resetButton}
   </div>
-  const viewerHelp = <>Drag to rotate; scroll or pinch to zoom; hover over atoms for details or bonds for their length in Å. Enable Measure and click two atoms for a distance, or three for distances and the angle at atom 2. Measurements use the displayed periodic images and do not imply a chemical bond. Escape clears the selection. Bonds are inferred from distances. Display settings do not change FEFF parameters. The largest sphere marks the center; larger neighboring spheres mark CrystalNN first-shell atoms, keeping their element colors. In radial view, shell colors and neighbor counts appear in the shell table. Element visibility does not change shell membership. Use CrystalNN first shell view to show all periodic neighbors.</>
+  const radiusHelp = onDisplayRadiusChange ? "Display radius is synced with the FEFF cluster radius for this CIF in both calculators. FEFF accepts 3–6 Å. Changing the radius updates the next calculation without running FEFF automatically." : undefined
+  const viewerHelp = <>Drag to rotate; scroll or pinch to zoom; hover over atoms for details or bonds for their length in Å. Enable Measure and click two atoms for a distance, or three for distances and the angle at atom 2. Measurements use the displayed periodic images and do not imply a chemical bond. Escape clears the selection. Bonds are inferred from distances. {radiusHelp ?? "Display settings do not change FEFF parameters."} The largest sphere marks the center; larger neighboring spheres mark CrystalNN first-shell atoms, keeping their element colors. In radial view, shell colors and neighbor counts appear in the shell table. Element visibility does not change shell membership. Use CrystalNN first shell view to show all periodic neighbors.</>
   const content = <><ResizablePlotCard className={styles.resizeCard} storageKey="artemis.cif.height.v1"
     defaultHeight={310} minHeight={250} plotSelector="[data-cif-plot]" resizeLabel="Resize CIF structure height" controlsId={plotId}>
     {structureControls}
@@ -317,6 +323,7 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
         {shell && mode !== "radial" && <label><input type="checkbox" aria-label="Highlight CrystalNN first shell" checked={highlightShell || mode === "shell"} disabled={mode === "shell"} onChange={event => setHighlightShell(event.target.checked)} />First shell<SectionHelp label="Highlight first shell">Enlarge neighbors assigned by CrystalNN while keeping their element colors. The first-shell view always shows them; hiding or highlighting atoms does not change shell membership.</SectionHelp></label>}
       </div>
       <LocalStructureControls radius={radius} min={CIF_VIEWER_MIN_RADIUS} max={CIF_VIEWER_MAX_RADIUS} onRadiusChange={setRadius}
+        radiusDisabled={radiusDisabled} radiusHelp={radiusHelp}
         radiusAriaLabel="CIF display radius" bonds={bonds} onBondsChange={setBonds}
         extentControl={mode === "radial" ? <span>Selected radial shells · search to {radialState.settings.radius} Å</span> : mode === "shell" && shell ? <span>Complete first shell · {shell.coordination_number} neighbors</span> : mode === "cell" ? <div className={styles.cellRepeats} role="group" aria-label="Unit cell repetitions">
           <span>Unit cell repeats<SectionHelp label="Unit cell repeats">Repeat the cell along lattice vectors a, b, and c. Each value is a whole number from 1 to {CIF_VIEWER_MAX_CELL_REPEATS}; repetitions change the display only.</SectionHelp></span>

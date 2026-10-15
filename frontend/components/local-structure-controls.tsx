@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useState, type ReactNode } from "react"
+import { useEffect, useId, useState, type ReactNode } from "react"
 import { SectionHelp } from "./section-help"
 import styles from "./artefact-viewers/cif-viewer.module.css"
 
@@ -12,6 +12,7 @@ interface LocalStructureControlsProps {
   radiusLabel?: string
   radiusAriaLabel: string
   radiusDisabled?: boolean
+  radiusHelp?: ReactNode
   extentControl?: ReactNode
   bonds: boolean
   onBondsChange: (bonds: boolean) => void
@@ -22,20 +23,22 @@ interface LocalStructureControlsProps {
 
 /** Shared display controls; each viewer owns its geometry and presentation state. */
 export function LocalStructureControls({
-  radius, min, max, onRadiusChange, radiusLabel = "Display radius", radiusAriaLabel, radiusDisabled = false,
+  radius, min, max, onRadiusChange, radiusLabel = "Display radius", radiusAriaLabel, radiusDisabled = false, radiusHelp,
   extentControl, bonds, onBondsChange, showBondsControl = true, atomCount, children,
 }: LocalStructureControlsProps) {
   const radiusId = useId()
-  const [radiusDraft, setRadiusDraft] = useState<string | null>(null)
+  const [radiusDraft, setRadiusDraft] = useState<{ radius: number; text: string } | null>(null)
+  useEffect(() => { setRadiusDraft(previous => previous?.radius === radius ? previous : null) }, [radius])
   return <div className={styles.localControls}>
     {extentControl ?? <div className={styles.radius}>
-      <label htmlFor={radiusId}>{radiusLabel}<SectionHelp label={radiusAriaLabel}>Radius in Å of the displayed local environment around the absorbing site, from {min} to {max} Å. Type a custom value or use the slider. Changing this display does not recalculate FEFF paths or change fit parameters.</SectionHelp></label>
+      <label htmlFor={radiusId}>{radiusLabel}<SectionHelp label={radiusAriaLabel}>Radius in Å of the displayed local environment around the absorbing site, from {min} to {max} Å. Type a custom value or use the slider. {radiusHelp ?? "Changing this display does not recalculate FEFF paths or change fit parameters."}</SectionHelp></label>
       <span className={styles.radiusValue}><input id={radiusId} aria-label={radiusAriaLabel} type="number" min={min} max={max} step="any"
-        value={radiusDraft ?? radius} disabled={radiusDisabled} onChange={event => {
+        value={radiusDraft?.radius === radius ? radiusDraft.text : radius} disabled={radiusDisabled} onChange={event => {
           const text = event.target.value
-          setRadiusDraft(text)
           const value = Number(text)
-          if (text !== "" && Number.isFinite(value) && value >= min && value <= max) onRadiusChange(value)
+          const valid = text !== "" && Number.isFinite(value) && value >= min && value <= max
+          setRadiusDraft({ radius: valid ? value : radius, text })
+          if (valid) onRadiusChange(value)
         }} onBlur={event => {
           const text = event.target.value
           const value = Number(text)

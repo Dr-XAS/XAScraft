@@ -11,6 +11,7 @@ import { simulationFixture, simulationJob } from "@/tests/fixtures/artemis-simul
 import type { FirstShell } from "@/lib/first-shell"
 import { ArtemisStructures } from "./artemis-structures"
 import { radialFixture } from "@/tests/fixtures/radial-shells"
+import { CifRadiusProvider, useCifRadius } from "@/lib/cif-radius-context"
 
 vi.mock("@/lib/artemis", () => ({ artemisApi: vi.fn() }))
 const firstShell = vi.hoisted(() => ({ shell: null as FirstShell | null }))
@@ -18,7 +19,9 @@ vi.mock("@/lib/use-first-shell", () => ({ useFirstShell: () => ({ shell: firstSh
 const radialAnalysis = vi.hoisted(() => vi.fn())
 vi.mock("@/lib/use-radial-shells", () => ({ useRadialShells: radialAnalysis }))
 vi.mock("./artefact-viewers/cif-viewer", () => ({
-  CifViewer: ({ structure }: { structure: ArtemisStructure }) => <section aria-label="CIF structure viewer" data-testid="cif-viewer" data-cif={structure.cif} data-structure-id={structure.id} data-provider={structure.provider ?? "amcsd"} />,
+  CifViewer: ({ structure, displayRadius, onDisplayRadiusChange, radiusDisabled }: { structure: ArtemisStructure; displayRadius?: number; onDisplayRadiusChange?: (radius: number) => void; radiusDisabled?: boolean }) => <section aria-label="CIF structure viewer" data-testid="cif-viewer" data-cif={structure.cif} data-structure-id={structure.id} data-provider={structure.provider ?? "amcsd"}>
+    <input aria-label="CIF display radius" type="number" value={displayRadius ?? 5} disabled={radiusDisabled} onChange={event => onDisplayRadiusChange?.(Number(event.target.value))} />
+  </section>,
 }))
 vi.mock("./artefact-viewers/artemis-simulation-viewer", () => ({ ArtemisSimulationViewer: ({ actions }: { actions?: ReactNode }) => <div data-testid="simulation-result">{actions}</div> }))
 const api = vi.mocked(artemisApi)
@@ -50,6 +53,10 @@ const addPathsMock = (result: string | null = null) => vi.fn<(paths: ArtemisGene
 function Harness(props: Omit<ComponentProps<typeof ArtemisStructures>, "version">) {
   const [revision, setRevision] = useState(1)
   return <ArtemisStructures {...props} projectId={props.projectId ?? "p"} version={revision} onProjectChange={project => { props.onProjectChange?.(project); setRevision(project.version) }} />
+}
+function DockedRadius({ cif = structure().cif, projectId = "p", label = "Docked CIF display radius" }: { cif?: string; projectId?: string; label?: string }) {
+  const [radius, setRadius] = useCifRadius(cif, projectId)
+  return <input aria-label={label} type="number" value={radius} onChange={event => setRadius(Number(event.target.value))} />
 }
 function setup(availableSlots = 24, onAddPaths = addPathsMock()) {
   const view = render(<Harness contextKey="p:cu" availableSlots={availableSlots} onAddPaths={onAddPaths} />)
@@ -131,6 +138,143 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe("ArtemisStructures", () => {
+  it.each(["feff", "simulation"] as const)("uses the CIF viewer's exact radius for an explicit %s calculation", async mode => {
+    savedAttachments = [attachment()]
+    render(<Harness contextKey="p:cu" spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} />)
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click(mode === "feff" ? "Generate FEFF paths" : "Simulate EXAFS from Copper CIF")
+    fireEvent.change(screen.getByLabelText("CIF display radius"), { target: { value: "3.4" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    expect(screen.getByLabelText(mode === "feff" ? "FEFF maximum path radius" : "Simulation maximum R")).toHaveValue(3.4)
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(0)
+
+    await click(mode === "feff" ? "Run FEFF calculation" : "Run EXAFS simulation")
+    expect(api).toHaveBeenCalledWith("/feff/jobs", expect.objectContaining({ attachment_id: "cif1", cluster_radius: 3.4, path_radius: 3.4 }), expect.any(AbortSignal))
+  })
+
+  it("shares the docked viewer radius in both directions and preserves it when switching calculation forms", async () => {
+    savedAttachments = [attachment()]
+    render(<CifRadiusProvider projectId="p"><DockedRadius /><Harness contextKey="p:cu" spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} /></CifRadiusProvider>)
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.4" } })
+    await click("Generate FEFF paths")
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    expect(screen.getByLabelText("CIF display radius")).toHaveValue(3.4)
+    fireEvent.change(screen.getByLabelText("FEFF cluster radius"), { target: { value: "5.2" } })
+    expect(screen.getByLabelText("Docked CIF display radius")).toHaveValue(5.2)
+    expect(screen.getByLabelText("CIF display radius")).toHaveValue(5.2)
+    fireEvent.change(screen.getByLabelText("FEFF maximum path radius"), { target: { value: "5" } })
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.4" } })
+    expect(screen.getByLabelText("FEFF maximum path radius")).toHaveValue(3.4)
+    await click("Run FEFF calculation")
+    expect(screen.getByText("FEFF calculation complete")).toBeVisible()
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.2" } })
+    expect(screen.queryByText("FEFF calculation complete")).not.toBeInTheDocument()
+    expect(screen.queryByRole("checkbox", { name: /^Select generated / })).not.toBeInTheDocument()
+    await click("Close")
+
+    await click("Simulate EXAFS from Copper CIF")
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.2)
+    expect(screen.getByLabelText("CIF display radius")).toHaveValue(3.2)
+    expect(screen.getByLabelText("Simulation maximum R")).toHaveValue(3.2)
+    fireEvent.change(screen.getByLabelText("Simulation maximum R"), { target: { value: "5.5" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(5.5)
+    expect(screen.getByLabelText("Docked CIF display radius")).toHaveValue(5.5)
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.4" } })
+    expect(screen.getByLabelText("Simulation maximum R")).toHaveValue(3.4)
+    await click("Close EXAFS simulation")
+    await click("Generate FEFF paths")
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    expect(screen.getByLabelText("CIF display radius")).toHaveValue(3.4)
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(1)
+  })
+
+  it("keeps each CIF's shared radius separate and restores it only in its own project", async () => {
+    savedAttachments = [attachment(), { ...attachment(), id: "cif2", structure: structure({ id: 13089, mineral: "Cuprite", formula: "Cu2O", cif: "data_Cu2O" }) }]
+    const defaultApi = api.getMockImplementation()!
+    api.mockImplementation(async (url, body, signal, options) => {
+      if (url === "/projects/q/structures") return { project_id: "q", version: savedVersion, structures: savedAttachments }
+      return defaultApi(url, body, signal, options)
+    })
+    const scoped = (projectId: string) => <CifRadiusProvider projectId={projectId}><DockedRadius projectId={projectId} /><Harness projectId={projectId} contextKey={`${projectId}:cu`} spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} /></CifRadiusProvider>
+    const { rerender } = render(scoped("p"))
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click("Simulate EXAFS from Copper CIF")
+    fireEvent.change(screen.getByLabelText("CIF display radius"), { target: { value: "3.4" } })
+    fireEvent.change(screen.getByLabelText("Simulation crystal structure"), { target: { value: "cif2" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(5)
+    fireEvent.change(screen.getByLabelText("CIF display radius"), { target: { value: "5.1" } })
+    expect(screen.getByLabelText("Docked CIF display radius")).toHaveValue(3.4)
+    fireEvent.change(screen.getByLabelText("Simulation crystal structure"), { target: { value: "cif1" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    await click("Close EXAFS simulation")
+
+    rerender(scoped("q"))
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click("Simulate EXAFS from Copper CIF")
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(5)
+    expect(screen.getByLabelText("Docked CIF display radius")).toHaveValue(5)
+    fireEvent.change(screen.getByLabelText("CIF display radius"), { target: { value: "4.8" } })
+    await click("Close EXAFS simulation")
+
+    rerender(scoped("p"))
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click("Simulate EXAFS from Copper CIF")
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    expect(screen.getByLabelText("Docked CIF display radius")).toHaveValue(3.4)
+    fireEvent.change(screen.getByLabelText("Simulation crystal structure"), { target: { value: "cif2" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(5.1)
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(0)
+  })
+
+  it.each(["", "15"])("replaces an invalid cluster draft '%s' when the docked viewer changes the shared radius", async text => {
+    savedAttachments = [attachment()]
+    render(<CifRadiusProvider projectId="p"><DockedRadius /><Harness contextKey="p:cu" spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} /></CifRadiusProvider>)
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click("Generate FEFF paths")
+    fireEvent.change(screen.getByLabelText("FEFF cluster radius"), { target: { value: text } })
+    expect(screen.getByRole("button", { name: "Run FEFF calculation" })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.4" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(3.4)
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "5" } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(5)
+    expect(screen.getByRole("button", { name: "Run FEFF calculation" })).toBeEnabled()
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(0)
+  })
+
+  it.each([
+    ["feff", 2.5], ["feff", 7], ["simulation", 2.5], ["simulation", 7],
+  ] as const)("blocks %s for an unsupported viewer cluster radius of %s Å", async (mode, radius) => {
+    savedAttachments = [attachment()]
+    render(<Harness contextKey="p:cu" spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} />)
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click(mode === "feff" ? "Generate FEFF paths" : "Simulate EXAFS from Copper CIF")
+    fireEvent.change(screen.getByLabelText("CIF display radius"), { target: { value: String(radius) } })
+    expect(screen.getByLabelText("FEFF cluster radius")).toHaveValue(radius)
+    expect(screen.getByLabelText("CIF display radius")).toHaveValue(radius)
+    expect(screen.getByRole("button", { name: mode === "feff" ? "Run FEFF calculation" : "Run EXAFS simulation" })).toBeDisabled()
+    expect(screen.getAllByRole("status").some(item => /3.*6/.test(item.textContent ?? ""))).toBe(true)
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(0)
+  })
+
+  it("discards an in-flight FEFF result after the docked CIF viewer changes its radius", async () => {
+    savedAttachments = [attachment()]
+    render(<CifRadiusProvider projectId="p"><DockedRadius /><Harness contextKey="p:cu" spectrumEdge={{ element: "Cu", edge: "K" }} availableSlots={24} onAddPaths={addPathsMock()} /></CifRadiusProvider>)
+    await screen.findByRole("button", { name: "Simulate EXAFS from Copper CIF" })
+    await click("Generate FEFF paths")
+    const late = deferred<ArtemisFeffJob>()
+    api.mockReturnValueOnce(late.promise)
+    await click("Run FEFF calculation")
+    const signal = api.mock.calls.at(-1)?.[2]
+    fireEvent.change(screen.getByLabelText("Docked CIF display radius"), { target: { value: "3.4" } })
+    expect(signal?.aborted).toBe(true)
+    await act(async () => { late.resolve(job()) })
+    expect(screen.queryByText("FEFF calculation complete")).not.toBeInTheDocument()
+    expect(screen.queryByRole("checkbox", { name: /^Select generated / })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Run FEFF calculation" })).toBeEnabled()
+    expect(api.mock.calls.filter(([url]) => url === "/feff/jobs")).toHaveLength(1)
+  })
+
   it("opens a separate simulation form for the chosen CIF and automatically includes all paths", async () => {
     const copper = attachment()
     const cuprite = { ...attachment(), id: "cif2", amcsd_id: 13089, structure: structure({ id: 13089, mineral: "Cuprite", formula: "Cu2O", cif: "data_Cu2O" }) }

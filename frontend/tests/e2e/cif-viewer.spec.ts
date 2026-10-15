@@ -52,9 +52,9 @@ test("expands complete unit cells along each lattice axis without recalculating 
   })
 
   const radius = panel.getByRole("slider", { name: "CIF display radius", exact: true })
-  await expect(radius).toHaveValue("3.5")
+  await expect(radius).toHaveValue("5")
   await radius.press("ArrowRight")
-  await expect(radius).toHaveValue("3.6")
+  await expect(radius).toHaveValue("5.1")
   const mode = panel.getByRole("combobox", { name: "CIF view mode", exact: true })
   await mode.selectOption("cell")
   await expect(radius).toHaveCount(0)
@@ -87,7 +87,7 @@ test("expands complete unit cells along each lattice axis without recalculating 
   await repeats[2].fill("2")
   await expect.poll(async () => (await crystalScene(panel)).atoms).toBe(48)
   await mode.selectOption("cluster")
-  await expect(radius).toHaveValue("3.6")
+  await expect(radius).toHaveValue("5.1")
   await expect(panel.getByRole("group", { name: "Unit cell repetitions" })).toHaveCount(0)
   await mode.selectOption("cell")
   await panel.getByRole("button", { name: "Collapse CIF structure viewer", exact: true }).click()
@@ -125,6 +125,10 @@ test("calculates finite-cluster coordination numbers and invalidates changed inp
   expect((await transformed).ok()).toBe(true)
   const panel = page.getByRole("region", { name: "CIF structure viewer", exact: true })
   await expect(panel.getByRole("button", { name: "Reset view", exact: true })).toBeEnabled()
+  // Fix this geometry fixture independently of the shared calculator default.
+  const displayRadius = panel.getByRole("spinbutton", { name: "CIF display radius", exact: true })
+  await displayRadius.fill("3.5")
+  await displayRadius.press("Tab")
   await expect(panel.getByText("15 atoms shown", { exact: true })).toBeVisible()
   const scienceRequests: string[] = []
   page.on("request", request => {

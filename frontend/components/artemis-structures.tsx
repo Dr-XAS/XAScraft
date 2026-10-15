@@ -4,6 +4,8 @@ import { SectionHelp } from "./section-help"
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Pencil, Search, Trash2, Upload, X } from "lucide-react"
 import { CifViewer } from "./artefact-viewers/cif-viewer"
+import { useCifRadius } from "@/lib/cif-radius-context"
+import { CIF_VIEWER_MIN_RADIUS, CIF_VIEWER_MAX_RADIUS } from "@/lib/cif-viewer"
 import { useFirstShell } from "@/lib/use-first-shell"
 import { isFirstShellPath, type FirstShellSelection } from "@/lib/first-shell"
 import { useRadialShells } from "@/lib/use-radial-shells"
@@ -91,7 +93,11 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
   // An explicit choice belongs to this spectrum and absorbing element. Otherwise use its recorded edge.
   const edge = edgeChoice?.contextKey === contextKey && edgeChoice.projectId === projectId && edgeChoice.absorber === absorber ? edgeChoice.edge : defaultEdge
   const previousEdge = useRef(edge)
-  const [clusterRadius, setClusterRadius] = useState("5")
+  const [displayRadius, setDisplayRadius] = useCifRadius(structure?.cif, projectId)
+  const radiusKey = JSON.stringify([projectId, structure?.cif])
+  const [clusterDraft, setClusterDraft] = useState<{ key: string; radius: number; text: string } | null>(null)
+  const clusterRadius = clusterDraft?.key === radiusKey && clusterDraft.radius === displayRadius ? clusterDraft.text : String(displayRadius)
+  const validClusterRadius = !!clusterRadius.trim() && Number.isFinite(Number(clusterRadius)) && Number(clusterRadius) >= 3 && Number(clusterRadius) <= 6
   const [pathRadius, setPathRadius] = useState("4")
   const [simulationRadius, setSimulationRadius] = useState("5")
   const [maxLegs, setMaxLegs] = useState("4")
@@ -249,6 +255,28 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
     setNotice("")
     setBusy(previous => previous === "job" ? null : previous)
   }
+  function changeDisplayRadius(radius: number) {
+    if (controlsDisabled) return
+    setClusterDraft(null)
+    setDisplayRadius(radius)
+  }
+  function changeClusterRadius(text: string) {
+    invalidateJob()
+    const radius = Number(text)
+    const validDisplayRadius = !!text.trim() && Number.isFinite(radius) && radius >= CIF_VIEWER_MIN_RADIUS && radius <= CIF_VIEWER_MAX_RADIUS
+    setClusterDraft({ key: radiusKey, radius: validDisplayRadius ? radius : displayRadius, text })
+    if (validDisplayRadius) setDisplayRadius(radius)
+  }
+  useEffect(() => {
+    setClusterDraft(previous => previous?.key === radiusKey && previous.radius === displayRadius ? previous : null)
+    if (!structure) return
+    invalidateJob()
+    // A shorter cluster cannot support longer paths. Keep shorter user choices.
+    if (displayRadius >= 3 && displayRadius <= 6) {
+      setPathRadius(previous => Number(previous) > displayRadius ? String(displayRadius) : previous)
+      setSimulationRadius(previous => Number(previous) > displayRadius ? String(displayRadius) : previous)
+    }
+  }, [radiusKey, displayRadius])
   useEffect(() => {
     if (previousEdge.current === edge) return
     previousEdge.current = edge
@@ -607,10 +635,10 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
     && !job?.paths.some(path => path.filename === existing.filename && path.content === existing.content))
 
   const radius = Number(simulationRadius)
-  const validRadius = !!simulationRadius.trim() && Number.isFinite(radius) && radius >= 2 && radius <= 6
-  const simulationFeffRequest: ArtemisFeffRequest | null = structure?.supported && attachmentId && projectId && version !== undefined && absorber && edge && site && validRadius
+  const validRadius = !!simulationRadius.trim() && Number.isFinite(radius) && radius >= 2 && radius <= 6 && radius <= Number(clusterRadius)
+  const simulationFeffRequest: ArtemisFeffRequest | null = structure?.supported && attachmentId && projectId && version !== undefined && absorber && edge && site && validRadius && validClusterRadius
     ? { project_id: projectId, attachment_id: attachmentId, version, absorber, edge, site_index: Number(site),
-      cluster_radius: Math.max(3, radius), path_radius: radius, max_legs: 4, max_paths: null } : null
+      cluster_radius: Number(clusterRadius), path_radius: radius, max_legs: 4, max_paths: null } : null
   const dialogTitle = dialogMode === "simulation" ? "Simulate EXAFS" : dialogMode === "feff" ? "FEFF paths" : "Crystal structures"
   const calculationLabel = dialogMode === "simulation" ? "Simulation" : "FEFF"
   const sites = structure?.sites.filter(item => item.element === absorber) ?? []
@@ -652,7 +680,7 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
     <dialog ref={dialog} className={`${styles.panel} ${styles.dialog}`} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); closeDialog() }} onClose={() => { setOpen(false); if (opener.current?.isConnected) opener.current.focus() }}>
       <header className={styles.dialogHeader}><div><h3 id={titleId}>{dialogTitle}<SectionHelp label={dialogMode === "simulation" ? "EXAFS simulation" : dialogMode === "feff" ? "FEFF path generation" : "Crystal structures"}>{dialogMode === "simulation" ? "Choose a CIF, absorbing site, maximum R and simulation values, then run. The scattering calculation and complete path sum are automatic." : dialogMode === "feff" ? "Choose an attached CIF and absorber site, calculate paths, then add selected paths to the model. Closing this window keeps your calculation progress." : "Search and attach CIF structures to your project. Use Simulate EXAFS beside an attached structure to calculate a theoretical spectrum."}</SectionHelp></h3></div><button type="button" aria-label={dialogMode === "simulation" ? "Close EXAFS simulation" : dialogMode === "feff" ? "Close FEFF paths" : "Close CIF search"} disabled={mutationPending} onClick={closeDialog}><X size={18} /></button></header>
       {dialogMode === "feff" && attachmentId && (structure?.supported || job?.status === "complete") && <div className={styles.dialogActions} role="group" aria-label="FEFF path actions">
-        {structure?.supported && <button type="button" className={styles.primaryButton} onClick={generate} disabled={controlsDisabled || !attachmentId || site === "" || !absorber || !edge || working}>{working ? "Calculating FEFF…" : job?.status === "failed" ? "Retry FEFF calculation" : "Run FEFF calculation"}</button>}
+        {structure?.supported && <button type="button" className={styles.primaryButton} onClick={generate} disabled={controlsDisabled || !attachmentId || site === "" || !absorber || !edge || !validClusterRadius || working}>{working ? "Calculating FEFF…" : job?.status === "failed" ? "Retry FEFF calculation" : "Run FEFF calculation"}</button>}
         {job?.status === "complete" && <button type="button" className={styles.primaryButton} disabled={controlsDisabled || !newSelected.length || newSelected.length > availableSlots} onClick={() => addPaths()}>Add selected paths ({newSelected.length})</button>}
         {job?.status === "complete" && canReplace && <button type="button" disabled={controlsDisabled || !selected.length || selected.length > selectionLimit} onClick={() => addPaths(true)}>Replace the model’s {existingPaths.length} path{existingPaths.length === 1 ? "" : "s"} with selected ({selected.length})</button>}
       </div>}
@@ -707,7 +735,7 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
         {dialogMode === "structure" && <div className={styles.structureActions}><button type="button" className={styles.attachButton} disabled={controlsDisabled || !!attachmentId || !projectId || version === undefined || !onProjectChange} onClick={() => void attachStructure()}>{attachPending ? "Attaching CIF…" : attachmentId ? "Attached to project" : "Attach to project"}</button>{attachmentId && structure.supported && <button type="button" disabled={controlsDisabled} onClick={openSimulationDialog}>Simulate EXAFS from this CIF</button>}<SectionHelp label="Attach CIF">Attach this CIF to the project before generating FEFF paths. The saved CIF belongs to the current project; FEFF uses the attached snapshot.</SectionHelp></div>}
         </div>
         {structure.provider === "materials_project" && <p className={styles.help}>DFT-relaxed structure · <a href={`https://materialsproject.org/materials/${encodeURIComponent(structure.id)}`} target="_blank" rel="noreferrer">View on Materials Project</a><br />Database version: {structure.provenance?.database_version ?? "unavailable"}. Saved CIFs retain the retrieved geometry.</p>}
-        {open && <div ref={viewerAnchor}><CifViewer key={`${structure.provider ?? "amcsd"}:${structure.id}`} structure={structure} selectedSite={site ? Number(site) : undefined} analysis={shellState} radialAnalysis={radialState} /></div>}
+        {open && <div ref={viewerAnchor}><CifViewer key={`${structure.provider ?? "amcsd"}:${structure.id}`} structure={structure} selectedSite={site ? Number(site) : undefined} analysis={shellState} radialAnalysis={radialState} displayRadius={displayRadius} onDisplayRadiusChange={changeDisplayRadius} radiusDisabled={controlsDisabled} /></div>}
         <p className={styles.help}>{structure.formula} · {structure.space_group}<br />a {numberText(structure.cell.a)}, b {numberText(structure.cell.b)}, c {numberText(structure.cell.c)} Å<br />α {numberText(structure.cell.alpha)}, β {numberText(structure.cell.beta)}, γ {numberText(structure.cell.gamma)}°</p>
         <details className={styles.textDetails}><summary>View CIF</summary><pre>{structure.cif}</pre></details>
         {structure.warnings.map((warning, i) => <p className={styles.warning} key={i}>{warning}</p>)}
@@ -723,15 +751,22 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
             {!sites.length && <p className={styles.help}>No supported sites for this absorber.</p>}
           </fieldset>
           {dialogMode === "feff" && site && <details><summary>FEFF shell distance ranges · {absorber} site {site}</summary><RadialShellPanel state={radialState} disabled={controlsDisabled} /></details>}
+          <div className={styles.grid}>
+            <label><span>Cluster radius (Å)<SectionHelp label="FEFF cluster radius">Synced with this CIF's Display radius in the CIF viewer and both calculators. FEFF accepts 3–6 Å. The cluster must cover the requested paths; reducing it also reduces any larger path range. Radius changes apply to the next run.</SectionHelp></span><input aria-label="FEFF cluster radius" type="number" min={3} max={6} step="any" inputMode="decimal" value={clusterRadius} disabled={controlsDisabled} onChange={event => changeClusterRadius(event.target.value)} /></label>
+            {!validClusterRadius && <p className={styles.warning} role="status">FEFF requires a cluster radius from 3 to 6 Å. Adjust the cluster or CIF display radius before calculating.</p>}
+          </div>
           {dialogMode === "feff" && <div className={styles.grid}>
-            <label><span>Cluster radius (Å)<SectionHelp label="FEFF cluster radius">Radius of the atomic cluster built around the absorbing site from the periodic CIF. It must cover the paths you request; a larger cluster can increase calculation time.</SectionHelp></span><input aria-label="FEFF cluster radius" type="number" min={3} max={6} step="any" inputMode="decimal" value={clusterRadius} disabled={controlsDisabled} onChange={event => { invalidateJob(); setClusterRadius(event.target.value) }} /></label>
             <label><span>Max path R (Å)<SectionHelp label="Maximum path R">Maximum effective half-path length in Å. For single scattering this equals the absorbing atom–neighbor distance; for multiple scattering it is half the total path length.</SectionHelp></span><input aria-label="FEFF maximum path radius" type="number" min={2} max={Number.isFinite(Number(clusterRadius)) ? Math.min(6, Math.max(2, Number(clusterRadius))) : 6} step="any" inputMode="decimal" value={pathRadius} disabled={controlsDisabled} onChange={event => { invalidateJob(); setPathRadius(event.target.value) }} /></label>
             <label><span>Maximum legs<SectionHelp label="FEFF maximum legs">Maximum number of segments in a scattering path. Two legs means single scattering; three and four include multiple scattering and can create many more paths.</SectionHelp></span><select aria-label="FEFF maximum legs" value={maxLegs} disabled={controlsDisabled} onChange={event => { invalidateJob(); setMaxLegs(event.target.value) }}>{[2, 3, 4].map(item => <option key={item}>{item}</option>)}</select></label>
             <label><span>Maximum paths<SectionHelp label="FEFF maximum paths">Limit on the generated paths returned for review. Increase it if the result is truncated; adding many paths to a fit still requires a justified model.</SectionHelp></span><input aria-label="FEFF maximum paths" type="number" min={1} max={100} step={1} inputMode="numeric" value={maxPaths} disabled={controlsDisabled} onChange={event => { invalidateJob(); setMaxPaths(event.target.value) }} /></label>
           </div>}
           {dialogMode === "simulation" && <>
-            <div className={styles.grid}><label><span>Maximum R (Å)<SectionHelp label="Simulation maximum R">Include every FEFF-generated path up to this effective half-path length, with up to four legs. For single scattering R is the absorbing atom–neighbor distance; for multiple scattering it is half the total path length. The atomic cluster size is set automatically.</SectionHelp></span><input aria-label="Simulation maximum R" type="number" min={2} max={6} step="any" inputMode="decimal" value={simulationRadius} disabled={controlsDisabled} onChange={event => setSimulationRadius(event.target.value)} /></label></div>
-            {!validRadius && <p className={styles.warning} role="status">Enter a maximum R from 2 to 6 Å.</p>}
+            <div className={styles.grid}><label><span>Maximum R (Å)<SectionHelp label="Simulation maximum R">Include every FEFF-generated path up to this effective half-path length, with up to four legs. For single scattering R is the absorbing atom–neighbor distance; for multiple scattering it is half the total path length. Increasing this range beyond the cluster also increases the synced cluster and display radius.</SectionHelp></span><input aria-label="Simulation maximum R" type="number" min={2} max={6} step="any" inputMode="decimal" value={simulationRadius} disabled={controlsDisabled} onChange={event => {
+              const text = event.target.value, radius = Number(text)
+              setSimulationRadius(text)
+              if (text.trim() && Number.isFinite(radius) && radius >= 2 && radius <= 6 && radius > displayRadius) changeClusterRadius(String(Math.max(3, radius)))
+            }} /></label></div>
+            {!validRadius && <p className={styles.warning} role="status">Enter a maximum R from 2 to 6 Å, no larger than the cluster radius.</p>}
             <ArtemisSimulation key={`${projectId}:${contextKey}:${attachmentId}`} feffRequest={simulationFeffRequest} disabled={controlsDisabled}
               onAddToDataList={projectId && version !== undefined && onProjectChange ? addSimulationToDataList : undefined} />
           </>}

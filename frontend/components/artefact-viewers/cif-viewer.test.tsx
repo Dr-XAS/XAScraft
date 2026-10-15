@@ -351,6 +351,23 @@ describe("CifViewer", () => {
     expect(createViewer).toHaveBeenCalledOnce()
   })
 
+  it("uses the synced radius for controls and geometry, replacing an older input draft", async () => {
+    const attached = structure(), onDisplayRadiusChange = vi.fn()
+    const view = render(<CifViewer structure={attached} displayRadius={3.4} onDisplayRadiusChange={onDisplayRadiusChange} />)
+    const instance = await ready()
+    const input = screen.getByRole("spinbutton", { name: "CIF display radius" })
+    expect(input).toHaveValue(3.4)
+    fireEvent.change(input, { target: { value: "3.25" } })
+    expect(onDisplayRadiusChange).toHaveBeenLastCalledWith(3.25)
+    view.rerender(<CifViewer structure={attached} displayRadius={3.25} onDisplayRadiusChange={onDisplayRadiusChange} />)
+    expect(input).toHaveValue(3.25)
+    view.rerender(<CifViewer structure={attached} displayRadius={1} onDisplayRadiusChange={onDisplayRadiusChange} />)
+    expect(input).toHaveValue(1)
+    expect(screen.getByRole("slider", { name: "CIF display radius" })).toHaveValue("1")
+    expect(atoms(instance)).toEqual([{ element: "Cu", coordinates: [0, 0, 0] }])
+    expect(createViewer).toHaveBeenCalledOnce()
+  })
+
   it("updates radius and center geometry while retaining one renderer", async () => {
     const attached = structure()
     const original = structuredClone(attached)

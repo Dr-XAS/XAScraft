@@ -112,14 +112,16 @@ An empty project is sufficient. Open **EXAFS fitting → Crystal structures →
 Upload CIF**, then **Simulate EXAFS from this CIF**. Each attached CIF has a
 **Simulate EXAFS** action that opens the form with that structure selected.
 Choose the absorbing element, absorption edge, inequivalent site and **Maximum R**
-(default 5 Å, supported range 2–6 Å), enter the simulation values and click
+(initially capped at the CIF display radius, supported range 2–6 Å), enter the simulation values and click
 **Run EXAFS simulation** once. The scattering calculation and path sum run automatically.
 
 Simulation includes every FEFF-generated path within the requested effective
 half-path length, with single and multiple scattering through four legs. For
 single scattering R is the absorbing atom–neighbor distance; for multiple
-scattering it is half the total path length. The atomic cluster radius is set
-automatically to cover this range, with a minimum of 3 Å. There is no path picker,
+scattering it is half the total path length. **Cluster radius** is synced with
+the CIF viewer's **Display radius** and the FEFF calculator for the same CIF.
+Increasing Maximum R beyond the cluster grows the shared radius to cover it;
+reducing the cluster caps any larger path range. There is no path picker,
 maximum returned-path count, or fit-model action in the simulation form. The
 separate **Generate FEFF paths** workflow retains path selection and the 24-path
 fit-model limit. Existing calculation time and byte limits still apply; exceeding
@@ -300,8 +302,14 @@ radius slider with **Unit cell repeats** along the lattice **a**, **b**, and **c
 directions (1–6 each). For example, 2 × 2 × 2 displays eight cells with their
 atoms and outlines, including non-orthogonal lattices. Each mode retains its
 display settings when switching views. Expansions beyond the 1,500-atom preview
-limit show a message to reduce the repeats. These controls do not modify the
-saved CIF or FEFF parameters.
+limit show a message to reduce the repeats. **Display radius** is shared with
+**Cluster radius** in FEFF calculation and EXAFS simulation, including both the
+docked viewer and the dialog viewer. It starts at 5 Å and is retained per CIF
+within each project while the app stays open. Changing it invalidates the current
+calculation preview without automatically running FEFF or changing saved fit paths.
+The viewer still supports 1–10 Å; calculations require 3–6 Å and show a warning
+outside that range. Other display controls do not modify the saved CIF or FEFF
+parameters.
 
 Enable **Measure** in the CIF viewer heading, then click two atoms to display
 their distance in Å. A third atom adds the 2–3 distance and the 1–2–3 angle
