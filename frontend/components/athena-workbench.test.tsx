@@ -174,9 +174,6 @@ describe("integration mode", () => {
     api.mockImplementation(async path => path === "/projects/integrated-project" ? projectFixture({ id: "integrated-project" }) : Promise.reject(new Error(`unexpected ${path}`)))
     render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "copy_parameters"] }} />)
     await waitForIntegratedProject()
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Processing parameters' }))
-    expect(screen.getByRole('menuitem', { name: 'Set marked data to current processing parameters' })).toBeEnabled()
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     fireEvent.click(screen.getByRole("button", { name: /copy \/ reset parameters/i }))
     const dialog = screen.getByRole("dialog", { name: /copy \/ reset parameters/i })
     expect(within(dialog).getByRole("button", { name: /copy parameters/i })).toBeEnabled()
@@ -662,7 +659,9 @@ describe("AthenaWorkbench EXAFS fitting", () => {
     selectGroup("Sample scan")
     expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].group?.id).toBe("sample")
     fireEvent.click(screen.getByRole("tab", { name: "Processing" }))
-    expect(screen.getByRole("heading", { name: "Processing parameters" })).toBeVisible()
+    expect(screen.getByRole("tabpanel", { name: "Processing" })).toBeVisible()
+    expect(screen.getByRole("spinbutton", { name: "Rbkg Å" })).toBeVisible()
+    expect(screen.queryByRole("heading", { name: "Processing parameters" })).not.toBeInTheDocument()
     expect(screen.getByTestId("artemis-results")).toBeVisible()
     expect(api.mock.calls.length).toBe(initialCalls)
   })
@@ -2159,7 +2158,7 @@ describe("AthenaWorkbench native context actions", () => {
     return screen.getByRole('menu', { name: 'Actions for Foil scan' })
   }
 
-  it.each(['marked', 'all'] as const)('copies every Processing section to %s groups from the heading or tab', async scope => {
+  it.each(['marked', 'all'] as const)('copies every Processing section to %s groups from the tab', async scope => {
     const initial = projectFixture()
     initial.groups[0].marked = true
     initial.groups[0].frozen = true // A frozen source can still supply its parameters.
@@ -2176,9 +2175,7 @@ describe("AthenaWorkbench native context actions", () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
     const pending = deferred<AthenaProject>()
     api.mockReturnValueOnce(pending.promise)
-    fireEvent.contextMenu(scope === 'marked'
-      ? screen.getByRole('heading', { name: 'Processing parameters' })
-      : screen.getByRole('tab', { name: 'Processing' }), { clientX: 250, clientY: 300 })
+    fireEvent.contextMenu(screen.getByRole('tab', { name: 'Processing' }), { clientX: 250, clientY: 300 })
     fireEvent.click(screen.getByRole('menuitem', { name: `Set ${scope} data to current processing parameters` }))
     expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
       version: project.version, action: 'copy_parameters',
@@ -2187,7 +2184,7 @@ describe("AthenaWorkbench native context actions", () => {
     })
     expect(screen.queryByRole('menu')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('Processing spectra')
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Processing parameters' }))
+    fireEvent.contextMenu(screen.getByRole('tab', { name: 'Processing' }))
     expect(screen.queryByRole('menu')).toBeNull()
     const copied = { ...initial.groups[0].parameters, energy_shift: project.groups[1].parameters.energy_shift }
     const next = nextProject(project, { sample: { parameters: copied, background_standard_id: 'unused' } })
@@ -2266,7 +2263,8 @@ describe("AthenaWorkbench native context actions", () => {
       if (condition === 'marked frozen' && group.marked) group.frozen = true
     }
     await openSaved(project)
-    const menu = fieldContext('Processing parameters')
+    fireEvent.contextMenu(screen.getByRole('tab', { name: 'Processing' }))
+    const menu = screen.getByRole('menu', { name: 'Actions for Foil scan' })
     expect(within(menu).getByRole('menuitem', { name: 'Set marked data to current processing parameters' })).toBeDisabled()
     expect(within(menu).getByRole('menuitem', { name: 'Set all data to current processing parameters' })).toBeEnabled()
     expect(api).toHaveBeenCalledOnce()
