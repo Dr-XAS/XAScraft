@@ -1507,7 +1507,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   function field(key: keyof Parameters, label: string, unit?: string, optional = false, visibleLabel = label) {
     if (!parameters || !active) return null
     const value = parameters[key] === undefined ? ({ bkg_dk: 1, nclamp: 5 } as Partial<Parameters>)[key] : parameters[key]
-    return <NumberField key={`${active.id}:${key}`} label={label} visibleLabel={visibleLabel} range={(parameterRanges as Partial<Record<keyof Parameters, NumericRange>>)[key]} help={parameterHelp[key]} disabled={active.frozen} contextMenu={event => showContext(event, { kind: "field", field: key })} value={value as number | null} unit={unit} optional={optional} effective={active.result?.effective[key === "step" ? "edge_step" : key]} onIncompleteChange={setParameterInputIncomplete} onChange={v => changeParameter(key, v)} pick={key in pickFields ? pickButton(key as PickKey, label) : undefined} />
+    return <NumberField key={`${active.id}:${key}`} label={label} visibleLabel={visibleLabel} step={key === "rbkg" ? "0.1" : undefined} range={(parameterRanges as Partial<Record<keyof Parameters, NumericRange>>)[key]} help={parameterHelp[key]} disabled={active.frozen} contextMenu={event => showContext(event, { kind: "field", field: key })} value={value as number | null} unit={unit} optional={optional} effective={active.result?.effective[key === "step" ? "edge_step" : key]} onIncompleteChange={setParameterInputIncomplete} onChange={v => changeParameter(key, v)} pick={key in pickFields ? pickButton(key as PickKey, label) : undefined} />
   }
   function splineEnergyField(key: "bkg_kmin" | "bkg_kmax", label: string, visibleLabel = label) {
     const k = parameters?.[key]
