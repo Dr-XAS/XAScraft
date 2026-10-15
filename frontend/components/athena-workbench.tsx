@@ -265,8 +265,14 @@ function NumberField({ label, visibleLabel = label, value, onChange, unit, effec
     // until blur or Enter so it is not submitted as an automatic (null) value.
     onIncompleteChange?.(e.target === document.activeElement && e.target.value === "")
     onChange(e.target.value === "" ? null : Number(e.target.value))
-  }} onBlur={() => { setEmptyWhileEditing(false); onIncompleteChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{problem && <em id={`${inputId}-range-error`}>{problem}</em>}{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}{optional && value !== null && typeof effective === 'number' && value !== effective && <em>Used in saved result: {Number(effective.toPrecision(10))}</em>}</label>
-  const content = (descriptionId?: string, helpIcon?: ReactNode) => pick ? <div className="ath-pick-field">{input(descriptionId, helpIcon)}{pick}</div> : input(descriptionId, helpIcon)
+  }} onBlur={() => { setEmptyWhileEditing(false); onIncompleteChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}</label>
+  // Messages grow below the controls so stepping a value cannot move its pick
+  // button or push the neighbouring input down to the message's baseline.
+  const content = (descriptionId?: string, helpIcon?: ReactNode) => <div className="ath-number-field">
+    {pick ? <div className="ath-pick-field">{input(descriptionId, helpIcon)}{pick}</div> : input(descriptionId, helpIcon)}
+    {problem && <em id={`${inputId}-range-error`}>{problem}</em>}
+    {optional && value !== null && typeof effective === 'number' && value !== effective && <em>Used in saved result: {Number(effective.toPrecision(10))}</em>}
+  </div>
   return help ? <ParameterHelp label={label} help={help}>{content}</ParameterHelp> : content()
 }
 

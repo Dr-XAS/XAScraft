@@ -1,3 +1,8 @@
+.ath-number-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin-bottom: 8px; }
+.ath-modal .ath-number-field { margin-bottom: 10px; }
+.ath-app .ath-number-field > .ath-field, .ath-fields .ath-number-field, .ath-modal .ath-fields .ath-number-field { margin-bottom: 0; }
+.ath-number-field > em { font-size: var(--text-caption); color: var(--ath-muted); font-style: normal; }
+.ath-fields:has(> .ath-number-field) { align-items: start; }
 .ath-pick-field { --ath-pick-width: 28px; display: flex; align-items: flex-end; gap: 4px; min-width: 0; }
 .ath-pick-field > .ath-field { flex: 1; min-width: 0; margin-bottom: 0; }
 .ath-pick-field > .ath-field > .ath-context-label { width: calc(100% + var(--ath-pick-width) + 4px); }
