@@ -1,9 +1,7 @@
 .editor { flex: 1 1 0px; display: flex; flex-direction: column; height: 0; box-sizing: border-box; min-width: 0; padding: 12px; min-height: 400px; overflow-y: auto; scrollbar-gutter: stable; font-size: var(--text-body); color: var(--ath-ink, #24362c); }
 .editor > * { flex-shrink: 0; }
 .editor h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--text-section); font-weight: 500; line-height: var(--leading-heading); }
-.intro h3 svg { flex: 0 0 20px; }
-.intro { padding: 0 0 8px; }
-.intro p, .help { margin: 7px 0; color: var(--ath-muted, #647669); font-size: var(--text-caption); line-height: var(--leading-body); }
+.help { margin: 7px 0; color: var(--ath-muted, #647669); font-size: var(--text-caption); line-height: var(--leading-body); }
 .spectrum { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; margin: 0 0 12px; background: var(--ath-canvas, #f5f8f5); border-radius: 5px; overflow-wrap: anywhere; }
 .spectrum span { color: var(--ath-muted, #647669); font-size: var(--text-caption); }
 .spectrum strong { font-weight: 500; }

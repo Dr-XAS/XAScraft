@@ -32,7 +32,7 @@ import { ArtemisStructures } from "./artemis-structures"
 import { ArtemisFastFitComparison } from "./artemis-fast-fit"
 import { ArtemisFitHistoryComparison } from "./artefact-viewers/artemis-fit-history-comparison"
 import { currentEdgeIdentity } from "./athena-edge-identity"
-import { CrystalLatticeIcon, FeffScatteringIcon, FitCurvesIcon } from "./athena-viewer-icons"
+import { CrystalLatticeIcon, FeffScatteringIcon } from "./athena-viewer-icons"
 import { FitRangeIcon } from "./athena-parameter-icons"
 import { ParameterSectionHeading } from "./parameter-section-heading"
 import { SectionHelp } from "./section-help"
@@ -672,7 +672,6 @@ function FittingEditor({ projectId, projectName, version, group, groups, pending
     : shownArchive?.modelChanged ? "The model in the editor differs from this fit. Use this fit’s model, or run a new fit, before comparing backends."
     : fastRequest ? "" : "Finish the model before comparing backends."
   return <section className={styles.editor} aria-label="Artemis EXAFS fitting setup">
-    <header className={styles.intro}><h3><FitCurvesIcon size={20} aria-hidden="true" />EXAFS fitting</h3></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {projectId && group && <ArtemisFastFitComparison key={`${shownArchive?.id ?? "local"}:${draft.revision}`}
       projectId={projectId} groupId={group.id} request={fastRequest} reference={currentResult}

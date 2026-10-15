@@ -2282,7 +2282,7 @@ describe("AthenaWorkbench native context actions", () => {
     fireEvent.keyDown(menu, { key: 'Escape' })
     expect(tab).toHaveFocus()
     fireEvent.click(screen.getByRole('tab', { name: 'EXAFS fitting' }))
-    fireEvent.contextMenu(screen.getByRole('heading', { name: 'EXAFS fitting' }))
+    fireEvent.contextMenu(screen.getByRole('tabpanel', { name: 'EXAFS fitting' }))
     expect(screen.queryByRole('menu')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Actions for Processing parameters' })).toBeNull()
     expect(api).toHaveBeenCalledOnce()
