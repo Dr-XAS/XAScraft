@@ -94,22 +94,20 @@ hardwired ROI names and does not present that unused field as effective.
 
 ## Configuration, staging and persistence
 
-Enable each reader in **File → Plugin registry…**, then open **Configure X15B**
-or **Configure X23A2MED**. The form shows current, saved and Athena default
+Readers recognize their formats automatically. For advanced changes, open
+**File → Plugin registry…**, then **Configure X15B** or **Configure X23A2MED**.
+The form shows current, saved and Athena default
 values. Copying current/saved/default values only edits the form. **Apply**
 changes subsequent inspections in this backend session. **Apply and Save**
 persists all currently applied reader configurations for future starts.
 This is shared local-server state. Reload refreshes changes from other windows;
 stale revisions or server sessions cannot overwrite newer values.
 
-From column selection, **File plugins…** preserves the selected file, current
-mapping and batch policy. Returning retains the old converted data and preview.
-**Reinspect selected file** uploads that same original again with current
-settings, selects the resulting suggestions/remembered columns and redraws the
-preview. It preserves the queue and original batch edge-policy snapshot.
-Staged SPEC scan entries do not offer this operation because their parent file
-has already been split. A failed reinspection clears the old import action and
-provides Retry file inspection. Changing settings never edits imported groups.
+After changing configuration, open **Import data** and select the original file
+again. The newly inspected data uses the current settings and recommended columns.
+Previously staged arrays and imported groups retain their original configuration;
+changing settings does not reinterpret their data. The import panel keeps format
+recognition automatic and leaves configuration controls in the advanced registry.
 
 Every staged upload and imported group retains its exact configuration
 snapshot. Preview/import use those staged arrays even if configuration changes

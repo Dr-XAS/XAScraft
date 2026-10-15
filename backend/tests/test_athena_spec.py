@@ -199,8 +199,6 @@ def test_real_http_collection_stage_reload_subset_preview_and_import(tmp_path):
     settings = Settings(data_root=tmp_path)
     with TestClient(create_app(settings)) as c:
         p = c.post('/api/athena/projects').json(); base = f'/api/athena/projects/{p["id"]}'
-        assert c.post(base+'/inspect', files={'file':('input.spec', raw())}).status_code == 400
-        c.put('/api/athena/preferences/plugins', json={'version':0, 'enabled':{SPEC:True}})
         response = c.post(base+'/inspect', files={'file':('input.spec', raw())})
         assert response.status_code == 200, response.text
         collection = response.json(); scan = collection['scans'][1]

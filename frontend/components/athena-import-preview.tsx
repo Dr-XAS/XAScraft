@@ -44,7 +44,7 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
   const hasReference = !!(mapping.reference_numerator || mapping.reference_denominator)
   const plottedReference = traces.some(t => t.role === "reference")
   return <section className={styles.previewPanel} aria-label="Column selection preview">
-    <div className={styles.previewTools}><strong>Preview selected columns <SectionHelp label="Selected columns preview">The selected detector signals before normalization or background removal.</SectionHelp></strong>
+    <div className={styles.previewTools}><strong>Preview selected columns <SectionHelp label="Selected columns preview">All selected detector signals before normalization or background removal. Switching a column tab changes the editing panel; transmission, fluorescence, and reference remain plotted together.</SectionHelp></strong>
       <label className="ath-check"><input type="checkbox" checked={paused} onChange={e => { setPaused(e.target.checked); setManualKey("") }} />Pause plotting <SectionHelp label="Pause plotting">Pause automatic preview updates while changing columns or processing options. Resume to inspect the current mapping before import.</SectionHelp></label>
       <button type="button" disabled={disabled || !!problem} onClick={() => { setManualKey(key); setRetry(n => n + 1); setState(null) }}>Replot</button>
       {hasReference && <label className="ath-check"><input type="checkbox" checked={showReference} onChange={e => setShowReference(e.target.checked)} />Plot reference <SectionHelp label="Plot reference">Overlay the reference signal calculated from the reference columns, so its edge and polarity can be checked before import.</SectionHelp></label>}

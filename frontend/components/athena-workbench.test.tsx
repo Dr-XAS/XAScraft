@@ -13,6 +13,7 @@ import { AthenaWavelet } from "./artefact-viewers/athena-wavelet"
 import { ArtemisFittingPanel, type ArtemisModelActions } from "./artemis-fitting"
 import { downloadLarixSession } from "@/lib/artemis-export"
 import { AthenaProjectImport } from "./athena-project-import"
+import { AthenaImportPreview } from "./athena-import-preview"
 import { edgePolicyStorageKey } from "./athena-edge-policy"
 import { AthenaWorkbench } from "./athena-workbench"
 import { differenceOptions, differencePreview, differenceSaved } from "./athena-difference.fixtures"
@@ -59,7 +60,7 @@ vi.mock("@/lib/artemis-export", () => ({ downloadLarixSession: vi.fn().mockResol
 vi.mock("./artefact-viewers/artemis-fit-result-viewer", () => ({ ArtemisFitResultViewer: () => <div data-testid="artemis-results" /> }))
 vi.mock("./athena-difference-plot", () => ({ AthenaDifferencePlot: () => <div data-testid="difference-preview-plot" /> }))
 // Live arithmetic and stale-response behavior have dedicated preview tests.
-vi.mock("./athena-import-preview", () => ({ AthenaImportPreview: () => <div data-testid="column-preview" /> }))
+vi.mock("./athena-import-preview", () => ({ AthenaImportPreview: vi.fn(() => <div data-testid="column-preview" />) }))
 // Correction plotting and readiness have dedicated reader-preview tests.
 vi.mock("./athena-reader-preview", () => ({
   AthenaReaderPreview: ({ required, reviewed, onReviewed, disabled }: { required: boolean; reviewed: boolean; onReviewed: (value: boolean) => void; disabled: boolean }) =>
@@ -279,6 +280,7 @@ beforeEach(() => {
   plot.mockClear()
   plot.mockImplementation(() => <div data-testid="athena-plot" />)
   projectImport.mockClear()
+  vi.mocked(AthenaImportPreview).mockClear()
 })
 
 afterEach(() => {
@@ -513,12 +515,15 @@ function chooseFluorescenceMapping(dialog: HTMLElement) {
   fireEvent.change(view.getByRole("combobox", { name: "Measurement" }), { target: { value: "fluorescence" } })
   expect(view.queryByRole("checkbox", { name: "Enable EXAFS processing" })).not.toBeInTheDocument()
   fireEvent.change(view.getByRole("combobox", { name: "Energy units" }), { target: { value: "keV" } })
-  fireEvent.click(view.getByRole("checkbox", { name: "Numerator It" }))
+  fireEvent.click(view.getByRole('button', { name: 'Clear numerator' }))
   fireEvent.click(view.getByRole("checkbox", { name: "Numerator If1" }))
   fireEvent.click(view.getByRole("checkbox", { name: "Numerator If2" }))
-  fireEvent.click(view.getByText("Reference channel & ordering"))
+  fireEvent.click(view.getByRole('button', { name: 'Clear denominator' }))
+  fireEvent.click(view.getByRole('checkbox', { name: 'Denominator I0' }))
+  fireEvent.click(view.getByRole('tab', { name: 'Reference' }))
   fireEvent.change(view.getByLabelText("reference numerator"), { target: { value: "col_1" } })
   fireEvent.change(view.getByLabelText("reference denominator"), { target: { value: "col_5" } })
+  fireEvent.click(view.getByText('Ordering', { exact: true }))
   fireEvent.click(view.getByRole("checkbox", { name: /sort ascending/i }))
 }
 
@@ -531,6 +536,7 @@ function chooseBothModesMapping(dialog: HTMLElement) {
   fireEvent.click(view.getByRole('button', { name: 'Clear denominator' }))
   fireEvent.click(view.getByRole('checkbox', { name: 'Denominator It' }))
   fireEvent.change(view.getByRole('spinbutton', { name: 'Multiplicative constant' }), { target: { value: '1.25' } })
+  fireEvent.click(view.getByRole('tab', { name: 'Fluorescence' }))
   fireEvent.click(view.getByRole('button', { name: 'Clear fluorescence numerator' }))
   fireEvent.click(view.getByRole('checkbox', { name: 'Fluorescence numerator If1' }))
   fireEvent.click(view.getByRole('checkbox', { name: 'Fluorescence numerator If2' }))
@@ -547,12 +553,11 @@ const bothModesMapping = {
 }
 
 const fluorescenceMapping = {
-  rebin: null,
-  rebin_grid: { emin: -30, emax: 50, pre: 10, xanes: .5, exafs: .05, width: 3 },
   preprocessing: { mark: false, standard_id: null, copy_parameters: false, align: false },
   edge_policy: null,
   energy_column: "col_0", numerator: ["col_3", "col_4"], denominator: "col_2",
   mode: "fluorescence", units: "keV", data_type: "mu", exafs: null,
+  individual_channels: false,
   reference_numerator: "col_1", reference_denominator: "col_5", sort: true,
 }
 
@@ -565,7 +570,7 @@ function importKeys() {
 }
 
 function submitImport(dialog: HTMLElement) {
-  fireEvent.click(within(dialog).getByRole("button", { name: /^Import (spectrum|both modes|\d+ files)$/i }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Import (spectrum|both modes|\d+ spectra|\d+ files)$/i }))
 }
 
 function armPick(label: string) {
@@ -593,54 +598,22 @@ function chooseE0Method(dialog: HTMLElement, method: E0Method) {
 }
 
 const copperPolicy = { element: "Cu", edge: "K", fraction: 0.5 }
-function openImportSettings() {
-  let dialog = screen.queryByRole("dialog", { name: "Import spectra" })
-  if (!dialog) {
-    fireEvent.click(screen.getByRole("button", { name: "Import spectra" }))
-    dialog = screen.getByRole("dialog", { name: "Import spectra" })
+function expectSimpleImport(dialog: HTMLElement) {
+  const view = within(dialog)
+  for (const name of ['Advanced import settings', 'Rebin quick scans', 'Preprocess imported data']) {
+    expect(view.queryByText(name, { exact: true })).not.toBeInTheDocument()
   }
-  const summary = within(dialog).getByText("Advanced import settings")
-  if (!summary.closest("details")!.open) fireEvent.click(summary)
-  return dialog
-}
-function expectPolicyControlsState(enabled: boolean) {
-  const alreadyOpen = !!screen.queryByRole("dialog", { name: "Import spectra" })
-  const dialog = openImportSettings()
-  const toggle = within(dialog).getByRole("checkbox", { name: "Enforce element and edge" })
-  if (enabled) {
-    expect(toggle).toBeChecked()
-    expect(within(dialog).getByRole("button", { name: "Edit element and edge…" })).toBeEnabled()
-    expect(within(dialog).getByText(/Next batch:/)).toHaveTextContent("Cu K · fraction 0.5")
-  } else {
-    expect(toggle).not.toBeChecked()
-    expect(within(dialog).queryByRole("button", { name: "Edit element and edge…" })).not.toBeInTheDocument()
-    expect(within(dialog).getByText(/Next batch:/)).toHaveTextContent("Off")
+  for (const name of ['File plugins…', 'Reinspect selected file', 'Save grid as defaults', 'Load saved grid', 'Use Craft default grid']) {
+    expect(view.queryByRole('button', { name })).not.toBeInTheDocument()
   }
-  if (!alreadyOpen) fireEvent.click(within(dialog).getByRole("button", { name: "Close dialog" }))
+  expect(view.queryByRole('region', { name: 'Import batch edge policy' })).not.toBeInTheDocument()
+  expect(view.queryByRole('checkbox', { name: 'Enforce element and edge' })).not.toBeInTheDocument()
 }
-async function openEdgePolicyDialog() {
-  const dialog = openImportSettings()
-  const toggle = within(dialog).getByRole("checkbox", { name: "Enforce element and edge" })
-  if ((toggle as HTMLInputElement).checked) fireEvent.click(within(dialog).getByRole("button", { name: "Edit element and edge…" }))
-  else fireEvent.click(toggle)
-  return screen.getByRole("dialog", { name: "Enforce element and edge" })
-}
-async function enableCopperPolicy() {
-  const dialog = await openEdgePolicyDialog()
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Element symbol" }), { target: { value: "cu" } })
-  api.mockResolvedValueOnce({ element: "Cu", edges: [{ edge: "K", energy: 8979 }, { edge: "L3", energy: 932.7 }] })
-  await act(async () => {
-    fireEvent.click(within(dialog).getByRole("button", { name: "Look up edges" }))
-  })
-  expect(within(dialog).getByRole("option", { name: "K · 8979 eV" })).toBeInTheDocument()
-  fireEvent.change(within(dialog).getByRole("combobox", { name: "Enforced edge" }), { target: { value: "K" } })
-  fireEvent.click(within(dialog).getByRole("button", { name: "Apply enforcement" }))
-  expect(screen.queryByRole("dialog", { name: "Enforce element and edge" })).not.toBeInTheDocument()
-  const importDialog = screen.getByRole("dialog", { name: "Import spectra" })
-  expect(importDialog).toBeVisible()
-  expect(sessionStorage.getItem(edgePolicyStorageKey)).toBe(JSON.stringify(copperPolicy))
-  expectPolicyControlsState(true)
-  fireEvent.click(within(importDialog).getByRole("button", { name: "Close dialog" }))
+
+function expectUnprocessedImport(payload: unknown) {
+  expect(payload).toMatchObject({ edge_policy: null, preprocessing: { mark: false, standard_id: null, copy_parameters: false, align: false } })
+  expect(payload).not.toHaveProperty('rebin')
+  expect(payload).not.toHaveProperty('rebin_grid')
 }
 
 function identityBar() { return screen.getByRole("region", { name: "Current absorber and edge" }) }
@@ -2881,7 +2854,6 @@ describe("AthenaWorkbench absorber and edge identity", () => {
     expect(within(screen.getByRole("navigation", { name: /main menu/i })).queryByRole("button", { name: "Edit absorber and edge…" })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Data" }))
     expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
-    expectPolicyControlsState(false)
     selectGroup("Sample scan")
     expect(identityBar()).toHaveTextContent("Zn L3")
     expect(within(identityBar()).queryByRole("button")).not.toBeInTheDocument()
@@ -2913,166 +2885,76 @@ describe("AthenaWorkbench absorber and edge identity", () => {
   })
 })
 
-describe("AthenaWorkbench import edge policy", () => {
-  it("starts off without a catalog request, enables without mutating the project, and cancels edits", async () => {
+describe("AthenaWorkbench simplified import", () => {
+  it.each([null, JSON.stringify(copperPolicy), '{broken'])("does not apply stale session policy %j or expose removed controls", async stored => {
+    if (stored !== null) sessionStorage.setItem(edgePolicyStorageKey, stored)
     const project = await openSaved()
-    // Keep the unrelated parameter debounce pending while testing policy edits.
-    // Accessibility queries can exceed its 400 ms delay on a busy CI worker.
-    vi.useFakeTimers()
-    editNumber(/^Rbkg/, 2.7)
-    expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
-    expectPolicyControlsState(false)
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`]])
-    await enableCopperPolicy()
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`], ["/edges?element=Cu"]])
-    expect(JSON.parse(sessionStorage.getItem(edgePolicyStorageKey)!)).toEqual(copperPolicy)
-    expect(plotProps().active).toBe(project.groups[0])
-    expect(screen.getByRole("spinbutton", { name: /^Rbkg/ })).toHaveValue(2.7)
-    const dialog = await openEdgePolicyDialog()
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "Element symbol" }), { target: { value: "Fe" } })
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }))
-    expectPolicyControlsState(true)
-    expect(JSON.parse(sessionStorage.getItem(edgePolicyStorageKey)!)).toEqual(copperPolicy)
-    expect(api.mock.calls.filter(([path]) => path.startsWith("/edges?"))).toHaveLength(1)
-  })
-
-  it.each(["empty", "frozen"] as const)("can enable and disable enforcement in import settings with %s groups and no marks", async kind => {
-    const project = projectFixture({ groups: kind === "empty" ? [] : [{ ...group("frozen", "Frozen foil"), frozen: true }] })
-    localStorage.setItem(storageKey, project.id)
-    api.mockResolvedValueOnce(project)
-    render(<AthenaWorkbench />)
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Opening project · complete"))
-    await enableCopperPolicy()
-    const dialog = openImportSettings()
-    const toggle = within(dialog).getByRole("checkbox", { name: "Enforce element and edge" })
-    expect(toggle).toBeEnabled()
-    fireEvent.click(toggle)
-    expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
-    expectPolicyControlsState(false)
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`], ["/edges?element=Cu"]])
-  })
-
-  it("survives a same-tab remount and remains independent of project switches and Undo", async () => {
-    const project = await openSaved()
-    await enableCopperPolicy()
-    cleanup()
-    api.mockResolvedValueOnce(project)
-    render(<AthenaWorkbench />)
-    await waitForWorkbenchIdle()
-    expectPolicyControlsState(true)
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`], ["/edges?element=Cu"], [`/projects/${project.id}`]])
-    const loaded = projectFixture({ id: "different-project", name: "Different project", version: 2, undo: ["Before edit"] })
-    loaded.groups[0].source.edge_policy = { element: "Fe", edge: "K", fraction: 1 }
-    api.mockResolvedValueOnce([{ id: loaded.id, name: loaded.name, updated: loaded.updated, count: loaded.groups.length }]).mockResolvedValueOnce(loaded)
-    fireEvent.click(screen.getByRole("button", { name: "Open project" }))
-    const dialog = await screen.findByRole("dialog", { name: "Open a project" })
-    const recent = await within(dialog).findByRole("button", { name: new RegExp(loaded.name) })
-    await waitFor(() => expect(recent).toBeEnabled())
-    fireEvent.click(recent)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expectPolicyControlsState(true)
-    api.mockResolvedValueOnce({ ...loaded, version: 3, undo: [] })
-    fireEvent.click(screen.getByRole("button", { name: "Undo" }))
-    await waitForWorkbenchIdle()
-    expect(api.mock.calls.at(-1)?.[1]).toEqual({ version: 2, action: "undo", group_ids: [], options: {} })
-    expectPolicyControlsState(true)
-    expect(JSON.parse(sessionStorage.getItem(edgePolicyStorageKey)!)).toEqual(copperPolicy)
-  })
-
-  it.each(["", "{broken", "null", "[]", '{"element":"","edge":"K","fraction":0.5}', '{"element":"Cu","edge":"K","fraction":0}', '{"element":"Cu","edge":"K","fraction":1.1}', '{"element":"Cu","edge":"K","fraction":"0.5"}'])("recovers malformed stored policy %j as off without a lookup", async stored => {
-    sessionStorage.setItem(edgePolicyStorageKey, stored)
-    const project = await openSaved()
-    expectPolicyControlsState(false)
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`]])
-  })
-
-  it.each([false, true])("ignores saved and imported project policy provenance with tab enforcement %s", async enabled => {
-    if (enabled) sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
-    const project = projectFixture()
-    project.groups[0].source.edge_policy = { element: "Fe", edge: "K", fraction: 1 }
-    await openSaved(project)
-    expectPolicyControlsState(enabled)
-    api.mockResolvedValueOnce([])
-    fireEvent.click(screen.getByRole("button", { name: "Open project" }))
-    const dialog = await screen.findByRole("dialog", { name: "Open a project" })
-    const panelProps = () => projectImport.mock.calls.at(-1)![0]
-    await waitFor(() => expect(panelProps().disabled).toBe(false))
-    const restored = importedProject(project, "Native enforced foil")
-    restored.groups.at(-1)!.source.edge_policy = { element: "Zn", edge: "L3", fraction: 0.7 }
-    act(() => { panelProps().onImported(restored, true); panelProps().onComplete() })
-    expect(dialog).not.toBeInTheDocument()
-    expectPolicyControlsState(enabled)
-    expect(api.mock.calls).toEqual([[`/projects/${project.id}`], ["/projects"]])
-  })
-
-  it("keeps one policy across sample/reference batch requests and failed retries after disabling enforcement, then uses off for a new batch", async () => {
-    const project = await openSaved()
-    await enableCopperPolicy()
-    const inspections = ["first.dat", "second.dat", "third.dat"].map(name => inspectionFixture(name))
-    const { dialog } = await chooseImportFiles(inspections)
-    chooseFluorescenceMapping(dialog)
-    const afterFirst = importedProject(project, "first.dat"), afterSecond = importedProject(afterFirst, "second.dat"), afterThird = importedProject(afterSecond, "third.dat")
-    const first = deferred<AthenaProject>()
-    api.mockReturnValueOnce(first.promise).mockResolvedValueOnce(inspections[1]).mockRejectedValueOnce(new Error("Second sample normalization failed"))
+    const inspected = inspectionFixture('sample.dat')
+    const { dialog } = await chooseImportFiles([inspected])
+    expectSimpleImport(dialog)
+    expect(api.mock.calls.some(([path]) => path.startsWith('/edges?'))).toBe(false)
+    api.mockResolvedValueOnce(importedProject(project, inspected.display_name))
     submitImport(dialog)
-    // Disabling enforcement is local and remains usable during an import. The batch keeps its snapshot.
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Enforce element and edge" }))
-    expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
-    await act(async () => first.resolve(afterFirst))
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Second sample normalization failed")
-    expect(plotProps().active).toEqual(afterFirst.groups.at(-1))
-    expect(within(dialog).getByRole("region", { name: "Import batch edge policy" })).toHaveTextContent("This batch: Cu K · fraction 0.5")
-    api.mockResolvedValueOnce(afterSecond).mockResolvedValueOnce(inspections[2]).mockResolvedValueOnce(afterThird)
-    submitImport(dialog)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expect(importCalls()).toEqual([
-      [inspections[0], project.version], [inspections[1], afterFirst.version], [inspections[1], afterFirst.version], [inspections[2], afterSecond.version],
-    ].map(([inspection, version]) => [`/projects/${project.id}/import`, { ...fluorescenceMapping, edge_policy: copperPolicy, upload_id: (inspection as InspectionResponse).upload_id, version }]))
-    const nextInspection = inspectionFixture("new-intent.dat")
-    const next = await chooseImportFiles([nextInspection])
-    api.mockResolvedValueOnce(importedProject(afterThird, nextInspection.display_name))
-    submitImport(next.dialog)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expect(importCalls().at(-1)?.[1]).toEqual(expect.objectContaining({ edge_policy: null, version: afterThird.version, upload_id: nextInspection.upload_id }))
-    expect(importCalls().filter(([, body]) => (body as { upload_id: string }).upload_id === inspections[0].upload_id)).toHaveLength(1)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expectUnprocessedImport(importCalls()[0][1])
   })
 
-  it("keeps the batch policy through an incompatible layout review", async () => {
+  it('keeps detector and reference choices across a failed batch retry without enforcing an old edge policy', async () => {
     sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
     const project = await openSaved()
-    const first = inspectionFixture("first.dat"), second = inspectionFixture("different.dat", ["Energy", "Signal"])
+    const inspections = ['first.dat', 'second.dat', 'third.dat'].map(name => inspectionFixture(name))
+    const { dialog } = await chooseImportFiles(inspections)
+    chooseFluorescenceMapping(dialog)
+    const afterFirst = importedProject(project, 'first.dat'), afterSecond = importedProject(afterFirst, 'second.dat'), afterThird = importedProject(afterSecond, 'third.dat')
+    api.mockResolvedValueOnce(afterFirst).mockResolvedValueOnce(inspections[1]).mockRejectedValueOnce(new Error('Second sample normalization failed'))
+    submitImport(dialog)
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Second sample normalization failed')
+    expectSimpleImport(dialog)
+    api.mockResolvedValueOnce(afterSecond).mockResolvedValueOnce(inspections[2]).mockResolvedValueOnce(afterThird)
+    submitImport(dialog)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(importCalls()).toEqual([
+      [inspections[0], project.version], [inspections[1], afterFirst.version], [inspections[1], afterFirst.version], [inspections[2], afterSecond.version],
+    ].map(([inspection, version]) => [`/projects/${project.id}/import`, { ...fluorescenceMapping, upload_id: (inspection as InspectionResponse).upload_id, version }]))
+    for (const [, payload] of importCalls()) expectUnprocessedImport(payload)
+  })
+
+  it('does not apply remembered enforcement when an incompatible layout pauses the batch', async () => {
+    sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
+    const project = await openSaved()
+    const first = inspectionFixture('first.dat'), second = inspectionFixture('different.dat', ['Energy', 'Signal'])
     const { dialog } = await chooseImportFiles([first, second])
     const afterFirst = importedProject(project, first.display_name)
     api.mockResolvedValueOnce(afterFirst).mockResolvedValueOnce(second)
     submitImport(dialog)
     await within(dialog).findByText(second.display_name)
-    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Import spectrum" })).toBeEnabled())
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Enforce element and edge" }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Import spectrum' })).toBeEnabled())
+    expectSimpleImport(dialog)
     api.mockResolvedValueOnce(importedProject(afterFirst, second.display_name))
     submitImport(dialog)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expect(importCalls().map(([, body]) => (body as { edge_policy: unknown }).edge_policy)).toEqual([copperPolicy, copperPolicy])
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(importCalls()).toHaveLength(2)
+    for (const [, payload] of importCalls()) expectUnprocessedImport(payload)
   })
 
-  it("retries an inspection using the original batch policy and reference mapping", async () => {
-    sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
+  it('retries a failed inspection using the reviewed detector and reference mapping', async () => {
     const project = await openSaved()
-    const first = inspectionFixture("first.dat"), second = inspectionFixture("second.dat")
+    const first = inspectionFixture('first.dat'), second = inspectionFixture('second.dat')
     const { dialog } = await chooseImportFiles([first, second])
     chooseFluorescenceMapping(dialog)
     const afterFirst = importedProject(project, first.display_name)
-    api.mockResolvedValueOnce(afterFirst).mockRejectedValueOnce(new Error("Inspection unavailable"))
+    api.mockResolvedValueOnce(afterFirst).mockRejectedValueOnce(new Error('Inspection unavailable'))
     submitImport(dialog)
-    await within(dialog).findByRole("alert")
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Enforce element and edge" }))
+    await within(dialog).findByRole('alert')
+    expect(within(dialog).queryByRole('button', { name: 'Import spectrum' })).not.toBeInTheDocument()
     api.mockResolvedValueOnce(second)
-    fireEvent.click(within(dialog).getByRole("button", { name: "Retry file inspection" }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry file inspection' }))
     await within(dialog).findByText(second.display_name)
-    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Import spectrum" })).toBeEnabled())
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Import spectrum' })).toBeEnabled())
     api.mockResolvedValueOnce(importedProject(afterFirst, second.display_name))
     submitImport(dialog)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expect(importCalls().at(-1)?.[1]).toEqual({ ...fluorescenceMapping, edge_policy: copperPolicy, version: afterFirst.version, upload_id: second.upload_id })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(importCalls().at(-1)?.[1]).toEqual({ ...fluorescenceMapping, version: afterFirst.version, upload_id: second.upload_id })
     expect(importCalls()).toHaveLength(2)
   })
 
@@ -3083,9 +2965,7 @@ describe("AthenaWorkbench import edge policy", () => {
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'This is reference' }))
     const afterFirst = importedProject(project, first.display_name)
     api.mockResolvedValueOnce(afterFirst).mockRejectedValueOnce(new Error('Inspection unavailable'))
-
     submitImport(dialog)
-
     await within(dialog).findByRole('alert')
     api.mockResolvedValueOnce(second)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Retry file inspection' }))
@@ -3094,60 +2974,33 @@ describe("AthenaWorkbench import edge policy", () => {
     expect(importCalls()[0][1]).toEqual(expect.objectContaining({ is_reference: true }))
   })
 
-  it('reinspects the original file with current reader settings while retaining the batch policy and tail', async () => {
-    sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
-    const project = await openSaved()
-    const first = inspectionFixture('first.dat'), tail = inspectionFixture('tail.dat')
-    const { dialog, files } = await chooseImportFiles([first, tail])
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'This is reference' }))
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Enforce element and edge' }))
-    const next = { ...first, upload_id: 'reinspected-upload' }
-    api.mockResolvedValueOnce(next)
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Reinspect selected file' }))
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Import 2 files' })).toBeEnabled())
-    expect(within(dialog).getByRole('checkbox', { name: 'This is reference' })).toBeChecked()
-    const call = api.mock.calls.at(-1)!
-    expect(call[0]).toBe(`/projects/${project.id}/inspect`)
-    expect((call[1] as FormData).get('file')).toBe(files[0])
-    expect(importCalls()).toHaveLength(0)
-    const afterFirst = importedProject(project, first.display_name)
-    api.mockResolvedValueOnce(afterFirst).mockResolvedValueOnce(tail).mockResolvedValueOnce(importedProject(afterFirst, tail.display_name))
-    submitImport(dialog)
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(importCalls().map(([, body]) => (body as { upload_id: string }).upload_id)).toEqual([next.upload_id, tail.upload_id])
-    expect(importCalls().map(([, body]) => (body as { is_reference?: boolean }).is_reference)).toEqual([true, true])
-    expect(importCalls().map(([, body]) => (body as { edge_policy: unknown }).edge_policy)).toEqual([copperPolicy, copperPolicy])
-  })
-
-  it('removes the old import action if reinspection fails and retries the same file', async () => {
+  it('retries a failed initial inspection without retaining an import action', async () => {
     await openSaved()
-    const inspected = inspectionFixture('retry.dat')
-    const { dialog, files } = await chooseImportFiles([inspected])
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'This is reference' }))
-    api.mockRejectedValueOnce(new Error('Reader configuration needs correction'))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Reinspect selected file' }))
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('configuration needs correction')
+    fireEvent.click(screen.getByRole('button', { name: 'Import data' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Import spectra' })
+    const file = new File(['synthetic'], 'retry.dat')
+    api.mockRejectedValueOnce(new Error('Reader could not inspect this file'))
+    fireEvent.change(within(dialog).getByLabelText('Choose data files'), { target: { files: [file] } })
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not inspect')
     expect(within(dialog).queryByRole('button', { name: 'Import spectrum' })).not.toBeInTheDocument()
-    api.mockResolvedValueOnce({ ...inspected, upload_id: 'retry-upload' })
+    api.mockResolvedValueOnce(inspectionFixture('retry.dat'))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Retry file inspection' }))
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Import spectrum' })).toBeEnabled())
-    expect(within(dialog).getByRole('checkbox', { name: 'This is reference' })).toBeChecked()
-    expect((api.mock.calls.at(-1)![1] as FormData).get('file')).toBe(files[0])
+    expect((api.mock.calls.at(-1)![1] as FormData).get('file')).toBe(file)
     expect(importCalls()).toHaveLength(0)
   })
 
-  it("includes the policy snapshot in a single χ(k) import so the backend can ignore it by data type", async () => {
+  it('imports extracted chi without carrying an old enforcement policy', async () => {
     sessionStorage.setItem(edgePolicyStorageKey, JSON.stringify(copperPolicy))
     const project = await openSaved()
-    const inspection = inspectionFixture("chi.dat")
-    const { dialog } = await chooseImportFiles([inspection])
-    fireEvent.change(within(dialog).getByRole("combobox", { name: "Input format" }), { target: { value: "chi" } })
-    fireEvent.click(screen.getByRole("checkbox", { name: "Show instruction" }))
-    expect(within(dialog).getByRole("button", { name: "About Import edge policy" })).toHaveAccessibleDescription(/χ\(k\) imports ignore it/)
-    api.mockResolvedValueOnce(importedProject(project, inspection.display_name))
+    const inspected = inspectionFixture('chi.dat')
+    const { dialog } = await chooseImportFiles([inspected])
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Input format' }), { target: { value: 'chi' } })
+    api.mockResolvedValueOnce(importedProject(project, inspected.display_name))
     submitImport(dialog)
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
-    expect(importCalls().at(-1)?.[1]).toEqual(expect.objectContaining({ edge_policy: copperPolicy, data_type: "chi" }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(importCalls().at(-1)?.[1]).toMatchObject({ edge_policy: null, data_type: 'chi' })
+    expectSimpleImport(dialog)
   })
 })
 
@@ -4266,6 +4119,7 @@ describe("AthenaWorkbench batch import", () => {
     expect(importCalls()).toHaveLength(2)
     expect(plotProps().groups).toEqual(first.groups.filter(g => g.marked))
     expect(within(dialog).getByRole('combobox', { name: 'Measurement' })).toHaveValue('both')
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Fluorescence' }))
     expect(within(dialog).getByRole('checkbox', { name: 'Fluorescence numerator I0' })).toBeChecked()
     expect(within(dialog).getByRole('checkbox', { name: 'Fluorescence numerator If2' })).not.toBeChecked()
     expect(within(dialog).getByRole('checkbox', { name: 'Fluorescence denominator I0' })).not.toBeChecked()
@@ -4287,14 +4141,14 @@ describe("AthenaWorkbench batch import", () => {
     expect(new Set(third.groups.map(g => g.id)).size).toBe(third.groups.length)
   })
 
-  it('restores remembered choices into the actual controls and sends them with the live revision', async () => {
+  it('restores detector choices but strips remembered rebinning and preprocessing from preview and import', async () => {
     const project = await openSaved()
     const inspected = inspectionFixture('remembered.dat')
     inspected.remembered_columns = { version: 5, matching_columns: true, warnings: [], mapping: {
       energy_column: 'col_0', numerator: ['col_3', 'col_4'], denominator: ['col_1', 'col_2'],
       mode: 'fluorescence', units: 'keV', data_type: 'xanes', reference_numerator: 'col_1', reference_denominator: 'col_5',
       reference_log: false, reference_same_element: false, sort: true, individual_channels: true,
-      signal_multiplier: 2, invert: false, preprocessing: { mark: true, standard_id: null, copy_parameters: false, align: false },
+      signal_multiplier: 2, invert: false, preprocessing: { mark: true, standard_id: 'foil', copy_parameters: true, align: true },
       rebin: { enabled: true, e0: null, emin: -20, emax: 60, pre: 7, xanes: .2, exafs: .1, width: 4 },
     } }
     const { dialog } = await chooseImportFiles([inspected])
@@ -4303,18 +4157,18 @@ describe("AthenaWorkbench batch import", () => {
     expect(view.getByRole('button', { name: 'About Remembered import choices' })).toHaveAccessibleDescription(/previous successful import/)
     expect(view.getByLabelText('Numerator If1')).toBeChecked()
     expect(view.getByLabelText('Denominator It')).toBeChecked()
-    fireEvent.click(view.getByText('Rebin quick scans', { exact: true }))
-    expect(view.getByLabelText('Perform rebinning')).toBeChecked()
-    expect(view.getByLabelText('Rebin pre-edge step · eV')).toHaveValue(7)
-    fireEvent.click(view.getByText('Preprocess imported data', { exact: true }))
-    expect(view.getByLabelText('Mark each imported sample')).toBeChecked()
+    expectSimpleImport(dialog)
+    const previewMapping = vi.mocked(AthenaImportPreview).mock.calls.at(-1)![0].mapping
+    expect(previewMapping).not.toHaveProperty('rebin')
+    expect(previewMapping).not.toHaveProperty('preprocessing')
     api.mockResolvedValueOnce({ ...importedProject(project, 'remembered.dat'),
       import_preferences_warning: 'Spectra imported, but column choices could not be remembered for the next import.' })
     submitImport(dialog)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(importCalls()).toHaveLength(1)
     expect(importCalls()[0][1]).toMatchObject({ version: project.version, numerator: ['col_3', 'col_4'], data_type: 'mu', exafs: null,
-      denominator: ['col_1', 'col_2'], invert: false, rebin: { pre: 7, e0: null }, rebin_grid: { pre: 7 }, preprocessing: { mark: true } })
+      denominator: ['col_1', 'col_2'], invert: false })
+    expectUnprocessedImport(importCalls()[0][1])
     expect(screen.getByRole('status')).toHaveTextContent('Spectra imported, but column choices could not be remembered')
     expect(plotProps().active?.label).toBe('remembered.dat')
   })
@@ -4336,37 +4190,36 @@ describe("AthenaWorkbench batch import", () => {
     expect(view.getByRole('checkbox', { name: 'This is reference' })).toBeChecked()
     expect(view.getByRole('combobox', { name: 'Measurement' })).toHaveValue('transmission')
     expect(view.getByLabelText('Numerator I0')).toBeChecked()
-    fireEvent.click(view.getByText('Rebin quick scans', { exact: true }))
-    expect(view.getByLabelText('Perform rebinning')).not.toBeChecked()
+    expectSimpleImport(dialog)
+    expect(vi.mocked(AthenaImportPreview).mock.calls.at(-1)![0].mapping).not.toHaveProperty('rebin')
     expect(importCalls()).toHaveLength(0)
     expect(plotProps().active?.id).toBe(project.groups[0].id)
   })
 
-  it('retains rebin choices through a matching batch failure and retries the failed file', async () => {
+  it('does not apply remembered rebin choices through a matching batch failure or retry', async () => {
     const project = await openSaved()
     const inspections = ['quick-1.dat', 'quick-2.dat'].map(name => inspectionFixture(name))
+    for (const inspection of inspections) inspection.remembered_columns = { version: 2, matching_columns: true, warnings: [], mapping: {
+      energy_column: 'col_0', units: 'eV', data_type: 'mu', reference_numerator: '', reference_denominator: '', sort: false,
+      mode: 'fluorescence', numerator: ['col_3'], denominator: 'col_2',
+      rebin: { enabled: true, e0: 8980, emin: -30, emax: 50, pre: 10, xanes: .5, exafs: .05, width: 4 },
+    } }
     const { dialog } = await chooseImportFiles(inspections)
-    fireEvent.click(within(dialog).getByText('Rebin quick scans', { exact: true }))
-    fireEvent.click(within(dialog).getByLabelText('Perform rebinning'))
-    fireEvent.change(within(dialog).getByLabelText('Rebin smoothing width · points'), { target: { value: '4' } })
-    fireEvent.change(within(dialog).getByLabelText('Rebin grid E₀ · eV'), { target: { value: '8980' } })
     const first = importedProject(project, inspections[0].display_name)
     const second = importedProject(first, inspections[1].display_name)
     api.mockResolvedValueOnce(first).mockResolvedValueOnce(inspections[1]).mockRejectedValueOnce(new Error('Temporary import failure'))
     submitImport(dialog)
     await within(dialog).findByText('quick-2.dat: Temporary import failure')
     expect(importCalls()).toHaveLength(2)
-    expect(within(dialog).getByLabelText('Perform rebinning')).toBeChecked()
-    expect(within(dialog).getByLabelText('Rebin smoothing width · points')).toHaveValue(4)
+    expectSimpleImport(dialog)
     api.mockResolvedValueOnce(second)
     submitImport(dialog)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const calls = importCalls()
     expect(calls[1]).toEqual(calls[2])
-    for (const [, payload] of calls) expect(payload).toMatchObject({ rebin: { e0: 8980, width: 4, pre: 10, xanes: .5, exafs: .05 } })
+    for (const [, payload] of calls) expectUnprocessedImport(payload)
     const next = await chooseImportFiles([inspectionFixture('new-selection.dat')])
-    expect(within(next.dialog).getByLabelText('Perform rebinning')).not.toBeChecked()
-    expect(within(next.dialog).getByLabelText('Rebin smoothing width · points')).toHaveValue(4)
+    expectSimpleImport(next.dialog)
   })
 
   it("pauses when a later file renames the selected detector columns, names the change, then continues the batch", async () => {
@@ -6295,33 +6148,30 @@ describe("AthenaWorkbench tools and analysis dialogs", () => {
 })
 
 
-describe("AthenaWorkbench import preprocessing", () => {
-  it("retains standard choices and marking across a failed batch retry, then resets marking for a new selection", async () => {
+describe("AthenaWorkbench remembered import preprocessing", () => {
+  it('drops old alignment, copied parameters and marking through batch retries and a new file selection', async () => {
     const project = await openSaved()
     const inspections = ['one.dat', 'two.dat'].map(name => inspectionFixture(name))
+    for (const inspection of inspections) inspection.remembered_columns = { version: 3, matching_columns: true, warnings: [], mapping: {
+      energy_column: 'col_0', units: 'eV', data_type: 'mu', reference_numerator: '', reference_denominator: '', sort: false,
+      mode: 'fluorescence', numerator: ['col_3'], denominator: 'col_2',
+      preprocessing: { standard_id: 'foil', copy_parameters: true, align: true, mark: true },
+    } }
     const { dialog } = await chooseImportFiles(inspections)
-    fireEvent.change(within(dialog).getByLabelText('Preprocessing standard'), { target: { value: 'foil' } })
-    fireEvent.click(within(dialog).getByLabelText('Set parameters to the standard'))
-    fireEvent.click(within(dialog).getByLabelText('Align to the standard'))
-    fireEvent.click(within(dialog).getByLabelText('Mark each imported sample'))
     const afterFirst = importedProject(project, 'one.dat'), afterSecond = importedProject(afterFirst, 'two.dat')
-    api.mockResolvedValueOnce(afterFirst).mockResolvedValueOnce(inspections[1]).mockRejectedValueOnce(new Error('Alignment needs overlap'))
+    api.mockResolvedValueOnce(afterFirst).mockResolvedValueOnce(inspections[1]).mockRejectedValueOnce(new Error('Temporary import failure'))
     submitImport(dialog)
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Alignment needs overlap')
-    expect(within(dialog).getByLabelText('Mark each imported sample')).toBeChecked()
-    expect(within(dialog).getByLabelText('Preprocessing standard')).toHaveValue('foil')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Temporary import failure')
+    expectSimpleImport(dialog)
     api.mockResolvedValueOnce(afterSecond)
     submitImport(dialog)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    const expected = { standard_id: 'foil', copy_parameters: true, align: true, mark: true }
     expect(importCalls()).toHaveLength(3)
-    for (const [, body] of importCalls()) expect(body).toMatchObject({ preprocessing: expected })
+    for (const [, body] of importCalls()) expectUnprocessedImport(body)
     expect(importCalls()[1]).toEqual(importCalls()[2])
     const fresh = await chooseImportFiles([inspectionFixture('fresh.dat')])
-    expect(within(fresh.dialog).getByLabelText('Mark each imported sample')).not.toBeChecked()
-    expect(within(fresh.dialog).getByLabelText('Preprocessing standard')).toHaveValue('foil')
-    expect(within(fresh.dialog).getByLabelText('Set parameters to the standard')).toBeChecked()
-    expect(within(fresh.dialog).getByLabelText('Align to the standard')).toBeChecked()
+    expectSimpleImport(fresh.dialog)
+    expect(vi.mocked(AthenaImportPreview).mock.calls.at(-1)![0].mapping).not.toHaveProperty('preprocessing')
   })
 })
 

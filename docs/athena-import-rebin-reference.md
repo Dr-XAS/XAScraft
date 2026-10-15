@@ -1,5 +1,11 @@
 # Athena import rebinning reference
 
+Current browser scope (2026-10-15): normal file import selects columns and
+does not expose or apply import-time rebinning, including saved rebin choices.
+Use the [post-import Rebin data tool](athena-post-rebin-reference.md) after
+import. The import request fields, numerical contracts and historical browser
+checks documented below remain API and provenance references.
+
 Baseline: Demeter `06afc8da08a5a7d5a26ee14992170fcf5dc67406`, reviewed
 2026-09-10. This implements the rebin portion of IM-07; the full Athena
 objective, its 107 matrix rows, and the exclusion of Artemis remain unchanged.

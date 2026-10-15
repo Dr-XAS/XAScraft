@@ -24,8 +24,12 @@ class PluginRegistry(BaseModel):
         return value
 
 
+def default_plugin_flags(enabled=True):
+    return {plugin['id']: enabled for plugin in plugin_catalog()}
+
+
 def registry_view(state):
-    return {**state, 'plugins': plugin_catalog()}
+    return {**state, 'enabled': default_plugin_flags() | state['enabled'], 'plugins': plugin_catalog()}
 
 
 def decode_registry(data):
@@ -60,5 +64,5 @@ def decode_registry(data):
 
 
 def encode_registry(state):
-    flags = {p['id']: False for p in plugin_catalog()} | state['enabled']
+    flags = default_plugin_flags() | state['enabled']
     return ('---\n' + ''.join(f'{name}: {int(flags[name])}\n' for name in sorted(flags))).encode()

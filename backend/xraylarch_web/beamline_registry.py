@@ -572,7 +572,7 @@ def reader_catalog() -> list[dict]:
     # The beamlines reached only through a Demeter file reader. They belong in
     # the view for the same reason the rest do -- the question is which data
     # the program opens, not which part of it does the opening -- but they are
-    # listed under the reader that has to be enabled for them to work.
+    # listed under the format reader that recognizes them automatically.
     described = {plugin['id'].rsplit('::', 1)[-1]: plugin['description'] for plugin in plugin_catalog()}
     seen = {(item['facility'], item['beamline']) for item in catalog}
     for name, (facility, beamline) in sorted(PLUGIN_BEAMLINES.items()):
@@ -580,7 +580,7 @@ def reader_catalog() -> list[dict]:
             catalog.append({'id': f'plugin-{name.lower()}', 'name': described[name],
                             'facility': facility, 'beamline': beamline,
                             'format': described[name],
-                            'evidence': f'the {name} file reader, which must be enabled first'})
+                            'evidence': f'automatic recognition by the {name} file reader'})
     # A saved project is a format web Larch opens, not a beamline's output, so
     # it names no facility; the view still has to list it.
     catalog.append({'id': 'athena-project', 'name': 'Athena project', 'facility': '',

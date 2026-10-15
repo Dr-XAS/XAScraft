@@ -255,9 +255,6 @@ def test_slri_signature_missing_calibration_live_columns_and_reinspection(tmp_pa
     s=AthenaStore(Settings(data_root=tmp_path));p=s.create();prefs=AthenaPreferences(s.settings)
     data=fixture('cu','pixels').read_bytes()
     with pytest.raises(WebInputError) as e:s.inspect(p['id'],data,'cu_08')
-    assert e.value.code=='file_plugin_disabled'
-    prefs.save_plugins(PluginRegistry(enabled={SLRI:True}))
-    with pytest.raises(WebInputError) as e:s.inspect(p['id'],data,'cu_08')
     assert e.value.code=='dispersive_calibration_missing'
     # Calibration inspection still reads raw pixels with the reader enabled.
     assert s.inspect_dispersive(p['id'],data,'cu_08')['columns'][0]['preview'][0]==0

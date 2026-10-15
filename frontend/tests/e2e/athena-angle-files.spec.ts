@@ -58,10 +58,16 @@ for (const { name, reader } of samples) {
     await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fixture(`demeter-${name}.dat`))
     const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
     await expect(dialog.getByLabel('File conversion')).toContainText(reader === 'PFBL12C' ? 'Photon Factory' : reader)
-    await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
     if (await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).count()) {
       await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
     }
+    const mode = name === 'srsc' || choice?.ln ? 'transmission' : 'fluorescence'
+    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+    await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
+    await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
+    await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
+    await dialog.getByRole('tab', { name: mode === 'transmission' ? 'Transmission' : 'Fluorescence', exact: true }).click()
+    await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
     const preview = dialog.getByLabel('Imported signal preview plot', { exact: true })
     if (name === 'srsc') {
       await signal(preview, x, rows.map(row => Math.log(Math.abs(row[2] / row[3]))))
@@ -84,7 +90,7 @@ for (const { name, reader } of samples) {
       await dialog.getByLabel('Numerator column numbers').fill(`7-${rows[0].length}`)
       await dialog.getByRole('button', { name: 'Select range', exact: true }).click()
       await signal(preview, x, rows.map(row => row.slice(6).reduce((sum, v) => sum + v, 0) / row[2]))
-      await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
+      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
     }
     await signal(preview, x, y)
     await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
@@ -138,11 +144,12 @@ for (const { name, reader } of samples) {
       await page.getByRole('button', { name: 'Import data', exact: true }).click()
       await page.getByLabel('Choose data files', { exact: true }).setInputFiles({ name: 'missing-spacing.dat', mimeType: 'text/plain',
         buffer: Buffer.from(source.toString().replace('D=  3.13551 A', 'monochromator spacing absent')) })
-      await expect(dialog.getByLabel('File conversion')).toContainText('2d = 1 Å')
+      const spacingWarning = dialog.getByText('Monochromator D spacing is absent: the native fallback 2d = 1 Å was used. Check the converted energy axis before importing.', { exact: true }).first()
+      await expect(spacingWarning).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
       const fallback: number[][] = JSON.parse(gunzipSync(readFileSync(fixture(manifest.pf_missing_spacing.file))).toString())
       await signal(preview, fallback.map(row => row[1]), y)
-      await dialog.getByLabel('File conversion').scrollIntoViewIfNeeded()
+      await spacingWarning.scrollIntoViewIfNeeded()
       await dialog.screenshot({ path: info.outputPath('pf-default-spacing.png') })
       await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
       await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()

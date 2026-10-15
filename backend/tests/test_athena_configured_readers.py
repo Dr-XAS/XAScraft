@@ -176,9 +176,8 @@ def test_med_configured_recognition_does_not_capture_ordinary_xdac():
 def test_real_http_configuration_is_used_by_reinspection_and_not_old_upload(tmp_path, reader):
     with TestClient(create_app(Settings(data_root=tmp_path))) as client:
         p = client.post('/api/athena/projects').json(); base = f'/api/athena/projects/{p["id"]}'
-        r = client.post(base+'/inspect', files={'file':('sample',raw(reader))}); assert r.status_code == 400 and 'disabled' in r.text
-        client.put('/api/athena/preferences/plugins', json={'version':0,'enabled':{f'Demeter::Plugins::{reader}':True}})
-        original = client.post(base+'/inspect', files={'file':('sample',raw(reader))}).json()
+        r = client.post(base+'/inspect', files={'file':('sample',raw(reader))}); assert r.status_code == 200
+        original = r.json()
         path = f'/api/athena/preferences/plugins/{reader}/configuration'; c = client.get(path).json()
         changed = MANIFESTS[reader]['references'][1]
         applied = client.put(path, json={'version':c['version'],'session_id':c['session_id'],'values':config(changed),'save':True})

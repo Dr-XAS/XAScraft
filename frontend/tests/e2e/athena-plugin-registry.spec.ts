@@ -10,10 +10,24 @@ async function openRegistry(page: Page) {
   return panel
 }
 
-test('plugin switches recover a blocked import, persist across windows, and exchange native YAML', async ({ page, browser }, info) => {
+test('formats open automatically, explicit opt-outs persist, and native YAML is preserved', async ({ page, browser }, info) => {
   test.setTimeout(90000)
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message))
   await page.goto('/')
+  // Reset this shared test server to unconfigured automatic recognition.
+  const current = await (await page.request.get('/api/backend/api/athena/preferences/plugins')).json()
+  expect((await page.request.put('/api/backend/api/athena/preferences/plugins', { data: { version: current.version, enabled: {} } })).ok()).toBe(true)
+  const path = fileURLToPath(new URL('../../../backend/tests/fixtures/demeter-x10c.dat', import.meta.url))
+  await page.getByRole('button', { name: 'Import data', exact: true }).click()
+  const automatic = page.waitForResponse(r => r.url().endsWith('/inspect'))
+  await page.getByLabel('Choose data files', { exact: true }).setInputFiles(path)
+  const detected = await automatic; expect(detected.ok()).toBe(true)
+  expect((await detected.json()).file_plugin.id).toBe('X10C')
+  const importing = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await expect(importing.getByLabel('Imported signal preview plot').locator('.js-line').first()).toBeAttached()
+  await expect(importing.getByRole('button', { name: 'File plugins…', exact: true })).toHaveCount(0)
+  await expect(importing.getByRole('button', { name: 'Reinspect selected file', exact: true })).toHaveCount(0)
+  await importing.getByRole('button', { name: 'Close dialog', exact: true }).click()
   let panel = await openRegistry(page)
   const toggle = panel.getByRole('checkbox', { name: 'Enable X10C' })
   if (await toggle.isChecked()) {
@@ -23,15 +37,13 @@ test('plugin switches recover a blocked import, persist across windows, and exch
   }
   await panel.getByRole('button', { name: 'Close registry', exact: true }).click()
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
-  const path = fileURLToPath(new URL('../../../backend/tests/fixtures/demeter-x10c.dat', import.meta.url))
   const picker = page.getByLabel('Choose data files', { exact: true }); await expect(picker).toBeEnabled()
   const rejected = page.waitForResponse(r => r.url().endsWith('/inspect'))
   await picker.setInputFiles(path)
   expect((await rejected).status()).toBe(400)
-  const importing = page.getByRole('dialog', { name: 'Import spectra', exact: true })
   await expect(importing.getByRole('alert')).toContainText('X10C file plugin is disabled')
-  await importing.getByRole('button', { name: 'File plugins…', exact: true }).click()
-  panel = page.getByRole('dialog', { name: 'Plugin registry', exact: true })
+  await importing.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  panel = await openRegistry(page)
   await expect(panel.getByRole('checkbox', { name: 'Enable X10C' })).toBeEnabled()
   const enabled = page.waitForResponse(r => r.url().endsWith('/preferences/plugins') && r.request().method() === 'PUT')
   await panel.getByRole('checkbox', { name: 'Enable X10C' }).click(); expect((await enabled).ok()).toBe(true)
@@ -39,9 +51,11 @@ test('plugin switches recover a blocked import, persist across windows, and exch
   await panel.getByText('X10C documentation', { exact: true }).click()
   await expect(panel.getByRole('link', { name: 'Original X10C documentation' })).toBeVisible()
   await panel.screenshot({ path: info.outputPath('plugin-registry.png') })
-  await panel.getByRole('button', { name: 'Return to import', exact: true }).click()
-  await importing.getByRole('button', { name: 'Retry file inspection', exact: true }).click()
-  await expect(importing.getByLabel('File conversion')).toContainText('X10C')
+  await panel.getByRole('button', { name: 'Close registry', exact: true }).click()
+  await page.getByRole('button', { name: 'Import data', exact: true }).click()
+  const retry = page.waitForResponse(r => r.url().endsWith('/inspect'))
+  await page.getByLabel('Choose data files', { exact: true }).setInputFiles(path)
+  expect((await retry).ok()).toBe(true)
   await expect(importing.getByLabel('Imported signal preview plot').locator('.js-line').first()).toBeAttached()
   const accepted = page.waitForResponse(r => r.url().endsWith('/import'), { timeout: 30000 })
   await importing.getByRole('button', { name: 'Import spectrum', exact: true }).click()

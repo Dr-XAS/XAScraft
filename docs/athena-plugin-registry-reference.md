@@ -18,18 +18,18 @@ discovery and reader ordering. Implementation references are pinned to Demeter
 
 ## Interaction and persistence
 
-**File → Plugin registry…** opens the available-reader list. **File plugins…**
-inside import opens the same panel while retaining selected files, column
-mapping and batch state. Returning restores import; a disabled-file failure
-can then use **Retry file inspection** without reselection.
+Recognized formats open automatically during import. **File → Plugin registry…**
+opens advanced reader switches and configuration. After changing these settings,
+open Import data and select the original file again to apply them.
 
 The 22 available readers (10BMMultiChannel, B18, BL8Ar, BM23, CMC, DUBBLE, HXMA,
 LNLS, Lytle, PFBL12C, SLRIBL4, SPEC, SRS, SSRLA, SSRLB, SSRLmicro, SpecFileLongLine, X10C, X15B,
 X23A2MED, X23A2MultiChannel and Zip) show descriptions, versions, ordered system-reader entries,
 local documentation and original source links. Switches save immediately to
-local server preferences. Unlike the earlier always-on converter checkpoint,
-fresh settings now match Athena's unchecked default. Enable the formats needed
-before importing. Ordinary ASCII/CSV/XDI reading requires no plugin switch.
+local server preferences. Readers with no saved override are enabled automatically;
+an explicit saved disabled flag remains disabled. This web default intentionally
+differs from native Athena's initially unchecked registry. Ordinary ASCII/CSV/XDI
+reading requires no format selection or plugin switch.
 
 The backend reports the specific disabled reader and recovery action, never
 calls a disabled converter, and can continue to a later enabled matching
@@ -48,8 +48,9 @@ its value. Stale initial requests cannot overwrite a newer mount's state.
 ## Native YAML exchange
 
 Import replaces the saved registry with the native flat name/flag mapping.
-Export writes sorted fully qualified names with numeric 0/1 values and the
-native filename. Known readers absent from an imported mapping are disabled.
+Export writes the effective settings as sorted fully qualified names with numeric
+0/1 values and the native filename. Known readers absent from an imported native
+mapping are saved as explicitly disabled, preserving native opt-in semantics.
 Unknown entries are retained, displayed separately as unavailable and exported
 again; they do not imply an installed or executable reader.
 
@@ -79,13 +80,12 @@ library check, not complete desktop UI replay.
 ## Verification and remaining scope
 
 [Backend tests](../backend/tests/test_athena_plugin_registry.py) cover defaults,
-order, disabled-converter traps, actual X10C/Lytle retry, staged/project
+order, automatic X10C/Lytle opening, explicit disabled-converter traps, staged/project
 independence, concurrent saves, failed writes, restart, validation, unknown
-entries and native YAML/HTTP exchange. Converter tests now explicitly enable
-readers in setup. [Component tests](../frontend/components/athena-plugin-registry.test.tsx)
+entries and native YAML/HTTP exchange. [Component tests](../frontend/components/athena-plugin-registry.test.tsx)
 cover confirmation, errors/reload, import, unknown entries, pending writes and
 stale loads. [Chromium](../frontend/tests/e2e/athena-plugin-registry.spec.ts)
-recovers the blocked X10C upload, displays its plot, imports it, changes settings
+opens X10C automatically, tests an explicit opt-out and recovery, imports it, changes settings
 without editing the project, tests a second browser window and exchanges the
 native registry. Results and screenshot review are in [verification](athena-verification.md).
 
@@ -117,8 +117,8 @@ The configured-reader checkpoint adds ten unique source/sample entries for
 current/saved/default values, session Apply, persistent Apply and Save, reload,
 validated inputs and session/revision conflict handling. Save includes other
 currently applied reader settings, following native write_ini semantics.
-The import panel can reinspect the original selected file after configuration
-changes; returning alone retains the staged preview. See the
+Select the original file again after configuration changes to use the new settings;
+already staged arrays retain their configuration snapshot. See the
 [configuration contract](athena-configured-readers-reference.md) for the two
 native numerical oracles, internal JSON persistence and remaining INI scope.
 

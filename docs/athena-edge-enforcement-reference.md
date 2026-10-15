@@ -1,5 +1,12 @@
 # Athena element/edge enforcement: SC-05 reference
 
+Current browser scope (2026-10-15): normal file import sends no edge-enforcement
+policy, including any policy left in browser storage by an older version.
+The import-policy API and recorded scientific behavior below remain supported.
+After import, use the group processing controls to choose absorber/edge metadata
+and E0, or the energy calibration/alignment tools when shifting the energy axis.
+The earlier import-enforcement dialog is no longer part of the normal workflow.
+
 Research baseline, 2026-09-07. Oracle revision: Demeter
 `06afc8da08a5a7d5a26ee14992170fcf5dc67406`. Findings below distinguish executable
 source, documented intent, and suggested web behavior. No Demeter runtime or

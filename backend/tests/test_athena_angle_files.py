@@ -215,6 +215,22 @@ def test_pf_native_spacing_fallback_is_visible_and_repeated_headers_use_the_last
     np.testing.assert_array_equal(np.loadtxt(StringIO(repeated.data.decode())), reference('pfbl12c'))
 
 
+def test_pf_automatic_inspection_warns_visibly_only_for_missing_spacing(tmp_path):
+    s = AthenaStore(Settings(data_root=tmp_path)); p = s.create()
+    original = raw('pfbl12c')
+    present = s.inspect(p['id'], original, 'header-spacing.dat')
+    missing = original.replace(b'D=  3.13551 A', b'monochromator spacing absent')
+    inspected = s.inspect(p['id'], missing, 'missing-spacing.dat')
+    warning = ('Monochromator D spacing is absent: the native fallback 2d = 1 Å was used. '
+               'Check the converted energy axis before importing.')
+    assert warning in inspected['warnings']
+    assert warning not in present['warnings']
+    assert inspected['file_plugin']['conversion']['d_spacing_origin'] == 'native_default'
+    converted = s.inspected_file(p['id'], inspected['upload_id'], 'converted')[0]
+    assert converted == prepare(missing).data
+    assert s.load(p['id']) == p
+
+
 def test_srsc_explicit_energy_is_not_inferred_from_monotonicity(tmp_path):
     s = store(tmp_path); p = s.create(); inspected = s.inspect(p['id'], raw('srsc'), 'soft-xray.dat')
     assert inspected['file_plugin']['conversion']['source_axis'] == 'energy_eV'
@@ -225,13 +241,12 @@ def test_srsc_explicit_energy_is_not_inferred_from_monotonicity(tmp_path):
     assert 'edge step is not positive' in imported['groups'][0]['processing_error']
 
 
-def test_real_http_reader_recovery_preview_and_original_bytes(tmp_path):
+def test_real_http_automatic_reader_preview_and_original_bytes(tmp_path):
     with TestClient(create_app(Settings(data_root=tmp_path))) as client:
         p = client.post('/api/athena/projects').json(); base = f'/api/athena/projects/{p["id"]}'
         response = client.post(base+'/inspect', files={'file':('input.dat',raw('dubble'))})
-        assert response.status_code == 400 and 'disabled' in response.text
-        client.put('/api/athena/preferences/plugins', json={'version':0,'enabled':{'Demeter::Plugins::DUBBLE':True}})
-        i = client.post(base+'/inspect', files={'file':('input.dat',raw('dubble'))}).json()
+        assert response.status_code == 200
+        i = response.json()
         req = dict(version=0,upload_id=i['upload_id'],**i['athena_suggestion'])
         assert client.post(base+'/preview-columns',json=req).status_code == 200
         assert client.get(base+f'/uploads/{i["upload_id"]}/file').content == raw('dubble')

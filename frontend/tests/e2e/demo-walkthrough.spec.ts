@@ -72,7 +72,7 @@ async function openImport(page: Page) {
  * Upload one file, read the beamline the reader claimed, and import it.
  *
  * `sort` ticks "Sort ascending by energy", under the import dialog's
- * collapsed "Reference channel & ordering" section. Some of the measured
+ * collapsed "Ordering" section. Some of the measured
  * files below need it -- where two scan regions overlap the energy steps
  * backwards once, and the app refuses the import rather than importing a
  * scrambled spectrum. Ticking it on a file whose axis already ascends does
@@ -95,14 +95,18 @@ async function importBeamlineFile(page: Page, file: string, { sort = false } = {
   const recognized = (await badge.locator('strong').innerText()).trim()
   const facility = recognized.split('·')[0].trim()
   if (sort) {
-    await dialog.getByText('Reference channel & ordering', { exact: true }).click()
+    await dialog.getByText('Ordering', { exact: true }).click()
     await dialog.getByRole('checkbox', { name: /^Sort ascending by energy/ }).check()
   }
-  // A reference channel the reader recognized is applied by default and
-  // imports as a second group; its formula line says so.
+  // A recognized reference is shared by the configured measurement modes.
+  // Open its tab to inspect the formula without changing the preview.
+  const referenceTab = dialog.getByRole('tab', { name: 'Reference', exact: true })
+  if (await referenceTab.count()) await referenceTab.click()
   const referenced = await dialog.getByText(/^Reference = /).first().isVisible()
+  const mode = await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).inputValue()
+  const samples = mode === 'both' || mode === 'all' ? 2 : 1
   const imported = page.waitForResponse(r => r.url().endsWith('/import'))
-  await dialog.getByRole('button', { name: 'Import spectrum', exact: true }).click()
+  await dialog.getByRole('button', { name: /^Import (?:spectrum|both modes|\d+ spectra)$/ }).click()
   const response = await imported
   if (!response.ok()) {
     // A refused import leaves its reason on screen; carry it out rather than
@@ -111,10 +115,10 @@ async function importBeamlineFile(page: Page, file: string, { sort = false } = {
     const reason = await dialog.getByRole('alert').first().innerText({ timeout: 5000 }).catch(() => '')
     await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
     await expect(dialog).toHaveCount(0)
-    return { recognized, facility, badge, referenced, refused: reason || (await response.text()) }
+    return { recognized, facility, badge, referenced, samples, refused: reason || (await response.text()) }
   }
   await expect(dialog).toHaveCount(0)
-  return { recognized, facility, badge, referenced, refused: '' }
+  return { recognized, facility, badge, referenced, samples, refused: '' }
 }
 
 async function openProject(page: Page, file: string) {
@@ -235,10 +239,11 @@ test.describe('demo walkthrough', () => {
 
     const seen: string[] = []
     const problems: string[] = []
-    let references = 0
+    let references = 0, samples = 0
     const walk = async (file: string, expected: string, sort: boolean) => {
-      const { recognized, facility, refused, referenced } = await importBeamlineFile(page, file, { sort })
+      const { recognized, facility, refused, referenced, samples: importedSamples } = await importBeamlineFile(page, file, { sort })
       if (!refused && referenced) references += 1
+      if (!refused) samples += importedSamples
       if (refused) problems.push(`${file} was refused: ${refused}`)
       else if (facility !== expected) problems.push(`${file} named "${recognized}", expected ${expected}`)
       else seen.push(facility)
@@ -247,7 +252,7 @@ test.describe('demo walkthrough', () => {
     for (const [file, expected] of synthetic) await walk(file, expected, false)
     expect(problems).toEqual([])
     expect([...new Set(seen)].sort()).toHaveLength(10)
-    await expect(page.getByRole('heading', { name: new RegExp(`^Data ${seen.length + references}\\b`) })).toBeVisible()
+    await expect(page.getByRole('heading', { name: new RegExp(`^Data ${samples + references}\\b`) })).toBeVisible()
     await page.screenshot({ path: shot('w1-3-ten-facilities-loaded'), fullPage: false })
     expect(errors).toEqual([])
   })

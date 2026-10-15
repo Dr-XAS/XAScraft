@@ -20,22 +20,57 @@ the pinned Git tree; SHA-256 hashes are in [the source manifest](athena-primary-
 
 Multi-file batches ask whether to use the same import parameters before the
 first import. Choosing Yes applies the reviewed column positions, units,
-signal/reference settings, rebinning, and preprocessing to the remaining files
-without another confirmation. Renamed headers are accepted; missing selected
-columns, known labels moving to different positions, and mandatory reader
+and signal/reference settings to the remaining files without another
+confirmation. Renamed headers, missing selected columns, known labels moving
+to different positions, and mandatory reader
 reviews pause the batch for that file. Choosing No retains individual review.
 Each new file selection asks again, including ZIP or SPEC selections expanded
 into multiple entries. Failed imports retain the pending file and accepted
 earlier imports, so retry resumes without duplicating successful files.
 
-The Measurement choice **Transmission + fluorescence** imports both signals
-from the same file. Transmission and fluorescence have independent detector
-selections, channel grouping, sign, and scale. Energy, units, reference,
-rebinning, and preprocessing settings are shared. Both curves are labeled in
-the preview, and imported groups include their measurement mode in the name.
-Both modes are validated and saved together as one project revision and undo
-step; an invalid second signal does not leave the first one partly imported.
-Shared-parameter batches reuse both sets of detector columns. This option
+The Measurement choice **Transmission + fluorescence + reference** imports
+three spectra from the same file: transmission `ln(I0/It)`, fluorescence
+`If/I0`, and reference `ln(It/Iref)`. Files with all four detector signals
+identified default to this choice, unless matching remembered choices or the
+reader's sample-or-foil evidence select a different workflow. Missing or
+ambiguous columns require a manual choice.
+
+**Transmission**, **Fluorescence**, and **Reference** tabs switch column controls
+without changing the preview's signal selection. The preview initially overlays
+all three curves. Transmission and fluorescence have independent detector
+selections, channel grouping, sign, and scale. Both samples link to one shared
+reference, and share the energy column and units.
+Imported spectra are ordered Transmission, Fluorescence, Reference and retain
+their own arithmetic and source columns. **Transmission + fluorescence** remains
+available for files without a reference.
+
+Normal import contains the column calculation and the controls needed to read
+the file. It does not apply remembered rebinning, marking, parameter copying,
+alignment, or an old import edge policy. Input normalization remains explicit;
+EXAFS eligibility and E0 are resolved for each imported spectrum. The
+**Ordering** section remains available for sorting an unsorted energy axis and
+averaging repeated-energy rows, because a strictly increasing axis is required
+before import can finish.
+
+Rebinning and alignment are available after import under **Process → Rebin
+data** and **Process → Align scans**. The rebin tool retains its grid defaults
+and previews, and **Copy / reset parameters…** in the processing panel copies
+or resets parameters for the chosen data. Mark data in the data list before
+applying a batch operation. These operations retain their own preview and undo
+behavior.
+
+Reader detector suggestions are applied when choosing the initial columns.
+The normal import form does not repeat them in a separate reader toolbar;
+switching a single measurement selects its detected columns, while leaving a
+combined import preserves that signal's reviewed columns. Manual corrections
+use the signal tabs. Reader notes, warnings, and required
+I0-correction review remain visible. An ambiguous sample-or-foil scan still
+requires an explicit choice before import. Reference options appear only in
+the Reference tab.
+
+Every selected signal is validated and saved together as one project revision
+and undo step; an invalid signal does not leave a partial import.
+Shared-parameter batches reuse all selected detector columns. Combined import
 requires energy data and is cleared when switching to extracted chi(k).
 
 `AthenaColumnSelection` displays the original file header and initial rows,
@@ -62,9 +97,11 @@ source point. Original input columns and their units are preserved for project e
 The selected signal array follows native sign/scale adjustments; the saved
 mu array includes those adjustments independently of later plot scaling.
 
-Separate-channel import creates a sample per numerator. If a reference is
-selected, each sample receives its own unmarked reference immediately below
-it. The entire import has one saved revision and one undo step. References
+Separate-channel import creates a sample per numerator. For a single measurement
+mode, each sample receives its own unmarked reference immediately below it.
+Combined transmission/fluorescence import instead shares one unmarked reference
+across all samples, including individual fluorescence channels. The entire import
+has one saved revision and one undo step. References
 keep the sample's input type, independently determined E0, and optionally its
 identity. A reference with a distant derivative E0 is reset to the tabulated
 edge with a visible warning. Raw, finite reference data remain inspectable
@@ -85,6 +122,11 @@ revision, retaining its ID, name, list position, notes, marks, plot styling,
 and reference links. Processing parameters are initialized again for the new
 signal; linked energy shifts remain tied. Cancel and preview do not change the
 project.
+
+Replacement retains rebin controls for replaying or adjusting a stored
+import-time grid against the original columns. It also keeps explicit EXAFS
+processing and reader-suggestion controls; these belong to rebuilding the
+existing spectrum and are not shown in normal import.
 
 Replacement creates one spectrum, so batch import, separate detector groups,
 dual measurement import, and new reference creation remain in the ordinary
@@ -109,7 +151,13 @@ used; applying recalculates the replacement and affected background dependents.
   is mocked here; these are component contracts rather than browser evidence.
 - `frontend/components/athena-column-selection.test.tsx`: range parsing,
   additive selection, clear, invalid-range recovery, individual channels,
-  reference options, chi eligibility, file contents and busy controls.
+  reference options, independent signal tabs with keyboard navigation, chi
+  eligibility, file contents and busy controls.
+- `backend/tests/test_athena_dual_mode_import.py`: shared reference arithmetic,
+  links, rebinning, alignment, capacity limits, reimport, and atomic undo/redo.
+- `frontend/tests/e2e/athena-three-channel-import.spec.ts`: automatic three-signal
+  selection, tab-independent Plotly overlays, reference edits, persisted formulas,
+  shared reference links, and project reload using synthetic detector counts.
 - `frontend/tests/e2e/athena-columns.spec.ts`: the repository's measured
   `examples/xafsdata/cu_10k.xmu` is transformed into deterministic detector
   counts whose inverse formulas recover the original mu. This fixture is
@@ -168,8 +216,10 @@ energy column uses constant 1. The live equation/figure lets the user correct
 these suggestions. Explicit choices persist for compatible files in the same
 batch, even when later files carry different recommendations. Successful imports
 also [remember choices across sessions](athena-column-memory-reference.md),
-including references, preprocessing and matching-layout rebin activation. Native editable
-preference expressions and the complete beamline plugin registry remain open.
+including detector selections and references. Normal import ignores historical
+preprocessing and rebin activation; the processing tools keep their own choices.
+Native editable preference expressions and the complete beamline plugin
+registry remain open.
 
 The column dialog's native expression fields are read-only in
 `ColumnSelection.pm`; earlier notes incorrectly implied a general expression
@@ -199,9 +249,10 @@ user-configurable import preferences, the beamline file-plugin registry, and
 general engine commands. File/column/group resource limits and complete native
 UI replay also require review. No full import row is promoted to Verified here.
 
-Import-time three-region rebinning and marking/standard copying/alignment are
-now covered by the [rebin](athena-import-rebin-reference.md) and
-[preprocessing](athena-import-preprocessing-reference.md) extensions.
+The API's import-time three-region rebinning and marking/standard
+copying/alignment remain documented by the [rebin](athena-import-rebin-reference.md)
+and [preprocessing](athena-import-preprocessing-reference.md) extensions.
+Normal browser import uses the post-import tools described above instead.
 
 FEFF xmu.dat import, normalized processing, live column alternatives and native
 project flags are now covered by the [FEFF extension](athena-feff-import-reference.md).

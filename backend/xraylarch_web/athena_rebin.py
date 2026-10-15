@@ -177,22 +177,26 @@ class RebinPlan:
         return np.asarray(out)
 
 
-def prepare_rebin(mapped, request, standard=None):
-    """Shared plan construction for previews and import, without project writes."""
+def prepare_rebin(mapped, request, standard=None, *, reference_count=None):
+    """Shared plan construction for previews and import, without project writes.
+
+    Combined measurements retain one foil, so only their first sample needs a
+    reference plan. Other detector groups may still use their own sample grid.
+    """
     if request.rebin is None:
         return
     if request.data_type == 'chi':
         raise ScientificError('Import rebinning needs an energy spectrum; chi(k) cannot use an energy-region grid.')
     from .athena_e0 import _infer_atomic, atomic_edge
     x = mapped['x']
-    for sample in mapped['samples']:
+    for index, sample in enumerate(mapped['samples']):
         y = sample['y']
         # Validate axes before edge selection (which assumes sorted data).
         if not np.isfinite(x).all() or np.any(np.diff(x) < 0):
             raise ScientificError('Rebinning needs nondecreasing energies. Sort the rows first.')
         e0, method = grid_e0(x, y, request)
         plan = sample['rebin'] = RebinPlan(x, request.rebin, e0, method)
-        if mapped['reference'] is not None:
+        if mapped['reference'] is not None and (reference_count is None or index < reference_count):
             ry = mapped['reference']['y']
             re0, rmethod = rebin_edge(x, ry), 'reference-derivative'
             if request.reference_same_element:

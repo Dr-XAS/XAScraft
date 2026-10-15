@@ -25,7 +25,11 @@ async function load(page:Page,name:string) {
   await page.getByLabel('Choose data files',{exact:true}).setInputFiles(fixture(name))
   const dialog=page.getByRole('dialog',{name:'Import spectra',exact:true})
   await expect(dialog.getByLabel('File conversion')).toContainText('HXMA')
-  await dialog.getByRole('button',{name:'Use transmission columns',exact:true}).click()
+  await dialog.getByRole('combobox',{name:'Measurement',exact:true}).selectOption('transmission')
+  await dialog.getByRole('tab',{name:'Reference',exact:true}).click()
+  await dialog.getByRole('combobox',{name:'reference numerator',exact:true}).selectOption('')
+  await dialog.getByRole('combobox',{name:'reference denominator',exact:true}).selectOption('')
+  await dialog.getByRole('tab',{name:'Transmission',exact:true}).click()
   // These older CLS headers leave Event-ID unquoted. Native HXMA retains
   // eleven generic columns: choose feedback energy and the actual I0/I1
   // channels explicitly, and verify the live figure before importing.

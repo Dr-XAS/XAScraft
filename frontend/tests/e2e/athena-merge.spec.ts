@@ -24,22 +24,23 @@ async function load(page:Page){
     await dialog.getByRole('button',{name:'Clear denominator',exact:true}).click()
     await dialog.getByRole('checkbox',{name:'Denominator it',exact:true}).check()
     await dialog.getByRole('checkbox',{name:'Natural log',exact:true}).check()
-    await dialog.getByText('Reference channel & ordering',{exact:true}).click()
+    await dialog.getByRole('tab',{name:'Reference',exact:true}).click()
     // Reuse the measured transmission as a constructed linked reference;
     // these are three real scans, not six independent measurements.
     await dialog.getByRole('combobox',{name:'reference numerator',exact:true}).selectOption({label:'i0 · column 2'})
     await dialog.getByRole('combobox',{name:'reference denominator',exact:true}).selectOption({label:'it · column 3'})
     await dialog.getByLabel('Reference natural log',{exact:true}).check()
-    await dialog.getByText('Preprocess imported data',{exact:true}).click()
-    await dialog.getByLabel('Mark each imported sample',{exact:true}).check()
     await expect.poll(async()=>{
       const ts=await curves(dialog.getByLabel('Imported signal preview plot',{exact:true}))
       return ts.length===2&&ts.every(t=>t.x.length===rows.length&&t.x.every((x,i)=>x===rows[i][0])&&t.y.every((y,i)=>Math.abs(y-Math.log(rows[i][1]/rows[i][2]))<1e-12))
     }).toBe(true)
     const wait=page.waitForResponse(r=>r.url().endsWith('/import'));await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click()
     const response=await wait;expect(response.ok()).toBe(true);project=await response.json();await expect(dialog).toHaveCount(0)
+    const sample=project!.groups.at(-2)!
+    const marked=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='metadata')
+    await page.getByLabel(`Mark ${sample.label}`,{exact:true}).check();expect((await marked).ok()).toBe(true)
   }
-  return project!
+  return await (await page.request.get(`/api/backend/api/athena/projects/${project!.id}`)).json() as AthenaProject
 }
 async function review(page:Page,dialog:Locator){
   const replot=dialog.getByRole('button',{name:'Replot merge',exact:true});await expect(replot).toBeEnabled()

@@ -11,7 +11,8 @@ the bundled three-column iron-foil files.
 
 ## Implemented flow
 
-Enable **Zip** in File → Plugin registry (the native default is unchecked).
+The web recognizes ZIP archives automatically unless **Zip** is explicitly
+disabled under File → Plugin registry (native Athena starts unchecked).
 Use Import data, drag and drop, or choose a `.zip` from Open project. The
 archive panel lists full member names, original order, sizes and independent
 entry numbers. Select all, none, invert, or select individual files, then

@@ -7,12 +7,12 @@ import { loadPluginRegistry, savePluginRegistry, importPluginRegistry, loadPlugi
 
 vi.mock('@/lib/athena-preferences', () => ({ loadPluginRegistry: vi.fn(), savePluginRegistry: vi.fn(), importPluginRegistry: vi.fn(), loadPluginConfiguration: vi.fn(), applyPluginConfiguration: vi.fn() }))
 const id = 'Demeter::Plugins::X10C', unknown = 'Demeter::Plugins::SSRLA'
-const blank: PluginRegistry = { version: 0, enabled: {}, plugins: [{ id, name: 'X10C', version: '0.1', origin: 'system',
+const blank: PluginRegistry = { version: 0, enabled: { [id]: false }, plugins: [{ id, name: 'X10C', version: '0.1', origin: 'system',
   description: 'NSLS beamline X10C', documentation: 'Transmission uses columns 4 and 6.', documentation_url: 'https://github.com/bruceravel/demeter/X10C.pm' }] }
 afterEach(cleanup)
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(loadPluginRegistry).mockResolvedValue(structuredClone(blank)) })
 
-it('loads native unchecked defaults, documentation, and exchange controls', async () => {
+it('loads saved reader opt-outs, documentation, and exchange controls', async () => {
   render(<AthenaPluginRegistry />)
   const toggle = await screen.findByRole('checkbox', { name: 'Enable X10C' })
   expect(toggle).not.toBeChecked(); expect(toggle).toBeEnabled()
@@ -20,6 +20,13 @@ it('loads native unchecked defaults, documentation, and exchange controls', asyn
   expect(screen.getByText('Transmission uses columns 4 and 6.')).toBeVisible()
   expect(screen.getByRole('link', { name: 'Original X10C documentation' })).toHaveAttribute('target', '_blank')
   expect(screen.getByRole('link', { name: 'Export plugin registry' })).toHaveAttribute('href', '/api/backend/api/athena/preferences/plugins/export')
+})
+
+it('shows an unconfigured reader enabled for automatic format detection', async () => {
+  vi.mocked(loadPluginRegistry).mockResolvedValue({ ...blank, enabled: {} })
+  render(<AthenaPluginRegistry />)
+  expect(await screen.findByRole('checkbox', { name: 'Enable X10C' })).toBeChecked()
+  expect(savePluginRegistry).not.toHaveBeenCalled()
 })
 
 it('opens native plugin actions by right click without enabling the reader and shows its local documentation', async () => {
@@ -65,7 +72,7 @@ it('offers native Configure only for configurable readers and leaves configurati
 })
 
 it('saves one toggle immediately, serializes pending changes and retains unknown native flags', async () => {
-  vi.mocked(loadPluginRegistry).mockResolvedValue({ ...blank, enabled: { [unknown]: true } })
+  vi.mocked(loadPluginRegistry).mockResolvedValue({ ...blank, enabled: { [id]: false, [unknown]: true } })
   let finish!: (value: PluginRegistry) => void
   vi.mocked(savePluginRegistry).mockReturnValue(new Promise(resolve => { finish = resolve }))
   const pending = vi.fn(); render(<AthenaPluginRegistry onPendingChange={pending} />)

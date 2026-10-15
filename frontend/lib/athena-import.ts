@@ -38,6 +38,14 @@ export interface ColumnPreview {
   rebin_results?: { id: string; label: string; role: "sample" | "reference"; e0: number; source_points: number; output_points: number }[]
 }
 
+/** Normal file import selects measured columns; processing is applied afterward.
+ * Keep older stored rebin/alignment choices from running behind removed controls.
+ * Reselecting an existing spectrum can still replay its explicit saved mapping. */
+export function withoutImportProcessing(mapping: ColumnMapping): ColumnMapping {
+  const { rebin: _rebin, preprocessing: _preprocessing, ...columns } = mapping
+  return columns
+}
+
 export function columnPayload(mapping: ColumnMapping, { automaticExafs = true } = {}) {
   mapping = normalizeImportInversion(mapping)
   if (automaticExafs) mapping = automaticImportProcessing(mapping)
@@ -137,21 +145,35 @@ export function changeImportProcessing(mapping: ColumnMapping, options: Partial<
   return { ...mapping, is_normalized, exafs, data_type: !exafs ? 'xanes' : is_normalized ? 'norm' : 'mu' }
 }
 
+function suggestedMeasurement(inspection: InspectionResponse, mode: 'transmission' | 'fluorescence') {
+  return inspection.plugin_suggestions?.[mode] ?? inspection.beamline_reader?.suggestions?.[mode]
+    ?? (inspection.athena_suggestion?.mode === mode ? inspection.athena_suggestion : undefined)
+}
+
+/** A named detector is useful as a default only when its identity is unique. */
+function uniqueDetector(inspection: InspectionResponse, role: string, pattern: RegExp): string | undefined {
+  const numeric = inspection.columns.filter(c => c.numeric)
+  const readerName = ({ it: 'transmission', iref: 'reference', ifluor: 'fluorescence' } as Record<string, string>)[role] ?? role
+  const readerRole = inspection.beamline_reader?.roles?.[readerName]
+  const readerIds = typeof readerRole === 'string' ? [readerRole] : readerRole ?? []
+  const roles = numeric.filter(c => c.role_hint === role || c.role_hint === readerName || readerIds.includes(c.column_id))
+  const matches = roles.length ? roles : numeric.filter(c => pattern.test(c.name.replace(/[^a-z0-9]/gi, '')))
+  return matches.length === 1 ? matches[0].column_id : undefined
+}
+
 export function setDualMode(mapping: ColumnMapping, inspection: InspectionResponse, enabled: boolean): ColumnMapping {
   if (!enabled) {
     const { additional_fluorescence: _fluorescence, ...single } = mapping
     return single
   }
   if (mapping.data_type === 'chi' || mapping.additional_fluorescence) return mapping
-  const suggested = (mode: 'transmission' | 'fluorescence') => inspection.plugin_suggestions?.[mode]
-    ?? (inspection.athena_suggestion?.mode === mode ? inspection.athena_suggestion : undefined)
-  const named = (role: string, pattern: RegExp) => inspection.columns.find(c => c.role_hint === role)?.column_id
-    ?? inspection.columns.find(c => pattern.test(c.name.replace(/[^a-z0-9]/gi, '')))?.column_id
+  const named = (role: string, pattern: RegExp) => uniqueDetector(inspection, role, pattern)
+    ?? inspection.columns.find(c => c.numeric && pattern.test(c.name.replace(/[^a-z0-9]/gi, '')))?.column_id
   const i0 = named('i0', /^(?:i0|io)$/i)
   const it = named('it', /^(?:it|i1|itrans|transmission)$/i)
   const fluorescence = named('ifluor', /^(?:if\d*|ifluor\d*|fluorescence\d*|iy)$/i)
-  const transmissionSuggestion = suggested('transmission')
-  const fluorescenceSuggestion = suggested('fluorescence')
+  const transmissionSuggestion = suggestedMeasurement(inspection, 'transmission')
+  const fluorescenceSuggestion = suggestedMeasurement(inspection, 'fluorescence')
   const additional: FluorescenceMapping = mapping.mode === 'fluorescence'
     ? { numerator: [...mapping.numerator], denominator: denominatorColumns(mapping), individual_channels: mapping.individual_channels,
       signal_multiplier: mapping.signal_multiplier, invert: mapping.invert }
@@ -167,6 +189,49 @@ export function setDualMode(mapping: ColumnMapping, inspection: InspectionRespon
 export function suggestedReference(inspection: InspectionResponse): Pick<ColumnMapping, 'reference_numerator' | 'reference_denominator' | 'reference_log'> | null {
   const reference = inspection.beamline_reader?.reference
   return reference ? { reference_numerator: reference.numerator, reference_denominator: reference.denominator ?? '', reference_log: reference.log } : null
+}
+
+/** Add the three measured signals while retaining column choices already reviewed. */
+export function setThreeMode(mapping: ColumnMapping, inspection: InspectionResponse): ColumnMapping {
+  if (mapping.data_type === 'chi') return mapping
+  const dual = setDualMode(mapping, inspection, true)
+  if (mapping.reference_numerator || mapping.reference_denominator) return dual
+  const reference = suggestedReference(inspection)
+  if (reference) return { ...dual, ...reference }
+  const it = uniqueDetector(inspection, 'it', /^(?:it|i1|itrans|transmission)$/i)
+  const iref = uniqueDetector(inspection, 'iref', /^(?:iref|i2|ireference|reference|ref)$/i)
+  return { ...dual, reference_numerator: it ?? '', reference_denominator: iref ?? '', reference_log: true }
+}
+
+function automaticThreeMode(mapping: ColumnMapping, inspection: InspectionResponse): ColumnMapping {
+  // Keep direct absorption/chi inputs and sample-or-foil decisions intact. A
+  // detector-like column name alone cannot override the reader's edge evidence.
+  const measurement = inspection.beamline_reader?.measurement
+  if (mapping.data_type === 'chi' || mapping.data_type === 'xmudat'
+    || inspection.athena_suggestion?.mode === 'mu'
+    || measurement?.foil_spectrum || measurement?.ambiguous) return mapping
+  const transmission = suggestedMeasurement(inspection, 'transmission')
+  const fluorescence = suggestedMeasurement(inspection, 'fluorescence')
+  const i0 = uniqueDetector(inspection, 'i0', /^(?:i0|io)$/i)
+  const it = uniqueDetector(inspection, 'it', /^(?:it|i1|itrans|transmission)$/i)
+  const ifluor = uniqueDetector(inspection, 'ifluor', /^(?:if\d*|ifluor\d*|fluorescence\d*|iy)$/i)
+  if ((!transmission && (!i0 || !it)) || (!fluorescence && !ifluor)) return mapping
+  const candidate = setThreeMode({ ...mapping, mode: 'transmission',
+    numerator: transmission?.numerator ?? [i0!], denominator: transmission?.denominator ?? it ?? '',
+  }, inspection)
+  // A detector suggestion must use actual numeric columns and the three
+  // ratios must share I0/It consistently before enabling them automatically.
+  const numeric = new Set(inspection.columns.filter(c => c.numeric && c.column_id !== mapping.energy_column).map(c => c.column_id))
+  const tn = candidate.numerator, td = denominatorColumns(candidate)
+  const fn = candidate.additional_fluorescence?.numerator ?? []
+  const fd = candidate.additional_fluorescence ? denominatorColumns(candidate.additional_fluorescence) : []
+  const ref = [candidate.reference_numerator, candidate.reference_denominator]
+  const operands = [...tn, ...td, ...fn, ...fd, ...ref]
+  if (tn.length !== 1 || td.length !== 1 || !fn.length || fd.length !== 1
+    || operands.some(id => !numeric.has(id)) || tn[0] === td[0]
+    || fd[0] !== tn[0] || ref[0] !== td[0] || ref[1] === tn[0] || ref[1] === td[0]
+    || fn.some(id => [tn[0], td[0], ref[1]].includes(id)) || candidate.reference_log === false) return mapping
+  return candidate
 }
 
 export function initialColumnMapping(inspection: InspectionResponse, previous: ColumnMapping, remembered = true, resetReference = true): ColumnMapping {
@@ -187,7 +252,8 @@ export function initialColumnMapping(inspection: InspectionResponse, previous: C
       reference_numerator: "", reference_denominator: "" }
   const restored = remembered && inspection.remembered_columns
   const is_reference = resetReference ? false : previous.is_reference ?? false
-  const selected = normalizeImportInversion(restored ? { ...mapping, ...restored.mapping, is_reference } : { ...mapping, is_reference })
+  const choices = restored ? { ...mapping, ...restored.mapping, is_reference } : { ...mapping, is_reference }
+  const selected = normalizeImportInversion(restored && restored.matching_columns ? choices : automaticThreeMode(choices, inspection))
   if (selected.rebin && !restored) selected.rebin = { ...selected.rebin, enabled: false }
   return selected.data_type === 'chi' ? changeInputType(selected, 'chi') : automaticImportProcessing(selected)
 }
@@ -325,12 +391,14 @@ function retainedValues(group: AthenaGroup): number {
  * lets the user split the series or open a new project instead. */
 export function batchCapacityWarning(mapping: ColumnMapping, inspection: InspectionResponse, groups: AthenaGroup[], files: number): string | null {
   if (files < 2) return null
+  const fluorescence = mapping.additional_fluorescence
   const samples = (mapping.individual_channels && mapping.numerator.length > 1 ? mapping.numerator.length : 1)
-    + (mapping.additional_fluorescence ? 1 : 0)
+    + (fluorescence ? fluorescence.individual_channels && fluorescence.numerator.length > 1 ? fluorescence.numerator.length : 1 : 0)
   const referenced = !!(mapping.reference_numerator || mapping.reference_denominator)
-  const perFile = samples * (referenced ? 2 : 1)
+  const references = referenced ? fluorescence ? 1 : samples : 0
+  const perFile = samples + references
   const rows = inspection.row_count, finite = inspection.columns.filter(c => c.preview.every(v => v !== null)).length
-  const valuesPerFile = samples * rows * (finite + 4) + (referenced ? samples * rows * 7 : 0)
+  const valuesPerFile = samples * rows * (finite + 4) + references * rows * 7
   const groupsAfter = groups.length + files * perFile
   const valuesAfter = groups.reduce((total, g) => total + retainedValues(g), 0) + files * valuesPerFile
   const fit = Math.max(0, Math.min(Math.floor((MAX_PROJECT_GROUPS - groups.length) / perFile),

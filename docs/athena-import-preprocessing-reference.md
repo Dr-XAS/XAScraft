@@ -1,5 +1,12 @@
 # Athena import preprocessing reference
 
+Current browser scope (2026-10-15): normal file import does not expose or
+apply marking, standard-copy or alignment preprocessing from saved choices.
+Use the data list, Copy / reset parameters and
+[Align scans tool](athena-alignment-reference.md) after import. The optional
+API preprocessing fields and historical verification below remain supported;
+they do not describe controls in the current import dialog.
+
 Baseline: Demeter `06afc8da08a5a7d5a26ee14992170fcf5dc67406`, reviewed
 2026-09-10. This extends IM-07 without reducing the full Athena objective.
 No Artemis functionality is introduced. Source URLs and hashes are in
@@ -48,7 +55,7 @@ fitted shift. No-copy reference alignment preserves real sample edge offsets.
 {"mark": false, "standard_id": null, "copy_parameters": false, "align": false}
 ```
 
-The current browser sends it explicitly. Omitting the object preserves the
+The earlier browser sent it explicitly. Omitting the object preserves the
 older API's marked-sample behavior. Successful imports now persist marking and
 standard/copy/alignment choices across new file selections and server/browser
 restarts, following the pinned implementation. The manual's reset-marking

@@ -99,11 +99,9 @@ def test_mixed_project_scan_text_and_nested_zip_are_independent(tmp_path):
 
 def test_disabled_plugin_and_staged_independence(tmp_path):
     settings=Settings(data_root=tmp_path);s=AthenaStore(settings);p=s.create()
-    with pytest.raises(WebInputError,match='Zip file plugin is disabled'):s.inspect(p['id'],RAW,'data.zip')
-    assert not list(s.storage.workspace_dir(p['id']).glob('upload-*'))
-    prefs=AthenaPreferences(settings);prefs.save_plugins(PluginRegistry(enabled={'Demeter::Plugins::Zip':True}))
     a=s.inspect(p['id'],RAW,'data.zip')
-    prefs.save_plugins(PluginRegistry(version=1,enabled={}))
+    prefs=AthenaPreferences(settings)
+    prefs.save_plugins(PluginRegistry(enabled={'Demeter::Plugins::Zip':False}))
     assert s.archive_member(p['id'],a['upload_id'],0)[0]
     with pytest.raises(WebInputError,match='disabled'):s.inspect(p['id'],RAW,'again.zip')
     assert s.load(p['id'])==p

@@ -32,7 +32,8 @@ desktop replay prevent a claim of complete desktop identity.
 
 [athena_file_plugins.py](../backend/xraylarch_web/athena_file_plugins.py) holds
 an ordered registration table with recognition and conversion functions. Only
-recognized Athena uploads with enabled readers use it; the classic parser is unchanged. Conversion
+recognized Athena uploads use it automatically unless that reader was explicitly
+disabled in advanced settings; the classic parser is unchanged. Conversion
 precedes extension-based reader selection, so a renamed CSV/XDI file with a
 known native signature still receives the correct adapter. The converted
 table goes through the normal bounded parser and actual `larch.io.read_ascii`.
@@ -84,8 +85,8 @@ rendering, PRJ reopening and reload. Results belong in the
 The converter checkpoint registered 94 sources; the subsequent
 [registry implementation](athena-plugin-registry-reference.md) adds persistent
 enablement, documentation and native YAML exchange for the two available
-readers. Enable readers there before importing; fresh registry settings match
-Athena’s unchecked default. The complete native reader collection,
+readers. Current web imports enable recognized readers by default and retain
+explicit opt-outs in advanced settings. The complete native reader collection,
 user/system extension loading, per-plugin configuration, other beamline and
 binary formats, generic wavelength conversion, archive inputs, complete
 metadata mapping, attached originals in exported projects and native desktop

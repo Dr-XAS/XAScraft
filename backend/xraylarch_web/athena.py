@@ -34,7 +34,7 @@ from .config import Settings
 from .athena_preprocessing import ImportPreprocessing
 from .athena_rebin import ImportRebin, PostRebin, RebinPlan, prepare_rebin, rebin_unavailable
 from .athena_preferences import AthenaPreferences, RebinDefaults, RebinGrid
-from .athena_plugin_registry import PluginRegistry, registry_view, decode_registry, encode_registry, MAX_REGISTRY_BYTES
+from .athena_plugin_registry import PluginRegistry, registry_view, default_plugin_flags, decode_registry, encode_registry, MAX_REGISTRY_BYTES
 from .athena_plugin_config import PluginConfigurations, ConfigurationRequest
 from .athena_smoothing_preferences import SmoothingPreferences, SGPreferenceRequest
 from .athena_dispersive import DispersiveRequest, DispersiveDefaults, PixelNormalization
@@ -1727,7 +1727,7 @@ class AthenaStore:
         if prepared is None:
             prepared = prepare_file(data, max_bytes=self.settings.max_upload_bytes,
                                     max_points=self.settings.max_points, max_columns=self.settings.max_columns,
-                                    enabled=AthenaPreferences(self.settings).read_plugins()['enabled'],
+                                    enabled=default_plugin_flags() | AthenaPreferences(self.settings).read_plugins()['enabled'],
                                     read_configuration=self.plugin_configurations.read,
                                     read_dispersive=lambda: AthenaPreferences(self.settings).read_dispersive()['coefficients'])
         display_name = _safe_display_name(filename)
@@ -1909,6 +1909,10 @@ class AthenaStore:
         inspection.update(athena_suggestion=suggestion, column_units=column_units)
         inspection['warnings'] = [*inspection['warnings'], *self._sanity_warnings(
             display_name, parsed, suggestion, column_units, (reader or {}).get('scan_e0'))]
+        if prepared and (prepared.metadata.get('conversion') or {}).get('d_spacing_origin') == 'native_default':
+            inspection['warnings'].append(
+                'Monochromator D spacing is absent: the native fallback 2d = 1 Å was used. '
+                'Check the converted energy axis before importing.')
         if prepared and prepared.metadata.get('hdf5_layout') and suggestion.get('data_type') != 'chi':
             energy_index = next((c['index'] for c in inspection['columns'] if c['column_id'] == suggestion['energy_column']), None)
             if energy_index not in (prepared.column_units or {}):
@@ -2475,20 +2479,26 @@ class AthenaStore:
             from .athena_columns import map_columns
             measurements = []
             imported_groups = []
+            share_reference = request.additional_fluorescence is not None and bool(
+                request.reference_numerator or request.reference_denominator)
             column_names = {c['column_id']: c['name'] for c in metadata['columns']}
-            for mode_request in request.measurement_requests():
+            for index, mode_request in enumerate(request.measurement_requests()):
                 mapped = map_columns(arrays, mode_request, column_names)
-                prepare_rebin(mapped, mode_request, standard)
+                prepare_rebin(mapped, mode_request, standard,
+                              reference_count=(1 if index == 0 else 0) if share_reference else None)
                 measurements.append((mode_request, mapped))
-            nnew = sum(len(mapped["samples"]) * (2 if mapped["reference"] is not None else 1)
-                       for _, mapped in measurements)
+            nnew = (sum(len(mapped["samples"]) for _, mapped in measurements) + 1 if share_reference else
+                    sum(len(mapped["samples"]) * (2 if mapped["reference"] is not None else 1)
+                        for _, mapped in measurements))
             if target is not None and nnew != 1:
                 fail('Reimport must produce exactly one replacement spectrum.')
             if len(p["groups"]) + nnew - (1 if target is not None else 0) > 100:
                 fail("A project can contain at most 100 groups.")
+            shared_reference, shared_alignment = None, None
             for mode_request, mapped in measurements:
                 x, planned = mapped["x"], mapped["arrays"]
-                shared_alignment = None
+                if not share_reference:
+                    shared_alignment = None
                 source_base = {"filename": metadata["display_name"], "mapping": mode_request.model_dump(exclude={"version", "edge_policy", "additional_fluorescence"}),
                           "original_filename": metadata.get("original_filename", metadata["display_name"]),
                           "source_sha256": metadata.get("raw_sha256"),
@@ -2555,8 +2565,8 @@ class AthenaStore:
                     p["groups"].append(g)
                     imported_groups.append(g)
                     self.preprocess_import(p, g, standard, mode_request.preprocessing)
-                    reference = None
-                    if mapped["reference"] is not None:
+                    reference = shared_reference
+                    if mapped["reference"] is not None and reference is None:
                         ref = mapped["reference"]
                         reference_source = copy.deepcopy(source)
                         # The sample beside it already keeps the whole table;
@@ -2574,14 +2584,23 @@ class AthenaStore:
                         reference_source, ref_x, ref_y = self.rebinned_source(reference_source, x, ref['y'], sample.get('reference_rebin'))
                         reference = self.make_reference_group(g, ref_x, ref_y,
                             source=reference_source, same_element=mode_request.reference_same_element)
+                        if share_reference:
+                            reference['label'] = metadata['display_name'] + ' · Reference'
+                            shared_reference = reference
                         if sample.get('reference_rebin') is not None:
                             from .athena_xdi_history import inherit_source
                             reference['source']['xdi_metadata'] = inherit_source(reference, 'rebin', {})
-                        g["reference_id"] = reference["id"]
                         p["groups"].append(reference)
                         imported_groups.append(reference)
+                    if reference is not None:
+                        g["reference_id"] = reference["id"]
                     shared_alignment = self.align_import(p, g, reference, standard,
                                                          mode_request.preprocessing, shared_alignment)
+            if shared_reference is not None:
+                # One foil belongs to the complete detector acquisition. Keep
+                # the sample measurements together, followed by their foil.
+                p['groups'].remove(shared_reference)
+                p['groups'].append(shared_reference)
             if target is not None:
                 replacement = p['groups'].pop()
                 temporary_id = replacement['id']
@@ -2655,10 +2674,13 @@ class AthenaStore:
         metadata = self.storage.read_json(ident, f"upload-{request.upload_id}.json")
         traces, rebin_results = [], []
         warnings = list(metadata.get("warnings", []))
+        share_reference = request.additional_fluorescence is not None and bool(
+            request.reference_numerator or request.reference_denominator)
         column_names = {c['column_id']: c['name'] for c in metadata['columns']}
-        for mode_request in request.measurement_requests():
+        for index, mode_request in enumerate(request.measurement_requests()):
             mapped = map_columns(arrays, mode_request, column_names)
-            prepare_rebin(mapped, mode_request, standard)
+            prepare_rebin(mapped, mode_request, standard,
+                          reference_count=(1 if index == 0 else 0) if share_reference else None)
             x = mapped["x"]
             if not np.isfinite(x).all():
                 fail("The selected horizontal axis contains non-finite values after unit conversion.")
@@ -2670,7 +2692,7 @@ class AthenaStore:
             names = {c["column_id"]: f"{c['name']} (column {c['index'] + 1})" for c in metadata["columns"]}
             mode_traces = [preview_trace(x, sample["y"], label=names.get(sample["columns"][0], 'Constant 1') if mode_request.individual_channels and sample["columns"] else "Sample",
                       role="sample", ident="sample:" + "+".join(sample["columns"])) for sample in mapped["samples"]]
-            if mapped["reference"] is not None:
+            if mapped["reference"] is not None and (not share_reference or index == 0):
                 mode_traces.append(preview_trace(x, mapped["reference"]["y"], label="Reference", role="reference", ident="reference"))
             mode_rebin_results = []
             if mode_request.rebin is not None:
@@ -2683,16 +2705,23 @@ class AthenaStore:
                         plan = sample.get(key)
                         if plan is None:
                             continue
+                        if share_reference and role == 'reference':
+                            title = 'Reference'
                         trace = preview_trace(plan.energy, plan.apply(y), label=title + ' · rebinned', role=role, ident=f'{key}:{i}')
                         mode_traces.append(trace | {'stage': 'rebinned'})
                         mode_rebin_results.append({'id': trace['id'], 'label': title, 'role': role, **plan.details})
                         warnings.extend(plan.details['warnings'])
             if request.additional_fluorescence is not None:
                 for entry in [*mode_traces, *mode_rebin_results]:
+                    if share_reference and entry['role'] == 'reference':
+                        continue
                     entry['id'] = mode_request.mode + ':' + entry['id']
                     entry['label'] = mode_request.mode.capitalize() + ' · ' + entry['label']
             traces.extend(mode_traces)
             rebin_results.extend(mode_rebin_results)
+        if share_reference:
+            traces.sort(key=lambda trace: trace['role'] == 'reference')
+            rebin_results.sort(key=lambda trace: trace['role'] == 'reference')
         self.check(self.load(ident), request.version)
         return {"filename": metadata["display_name"], "points": len(x), "traces": traces, "warnings": list(dict.fromkeys(warnings)),
                 **({'rebin_results': rebin_results} if request.rebin is not None else {}),
@@ -5158,7 +5187,10 @@ def build_athena_router(
     @router.post('/preferences/plugins/import')
     def import_file_plugins(version: int = Query(ge=0), file: UploadFile = File(...)):
         data = _read_bounded_upload(file, MAX_REGISTRY_BYTES)
-        return guarded(lambda: registry_view(preferences.save_plugins(PluginRegistry(version=version, enabled=decode_registry(data)))))
+        # Native registries are complete opt-in lists, unlike the web's sparse
+        # overrides. Preserve their omitted readers as explicit opt-outs.
+        return guarded(lambda: registry_view(preferences.save_plugins(PluginRegistry(
+            version=version, enabled=default_plugin_flags(False) | decode_registry(data)))))
     operation_aliases = {
         "inspect": "upload",
         "preview-project": "upload",

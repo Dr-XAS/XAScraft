@@ -26,7 +26,14 @@
 .range label { flex: 1 1 160px; margin-bottom: 0 !important; }
 .range button { min-height: 32px; border: 1px solid var(--ath-line); padding: 6px 8px; }
 .modeTitle { margin: 12px 0 8px; font-size: var(--text-section); }
-.fluorescence { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid var(--ath-line); border-radius: 6px; }
+.signalTabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--ath-line); }
+.signalTabs button { flex: 1 1 auto; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: var(--ath-surface); }
+.signalTabs button[aria-selected="true"] { border-color: var(--ath-primary); background: var(--ath-primary); color: var(--ath-primary-foreground); }
+.signalTabs button[aria-selected="true"]:hover:not(:disabled) { background: var(--ath-primary-hover); }
+.signalTabs button:focus-visible { outline: 2px solid var(--ath-primary); outline-offset: 2px; }
+.signalPanel { min-width: 0; padding: 8px 0; }
+.signalPanel[hidden] { display: none; }
+.fluorescence { min-width: 0; margin: 4px 0; padding: 0; border: 0; }
 .fluorescence legend { padding: 0 5px; font-size: var(--text-section); font-weight: 600; }
 /* The long Flip button's min-content width squeezed the multiplier to nothing
    in two fixed columns on a phone. Stack the two once both no longer fit. */

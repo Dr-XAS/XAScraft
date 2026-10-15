@@ -498,7 +498,8 @@ _PLUGINS = (
         'Retains all eight columns; transmission starts with ln(abs(column 4 / column 6)), '
         'using column 1 as energy. The column-selection panel shows the selected signal '
         'and offers both original and converted files.',
-        re.compile(rb'^EXAFS', re.I), _x10c),
+        re.compile(rb'^EXAFS', re.I), _x10c,
+        lambda data: re.search(rb'^\s+DATA START\b', data, re.I | re.M) is not None),
     FilePlugin('X15B', '0.1', 'NSLS beamline X15B',
         'Reads binary files with a 212-byte header and 64-byte scalar records. Native configuration selects '
         'energy, I0, narrow/wide ROI and transmission columns before the live detector preview. Configure '

@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from xraylarch_web.athena import AthenaStore, Command, ImportRequest
 from xraylarch_web.athena_file_plugins import plugin_catalog, prepare_file
-from xraylarch_web.athena_plugin_registry import PluginRegistry, decode_registry, encode_registry
+from xraylarch_web.athena_plugin_registry import PluginRegistry, default_plugin_flags, registry_view, decode_registry, encode_registry
 from xraylarch_web.athena_preferences import AthenaPreferences
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
@@ -22,9 +22,10 @@ LYTLE = 'Demeter::Plugins::Lytle'
 FIXTURES = Path(__file__).parent / 'fixtures'
 
 
-def test_native_default_off_catalog_order_and_project_independence(tmp_path):
+def test_automatic_defaults_catalog_order_and_project_independence(tmp_path):
     prefs = AthenaPreferences(Settings(data_root=tmp_path))
     assert prefs.read_plugins() == {'version': 0, 'enabled': {}}
+    assert registry_view(prefs.read_plugins())['enabled'] == default_plugin_flags()
     assert [p['name'] for p in plugin_catalog()] == ['10BMMultiChannel', 'B18', 'BL8Ar', 'BM23', 'CMC', 'DUBBLE', 'HXMA', 'LNLS', 'Lytle', 'PFBL12C', 'SLRIBL4', 'SPEC', 'SRS', 'SSRLA', 'SSRLB', 'SSRLmicro', 'SpecFileLongLine', 'X10C', 'X15B', 'X23A2MED', 'X23A2MultiChannel', 'Zip']
     assert all(p['documentation'] and p['documentation_url'].endswith(p['name'] + '.pm') for p in plugin_catalog())
     store = AthenaStore(prefs_settings := Settings(data_root=tmp_path)); p = store.create()
@@ -41,19 +42,17 @@ def test_native_default_off_catalog_order_and_project_independence(tmp_path):
 def test_enabled_reader_controls_inspection_but_not_already_staged_or_imported_data(tmp_path, name, ident):
     settings=Settings(data_root=tmp_path); prefs=AthenaPreferences(settings); store=AthenaStore(settings)
     p=store.create(); data=(FIXTURES / f'demeter-{name}.dat').read_bytes()
-    before=sorted(store.storage.workspace_dir(p['id']).iterdir())
-    with pytest.raises(WebInputError) as error: store.inspect(p['id'],data,'source.dat')
-    assert error.value.code=='file_plugin_disabled' and 'Plugin registry' in error.value.recovery
-    assert sorted(store.storage.workspace_dir(p['id']).iterdir())==before
-    prefs.save_plugins(PluginRegistry(enabled={ident: True}))
     inspected=store.inspect(p['id'],data,'source.dat')
+    assert inspected['file_plugin']['id'].lower() == name
+    assert prefs.read_plugins() == {'version': 0, 'enabled': {}}
     request=ImportRequest(version=0,upload_id=inspected['upload_id'],**inspected['athena_suggestion'])
-    prefs.save_plugins(PluginRegistry(version=1,enabled={ident: False}))
+    prefs.save_plugins(PluginRegistry(version=0,enabled={ident: False}))
     preview=store.preview_columns(p['id'],request)
     imported=store.import_data(p['id'],request); original=copy.deepcopy(imported)
     assert imported['groups'][0]['energy']==preview['traces'][0]['x']
     assert imported['groups'][0]['processing_error'] is None
-    with pytest.raises(WebInputError): store.inspect(p['id'],data,'next.dat')
+    with pytest.raises(WebInputError) as error: store.inspect(p['id'],data,'next.dat')
+    assert error.value.code == 'file_plugin_disabled' and 'Plugin registry' in error.value.recovery
     assert store.load(p['id'])==original
     exported=store.export_project(p['id'],'prj')
     undone=store.command(p['id'],Command(version=imported['version'],action='undo'))
@@ -78,6 +77,20 @@ def test_disabled_converters_are_never_called_and_later_enabled_match_can_run(mo
 def test_generic_files_need_no_plugin_enablement(tmp_path):
     s=AthenaStore(Settings(data_root=tmp_path));p=s.create()
     assert s.inspect(p['id'],b'# energy mu\n1000 1\n1001 2\n','simple.dat')['row_count']==2
+
+
+def test_generic_exafs_title_is_not_enough_to_select_x10c(tmp_path):
+    store = AthenaStore(Settings(data_root=tmp_path)); project = store.create()
+    inspection = store.inspect(project['id'], b'EXAFS exported spectrum\n# energy mu\n1000 1\n1001 2\n', 'spectrum.dat')
+    assert inspection['row_count'] == 2 and 'file_plugin' not in inspection
+
+
+def test_sparse_saved_overrides_keep_other_formats_automatic(tmp_path):
+    settings = Settings(data_root=tmp_path)
+    AthenaPreferences(settings).save_plugins(PluginRegistry(enabled={X10C: False}))
+    store = AthenaStore(settings); project = store.create()
+    inspected = store.inspect(project['id'], (FIXTURES / 'demeter-lytle.dat').read_bytes(), 'lytle.dat')
+    assert inspected['file_plugin']['id'] == 'Lytle'
 
 
 @pytest.mark.parametrize('value', [0,1,'true',None,[],{}])
@@ -112,7 +125,7 @@ def test_native_yaml_flags_and_unknown_entries_roundtrip():
     flags=decode_registry(data)
     assert flags=={X10C:True,LYTLE:False,'Demeter::Plugins::SSRLA':True}
     exported=encode_registry({'enabled':flags})
-    assert decode_registry(exported)=={p['id']:False for p in plugin_catalog()} | flags
+    assert decode_registry(exported)==default_plugin_flags() | flags
     unknown={**flags, 'Demeter::Plugins::B18':True}
     assert decode_registry(encode_registry({'enabled':unknown}))['Demeter::Plugins::B18']
     assert exported.startswith(b'---\n') and b'"' not in exported
@@ -135,9 +148,9 @@ def test_real_http_native_registry_import_export_validation_and_conflicts(tmp_pa
     settings=Settings(data_root=tmp_path)
     with TestClient(create_app(settings)) as client:
         url='/api/athena/preferences/plugins'; r=client.get(url); assert r.status_code==200
-        state=r.json(); assert state['enabled']=={} and state['version']==0
+        state=r.json(); assert state['enabled']==default_plugin_flags() and state['version']==0
         saved=client.put(url,json={'version':0,'enabled':{X10C:True}})
-        assert saved.status_code==200 and saved.json()['enabled']=={X10C:True}
+        assert saved.status_code==200 and saved.json()['enabled']==default_plugin_flags()
         assert client.put(url,json={'version':0,'enabled':{}}).status_code==409
         assert client.put(url,json={'version':1,'enabled':{X10C:1}}).status_code==422
         download=client.get(url+'/export')
@@ -146,7 +159,7 @@ def test_real_http_native_registry_import_export_validation_and_conflicts(tmp_pa
         yaml_file=b'---\nDemeter::Plugins::X10C: 0\nDemeter::Plugins::SSRLA: 1\n'
         imported=client.post(url+'/import?version=1',files={'file':('athena.plugin_registry',yaml_file)})
         assert imported.status_code==200 and imported.json()['version']==2
-        assert imported.json()['enabled']=={X10C:False,'Demeter::Plugins::SSRLA':True}
+        assert imported.json()['enabled']==default_plugin_flags(False) | {'Demeter::Plugins::SSRLA':True}
         assert client.post(url+'/import?version=1',files={'file':('registry',yaml_file)}).status_code==409
         assert client.post(url+'/import?version=2',files={'file':('registry',b'bad: value')}).status_code==400
         assert client.get(url).json()==imported.json()

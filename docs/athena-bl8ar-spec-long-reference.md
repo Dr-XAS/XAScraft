@@ -15,12 +15,13 @@ not the executed threshold. The pinned Elam table, get_energy implementation,
 reader and both normalization templates have retained source hashes in
 [the source catalog](athena-primary-sources.json).
 
-File → Plugin registry → BL8Ar enables the reader. Configure exposes harmonic
+BL8Ar recognizes matching files automatically unless explicitly disabled in
+File → Plugin registry. Configure exposes harmonic
 1/2/3, the activation margin, pre/post-edge bounds and the optional I0 review.
 Defaults are harmonic 2, margin 200 eV, pre-edge −30 to −10 eV, post-edge +10
 to +30 eV and review off. Apply affects subsequent inspections in the current
 server; Apply and Save persists all currently applied reader settings.
-Reinspect selected file explicitly applies updated settings. Previously staged
+Selecting the original file again applies updated settings. Previously staged
 data keep their own settings and review requirement.
 
 The native Larch template calls `pre_edge` with `nnorm=bkg_nnorm-1`.

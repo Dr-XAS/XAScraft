@@ -154,8 +154,8 @@ def test_lytle_joined_negative_count_keeps_its_sign():
 
 def test_x10c_requires_one_actual_data_boundary():
     data = raw_file('x10c')
-    for changed in (data.replace(b'DATA START', b'MISSING'), data + b'\n DATA START\n'):
-        with pytest.raises(WebInputError, match='DATA START'): prepare(changed)
+    assert prepare(data.replace(b'DATA START', b'MISSING')) is None
+    with pytest.raises(WebInputError, match='DATA START'): prepare(data + b'\n DATA START\n')
 
 
 def test_nonmatching_input_is_not_transformed():

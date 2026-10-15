@@ -45,16 +45,23 @@ for (const name of ['SSRLA', 'SSRLB', 'SSRLmicro']) {
     if (await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).count()) {
       await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
     }
+    // Keep this reader's original single-measurement oracle independent of
+    // the new combined-import default for complete detector files.
+    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+    await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
+    await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
+    await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
+    await dialog.getByRole('tab', { name: 'Transmission', exact: true }).click()
     const preview = dialog.getByLabel('Imported signal preview plot', { exact: true })
     if (name === 'SSRLmicro') {
       await expect(dialog.getByRole('alert')).toContainText(/zero/i)
-      await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
+      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
     }
     let y = rows.map(row => name === 'SSRLmicro' ? row[5] / row[2] : Math.log(Math.abs(row[3] / row[4])))
     await expect.poll(async () => (await curve(preview)).x).toEqual(x)
     await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - y[i])))).toBeLessThan(1e-12)
     // Change the chosen detector expression and check the real Plotly trace.
-    await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
+    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
     if (name === 'SSRLmicro') {
       await dialog.getByLabel('Numerator column numbers').fill('6-37')
       await dialog.getByRole('button', { name: 'Select range', exact: true }).click()
@@ -62,7 +69,7 @@ for (const name of ['SSRLA', 'SSRLB', 'SSRLmicro']) {
     } else {
       const fluorescence = rows.map(row => row[5] / row[3])
       await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - fluorescence[i])))).toBeLessThan(1e-12)
-      await dialog.getByRole('button', { name: 'Use transmission columns', exact: true }).click()
+      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
     }
     await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - y[i])))).toBeLessThan(1e-12)
     const source = name === 'SSRLB' ? 'Binary source bytes (hex) (first section)' : 'Source file contents (first section)'

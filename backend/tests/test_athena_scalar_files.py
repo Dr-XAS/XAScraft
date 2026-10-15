@@ -229,14 +229,12 @@ def test_hxma_missing_named_pv_never_uses_event_identifier_as_detector(pv):
 
 
 @pytest.mark.parametrize('name', SAMPLES)
-def test_real_http_registry_recovery_preview_original_and_import(tmp_path, name):
+def test_real_http_automatic_reader_preview_original_and_import(tmp_path, name):
     with TestClient(create_app(Settings(data_root=tmp_path))) as client:
         p = client.post('/api/athena/projects').json(); base = f'/api/athena/projects/{p["id"]}'
         response = client.post(base+'/inspect', files={'file':('input.dat', raw(name))})
-        assert response.status_code == 400 and 'disabled' in response.text
-        response = client.put('/api/athena/preferences/plugins', json={'version':0, 'enabled':{f'Demeter::Plugins::{name.upper()}':True}})
         assert response.status_code == 200
-        i = client.post(base+'/inspect', files={'file':('input.dat', raw(name))}).json()
+        i = response.json()
         if name == 'cmc':
             invalid = dict(version=0, upload_id=i['upload_id'], **i['athena_suggestion'])
             assert client.post(base+'/preview-columns', json=invalid).status_code == 400

@@ -38,6 +38,20 @@ async function apply(page: Page, editor: Locator, save: boolean) {
   return result.json()
 }
 
+async function selectFluorescence(dialog: Locator, inspection: {
+  columns: { name: string; column_id: string }[];
+  plugin_suggestions: { fluorescence: { numerator: string[]; denominator: string } };
+}) {
+  const choice = inspection.plugin_suggestions.fluorescence
+  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
+  await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Clear denominator', exact: true }).click()
+  for (const column of inspection.columns) {
+    if (choice.numerator.includes(column.column_id)) await dialog.getByRole('checkbox', { name: `Numerator ${column.name}`, exact: true }).check()
+    if (choice.denominator === column.column_id) await dialog.getByRole('checkbox', { name: `Denominator ${column.name}`, exact: true }).check()
+  }
+}
+
 for (const name of ['X15B', 'X23A2MED']) {
   test(`${name} configuration changes real preview columns, imports and survives PRJ exchange`, async ({ page }, info) => {
     test.setTimeout(90000)
@@ -66,11 +80,11 @@ for (const name of ['X15B', 'X23A2MED']) {
     await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fixture(manifest.file.file))
     const inspection = await (await inspected).json()
     const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
-    await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
+    await selectFluorescence(dialog, inspection)
     const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
     await signal(plot, before, channels)
-    await dialog.getByRole('button', { name: 'File plugins…', exact: true }).click()
-    panel = page.getByRole('dialog', { name: 'Plugin registry', exact: true }); editor = await configure(panel, name)
+    await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+    panel = await registry(page); editor = await configure(panel, name)
     if (name === 'X15B') {
       for (const [label, value] of [['I0 column', '7'], ['Narrow ROI column', '9'], ['Wide ROI column', '10'], ['Transmission column', '11']]) {
         await editor.getByRole('spinbutton', { name: label, exact: true }).fill(value)
@@ -82,16 +96,16 @@ for (const name of ['X15B', 'X23A2MED']) {
     const applied = await apply(page, editor, name === 'X23A2MED')
     await editor.getByRole('heading').scrollIntoViewIfNeeded()
     await panel.screenshot({ path: info.outputPath('configuration.png') })
-    await panel.getByRole('button', { name: 'Return to import', exact: true }).click()
-    await signal(plot, before, channels) // Returning alone cannot reinterpret the staged upload.
+    await panel.getByRole('button', { name: 'Close registry', exact: true }).click()
     const reinspection = page.waitForResponse(r => r.url().endsWith('/inspect'))
-    await dialog.getByRole('button', { name: 'Reinspect selected file', exact: true }).click()
+    await page.getByRole('button', { name: 'Import data', exact: true }).click()
+    await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fixture(manifest.file.file))
     const next = await (await reinspection).json()
     expect(next.upload_id).not.toBe(inspection.upload_id)
     expect(next.file_plugin.configuration.values).toEqual(applied.values)
-    await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
+    await selectFluorescence(dialog, next)
     await signal(plot, after, channels)
-    if (name === 'X23A2MED') await expect(dialog.getByLabel('File conversion')).toContainText('Integration time: constant 2 s.')
+    if (name === 'X23A2MED') expect(next.file_plugin.summary).toContain('Integration time: constant 2 s.')
     const sourceSummary = dialog.getByText(name === 'X15B' ? /^Binary source bytes \(hex\)( \(first section\))?$/ : /^Source file contents( \(first section\))?$/)
     await sourceSummary.click()
     const rawDownload = page.waitForEvent('download')
@@ -130,9 +144,19 @@ for (const name of ['X15B', 'X23A2MED']) {
     const restored = page.waitForResponse(r => r.url().endsWith('/restore-upload'))
     await page.getByRole('button', { name: 'Import all data', exact: true }).click()
     const restoredProject = await (await restored).json()
-    expect(restoredProject.groups[1].source).toEqual(group.source)
-    expect(restoredProject.groups[1].result.arrays).toEqual(group.result.arrays)
-    await page.reload(); await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
+    const restoredGroups = restoredProject.groups.slice(project.groups.length)
+    expect(restoredGroups).toHaveLength(project.groups.length)
+    for (let index = 0; index < project.groups.length; index++) {
+      const originalGroup = project.groups[index], restoredGroup = restoredGroups[index]
+      expect(restoredGroup.source).toEqual(originalGroup.source)
+      expect(restoredGroup.result.arrays).toEqual(originalGroup.result.arrays)
+      if (originalGroup.reference_id) {
+        const referenceIndex = project.groups.findIndex((candidate: { id: string }) => candidate.id === originalGroup.reference_id)
+        expect(referenceIndex).toBeGreaterThanOrEqual(0)
+        expect(restoredGroup.reference_id).toBe(restoredGroups[referenceIndex].id)
+      }
+    }
+    await page.reload(); await expect(page.getByRole('heading', { name: new RegExp(`^Data ${restoredProject.groups.length}\\b`) })).toBeVisible()
     panel = await registry(page); editor = await configure(panel, name)
     await expect(editor.getByRole(name === 'X15B' ? 'spinbutton' : 'combobox', {
       name: name === 'X15B' ? 'I0 column' : 'Integration time source', exact: true,

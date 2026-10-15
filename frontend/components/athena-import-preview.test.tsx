@@ -156,6 +156,35 @@ describe("live column preview", () => {
     fireEvent.click(screen.getByLabelText("Plot reference"))
     expect(handoff().data).toHaveLength(2)
   })
+  it("plots transmission, fluorescence, and one reference together after edits to either additional signal", async () => {
+    const combined: ColumnPreview = { ...response, traces: [
+      { ...response.traces[0], id: "transmission", label: "Transmission", y: [.2, .6, 1] },
+      { ...response.traces[0], id: "fluorescence", label: "Fluorescence", y: [.1, .3, .5] },
+      { ...response.traces[0], id: "reference", label: "Reference", role: "reference", y: [.3, .7, 1.1] },
+    ] }
+    api.mockResolvedValue(combined)
+    const both: Partial<ColumnMapping> = { additional_fluorescence: { numerator: ["c3"], denominator: "c1" },
+      reference_numerator: "c2", reference_denominator: "c4", reference_log: true }
+    const view = render(<AthenaImportPreview {...props(both)} />)
+    await tick()
+    expect(screen.getByLabelText("Plot reference")).toBeChecked()
+    expect(handoff().data.map((trace: { name: string; yaxis: string }) => [trace.name, trace.yaxis]))
+      .toEqual([["Transmission", "y"], ["Fluorescence", "y"], ["Reference", "y2"]])
+    expect(handoff().data.map((trace: { y: number[] }) => trace.y)).toEqual(combined.traces.map(trace => trace.y))
+    const fluorescenceEdit = { ...both, additional_fluorescence: { numerator: ["c5"], denominator: "c1" } }
+    view.rerender(<AthenaImportPreview {...props(fluorescenceEdit)} />)
+    await tick()
+    expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ numerator: ["c1"], denominator: "c2",
+      additional_fluorescence: { numerator: ["c5"], denominator: "c1" }, reference_numerator: "c2", reference_denominator: "c4" })
+    expect(handoff().data).toHaveLength(3)
+    view.rerender(<AthenaImportPreview {...props({ ...fluorescenceEdit, reference_denominator: "c6" })} />)
+    await tick()
+    expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ numerator: ["c1"], denominator: "c2",
+      additional_fluorescence: { numerator: ["c5"], denominator: "c1" }, reference_numerator: "c2", reference_denominator: "c6" })
+    expect(handoff().data.map((trace: { name: string }) => trace.name)).toEqual(["Transmission", "Fluorescence", "Reference"])
+    expect(handoff().layout.showlegend).toBe(true)
+    expect(api).toHaveBeenCalledTimes(3)
+  })
   it("uses chi axes and displays full-data warnings and extrema sampling information", async () => {
     api.mockResolvedValue({ ...response, points: 100000, x_label: "k (Å⁻¹)", y_label: "χ(k)", warnings: ["Duplicate energies need repair."] })
     render(<AthenaImportPreview {...props({ data_type: "chi", mode: "mu" })} />)

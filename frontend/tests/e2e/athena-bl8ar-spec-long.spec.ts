@@ -47,6 +47,13 @@ async function restore(page: Page, path: string) {
   const response = await restoring; expect(response.ok()).toBe(true)
   return response.json()
 }
+async function singleMeasurement(dialog: Locator, mode: 'transmission' | 'fluorescence') {
+  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+  await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
+  await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
+  await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
+  await dialog.getByRole('tab', { name: mode === 'transmission' ? 'Transmission' : 'Fluorescence', exact: true }).click()
+}
 
 test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import and PRJ exchange', async ({ page }, info) => {
   test.setTimeout(90000)
@@ -65,6 +72,7 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   await panel.getByRole('button', { name: 'Close registry', exact: true }).click()
   const inspected = await inspect(page, ['constructed-bl8ar-ge.dat', 'constructed-bl8ar-ge.dat'])
   const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await singleMeasurement(dialog, 'fluorescence')
   const i0Plot = dialog.getByLabel('I0 correction plot', { exact: true })
   await expect.poll(async () => (await curve(i0Plot)).length).toBe(4)
   expect((await curve(i0Plot)).map(t => t.y)).toEqual(inspected.reader_preview.traces.map((t: { y: number[] }) => t.y))
@@ -75,12 +83,11 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   await expect(i0Plot).toHaveCount(0)
   const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
   const rows = oracle('ge'), x = rows.map(r => r[0])
-  await dialog.getByRole('button', { name: 'Use fluorescence columns', exact: true }).click()
   await signal(plot, x, rows.map(r => r.slice(6, 10).reduce((a, b) => a+b, 0)/r[3]))
   for (const column of inspected.columns.slice(10, 19)) await dialog.getByRole('checkbox', { name: `Numerator ${column.name}`, exact: true }).check()
   const y = rows.map(r => r.slice(6, 19).reduce((a, b) => a+b, 0)/r[3])
   await signal(plot, x, y)
-  await dialog.getByText('Reference channel & ordering', { exact: true }).click()
+  await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
   await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption(inspected.columns[5].column_id)
   await dialog.getByRole('checkbox', { name: 'Reference natural log', exact: true }).uncheck()
   await expect(dialog.getByRole('checkbox', { name: 'Enable EXAFS processing', exact: true })).toHaveCount(0)
@@ -126,7 +133,7 @@ test('SPEC long labels keep exact converted bytes and editable native columns on
   const inspected = await inspect(page, ['constructed-spec-long.dat'])
   expect(inspected.columns).toHaveLength(60)
   const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
-  await dialog.getByRole('button', { name: 'Use transmission columns', exact: true }).click()
+  await singleMeasurement(dialog, 'transmission')
   const plot = dialog.getByLabel('Imported signal preview plot', { exact: true }), rows = oracle('spec'), x = rows.map(r => r[0])
   await signal(plot, x, rows.map(r => Math.log(Math.abs(r[55]/r[56]))))
   await dialog.getByRole('checkbox', { name: `Denominator ${inspected.columns[56].name}`, exact: true }).uncheck()

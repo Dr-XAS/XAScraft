@@ -155,9 +155,7 @@ def test_spec_exact_length_first_label_comment_boundary_and_short_manual_columns
 def test_review_guard_http_and_staged_configuration_snapshot(tmp_path):
     with TestClient(create_app(Settings(data_root=tmp_path))) as client:
         base = '/api/athena'; prefs = base+'/preferences/plugins'
-        state = client.get(prefs).json(); state = {k: state[k] for k in ['version', 'enabled']}
-        state['enabled']['Demeter::Plugins::BL8Ar'] = True
-        assert client.put(prefs, json=state).status_code == 200
+        assert client.get(prefs).json()['enabled']['Demeter::Plugins::BL8Ar'] is True
         path = prefs+'/BL8Ar/configuration'; config = client.get(path).json()
         def update(values):
             current = client.get(path).json()

@@ -32,6 +32,13 @@ async function enable(page: Page, reader: string) {
   }
   await registry.getByRole('button', { name: 'Close registry', exact: true }).click()
 }
+async function singleMeasurement(dialog: Locator, mode: 'transmission' | 'fluorescence') {
+  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+  await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
+  await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
+  await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
+  await dialog.getByRole('tab', { name: mode === 'transmission' ? 'Transmission' : 'Fluorescence', exact: true }).click()
+}
 for (const reader of ['B18','BM23']) {
   test(`${reader} native cleanup, edited detector preview and PRJ roundtrip`, async ({ page }, info) => {
     test.setTimeout(90000)
@@ -45,8 +52,8 @@ for (const reader of ['B18','BM23']) {
     await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fixture(ref.input))
     const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
     await expect(dialog.getByLabel('File conversion')).toContainText(reader)
-    const suggested = reader === 'B18' ? 'Use fluorescence columns' : 'Use transmission columns'
-    await dialog.getByRole('button', { name: suggested, exact: true }).click()
+    const mode = reader === 'B18' ? 'fluorescence' : 'transmission'
+    await singleMeasurement(dialog, mode)
     const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
     await signal(plot,x,y)
     await expect(dialog.getByRole('combobox', { name: 'Energy units', exact: true })).toHaveValue('eV')
@@ -61,7 +68,7 @@ for (const reader of ['B18','BM23']) {
       await dialog.getByLabel('Denominator iref', { exact: true }).check()
       await signal(plot,x,rows.map(row => Math.log(Math.abs(row[2]/row[4]))))
     }
-    await dialog.getByRole('button', { name: suggested, exact: true }).click(); await signal(plot,x,y)
+    await singleMeasurement(dialog, mode); await signal(plot,x,y)
     for (const variant of ['original','converted']) {
       const summary = dialog.getByText(variant === 'original' ? /^Source file contents( \(first section\))?$/ : /^Converted columns( \(first section\))?$/)
       await summary.click(); const downloading = page.waitForEvent('download')
@@ -113,7 +120,7 @@ test('BM23 multi-scan files preview independent sweeps and import the selected s
   await dialog.getByRole('checkbox', { name: 'Include Scan 7 · entry 1', exact: true }).uncheck()
   await dialog.screenshot({ path: info.outputPath('scan-preview.png') })
   await dialog.getByRole('button', { name: 'Review selected scans', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Use transmission columns', exact: true }).click()
+  await singleMeasurement(dialog, 'transmission')
   const importing = page.waitForResponse(r => r.url().endsWith('/import'))
   await dialog.getByRole('button', { name: 'Import spectrum', exact: true }).click()
   const response = await importing; expect(response.ok()).toBe(true)

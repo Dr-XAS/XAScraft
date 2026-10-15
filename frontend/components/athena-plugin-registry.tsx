@@ -71,7 +71,7 @@ export function AthenaPluginRegistry({ onPendingChange }: { onPendingChange?: (p
     }, 'Plugin setting saved for subsequent file inspections.')
   }
   const unavailable = state ? Object.entries(state.enabled).filter(([id]) => !state.plugins.some(p => p.id === id)) : []
-  return <section aria-label="File-plugin settings" className="ath-plugin-registry"><h3>File plugins <SectionHelp label="Applying file plugin settings">Settings apply when a file is inspected. After enabling a reader, return to the import panel and retry the selected file.<br /><br />Enable the file formats you use. Switches are saved immediately for future sessions on this local server. Plugins are checked in the order shown.</SectionHelp></h3>
+  return <section aria-label="File-plugin settings" className="ath-plugin-registry"><h3>File plugins <SectionHelp label="Applying file plugin settings">Recognized file formats are read automatically. Use these advanced settings to disable a reader or change its configuration. Changes apply the next time you select a file.<br /><br />Switches are saved immediately for future sessions on this local server. Readers are checked in the order shown.</SectionHelp></h3>
     {pending && <p role="status">Loading or saving plugin settings…</p>}
     {error && <p role="alert" className="ath-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -85,7 +85,7 @@ export function AthenaPluginRegistry({ onPendingChange }: { onPendingChange?: (p
           if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
           event.preventDefault(); event.stopPropagation(); openContext(plugin.id, event.target as HTMLElement)
         }}>
-        <label className="ath-check" style={{ minWidth: 0 }}><input type="checkbox" aria-label={`Enable ${plugin.name}`} checked={state.enabled[plugin.id] ?? false}
+        <label className="ath-check" style={{ minWidth: 0 }}><input type="checkbox" aria-label={`Enable ${plugin.name}`} checked={state.enabled[plugin.id] ?? true}
           onChange={e => toggle(plugin.id, e.target.checked)} /><strong>{plugin.name}</strong> · {plugin.description}</label>
         <button type="button" aria-label={`Actions for ${plugin.name} plugin`} aria-haspopup="menu" aria-expanded={context?.id === plugin.id}
           onClick={event => openContext(plugin.id, event.currentTarget)}>⋯</button>

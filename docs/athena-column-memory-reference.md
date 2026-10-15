@@ -1,5 +1,12 @@
 # Athena remembered import choices
 
+Current browser scope (2026-10-15): normal import restores compatible column
+and signal choices, while clearing remembered marking, parameter-copy,
+alignment and rebin options. It also excludes any active import edge policy.
+Use the post-import processing tools for those changes. The native behavior,
+full preference/API schema and historical browser checks below remain
+references; saved processing options no longer activate during normal import.
+
 Baseline: Demeter `06afc8da08a5a7d5a26ee14992170fcf5dc67406`, reviewed
 2026-09-10. This extends IM-04, IM-05, IM-07 and UI-11. All 107 Athena
 requirements remain in scope; no Artemis functionality is introduced.

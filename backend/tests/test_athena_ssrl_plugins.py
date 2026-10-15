@@ -148,13 +148,9 @@ def test_registry_and_http_original_binary_or_text_and_conversion(tmp_path, name
         p = c.post('/api/athena/projects').json(); url = f'/api/athena/projects/{p["id"]}'
         data = raw(name); before = c.get(url).json()
         files = {'file': ('source.dat', data)}
-        disabled = c.post(url + '/inspect', files=files)
-        assert disabled.status_code == 400 and disabled.json()['error']['code'] == 'file_plugin_disabled'
-        assert c.get(url).json() == before
-        state = c.put('/api/athena/preferences/plugins', json={'version': 0, 'enabled': {'Demeter::Plugins::' + name: True}})
-        assert state.status_code == 200
         response = c.post(url + '/inspect', files=files)
         assert response.status_code == 200, response.text
+        assert c.get(url).json() == before
         inspected = response.json(); source_url = url + '/uploads/' + inspected['upload_id'] + '/file'
         assert c.get(source_url).content == data
         assert c.get(source_url + '?variant=converted').content == prepare(data).data

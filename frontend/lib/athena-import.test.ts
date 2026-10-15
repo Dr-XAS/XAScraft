@@ -1,12 +1,29 @@
 import type { AthenaGroup } from "./athena"
 import { expect, it } from "vitest"
 import type { InspectionResponse } from "./contracts"
-import { columnPayload, columnProblem, defaultRebin, flipSignalColumns, initialColumnMapping, reuseColumnMapping, reuseProblem, batchCapacityWarning, batchExclusions, setDualMode, changeInputType, changeImportProcessing, lastImportedSample, type ColumnMapping } from "./athena-import"
+import { columnPayload, columnProblem, defaultRebin, flipSignalColumns, initialColumnMapping, reuseColumnMapping, reuseProblem, batchCapacityWarning, batchExclusions, setDualMode, setThreeMode, changeInputType, changeImportProcessing, lastImportedSample, withoutImportProcessing, type ColumnMapping } from "./athena-import"
 const previous: ColumnMapping = { energy_column: "old", numerator: ["old"], denominator: ["d1", "d2"], mode: "fluorescence",
   units: "eV", data_type: "xanes", reference_numerator: "r1", reference_denominator: "r2", signal_multiplier: 9, invert: true, sort: false }
 const inspection: InspectionResponse = { upload_id: "u", display_name: "file.dat", row_count: 5, warnings: [], issues: [],
   columns: ["e", "i0", "it"].map((name, index) => ({ column_id: `c${index}`, name, index, preview: [8, 9, 10, 11, 12], role_hint: null, unit: null, numeric: true })),
   athena_suggestion: { energy_column: "c0", numerator: ["c1"], denominator: "c2", mode: "transmission", units: "keV", data_type: "mu" } }
+it('normal import keeps reviewed detector choices without applying hidden saved processing', () => {
+  const configured = { ...previous,
+    additional_fluorescence: { numerator: ['if'], denominator: 'i0', signal_multiplier: 2 },
+    preprocessing: { mark: true, standard_id: 'old-standard', copy_parameters: true, align: true },
+    rebin: { ...defaultRebin, enabled: true, e0: 8980 },
+  }
+  const { preprocessing, rebin, ...columns } = configured
+  const simple = withoutImportProcessing(configured)
+  expect(simple).toEqual(columns)
+  expect(columnPayload(simple)).toMatchObject({ preprocessing: { mark: false, standard_id: null, copy_parameters: false, align: false } })
+  expect(columnPayload(simple)).not.toHaveProperty('rebin')
+  expect(columnPayload(simple)).not.toHaveProperty('rebin_grid')
+  // Retain the explicit recipe for API/replacement callers; sanitizing the
+  // normal import is not a mutation of the saved scientific provenance.
+  expect(configured.preprocessing).toBe(preprocessing)
+  expect(configured.rebin).toBe(rebin)
+})
 it("initializes a new file from backend suggestions and clears previous transforms and references", () => {
   expect(initialColumnMapping(inspection, { ...previous, is_reference: true })).toEqual({ ...previous, ...inspection.athena_suggestion,
     is_reference: false, exafs: null,
@@ -271,6 +288,99 @@ it('resets dual mode for chi and new layouts, restores remembered dual settings,
   expect(reuseColumnMapping(dualInspection, { ...target, columns: target.columns.slice(0, 3) }, dual)).toBeNull()
 })
 
+const threeInspection: InspectionResponse = { ...inspection, columns: ['energy', 'I0', 'It', 'If', 'Iref'].map((name, index) => ({
+  ...inspection.columns[0], name, index, column_id: `c${index}`,
+})) }
+
+it('defaults complete detector files to transmission, fluorescence and one It/Iref reference', () => {
+  const selected = initialColumnMapping(threeInspection, previous)
+  expect(columnPayload(selected)).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1', signal_multiplier: 1, invert: false },
+    reference_numerator: 'c2', reference_denominator: 'c4', reference_log: true })
+  expect(columnProblem(selected)).toBeNull()
+  const fluorescent = { ...threeInspection, athena_suggestion: { ...threeInspection.athena_suggestion!,
+    mode: 'fluorescence' as const, numerator: ['c3'], denominator: 'c1' } }
+  expect(initialColumnMapping(fluorescent, previous)).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' }, reference_numerator: 'c2', reference_denominator: 'c4' })
+})
+
+it('recognizes a unique ref label as Iref and declines competing reference aliases', () => {
+  const input = { ...threeInspection, columns: threeInspection.columns.map(c => c.index === 4 ? { ...c, name: 'ref' } : c) }
+  expect(setThreeMode(transmission, input)).toMatchObject({ reference_numerator: 'c2', reference_denominator: 'c4', reference_log: true })
+  expect(initialColumnMapping(input, previous)).toMatchObject({ additional_fluorescence: { numerator: ['c3'] }, reference_denominator: 'c4' })
+  const competing = { ...input, columns: [...input.columns, { ...input.columns[4], index: 5, column_id: 'c5', name: 'Iref' }] }
+  expect(setThreeMode(transmission, competing).reference_denominator).toBe('')
+  expect(initialColumnMapping(competing, previous).additional_fluorescence).toBeUndefined()
+})
+
+it('uses reader suggestions and detector roles for columns whose labels do not name the detectors', () => {
+  const input: InspectionResponse = { ...threeInspection,
+    columns: threeInspection.columns.map(c => ({ ...c, name: `channel ${c.index}` })),
+    beamline_reader: { id: 'test', name: 'Synthetic reader', facility: 'Test', beamline: 'Test', format: 'text',
+      evidence: 'header', confidence: 'beamline',
+      roles: { i0: 'c1', transmission: 'c2', fluorescence: ['c3'], reference: 'c4' },
+      suggestions: { transmission: threeInspection.athena_suggestion!,
+        fluorescence: { ...threeInspection.athena_suggestion!, mode: 'fluorescence', numerator: ['c3'], denominator: 'c1' } },
+      reference: { numerator: 'c2', denominator: 'c4', log: true, default: true },
+    } }
+  expect(initialColumnMapping(input, previous)).toMatchObject({ additional_fluorescence: { numerator: ['c3'], denominator: 'c1' },
+    reference_numerator: 'c2', reference_denominator: 'c4' })
+  expect(setThreeMode(transmission, { ...input, beamline_reader: { ...input.beamline_reader!, reference: undefined } })).toMatchObject({
+    reference_numerator: 'c2', reference_denominator: 'c4', reference_log: true })
+})
+
+it('preserves reviewed fluorescence and reference choices when adding all three modes', () => {
+  const reviewed: ColumnMapping = { ...transmission, mode: 'fluorescence', numerator: ['c3'], denominator: ['c1'],
+    signal_multiplier: 2, reference_numerator: 'c4', reference_denominator: 'c2', reference_log: false }
+  expect(setThreeMode(reviewed, threeInspection)).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    additional_fluorescence: { numerator: ['c3'], denominator: ['c1'], signal_multiplier: 2 },
+    reference_numerator: 'c4', reference_denominator: 'c2', reference_log: false })
+  expect(setThreeMode(changeInputType(reviewed, 'chi'), threeInspection).additional_fluorescence).toBeUndefined()
+})
+
+it('leaves missing, nonnumeric and ambiguous reference detectors for the user to select', () => {
+  const missing = { ...threeInspection, columns: threeInspection.columns.slice(0, 4) }
+  expect(setThreeMode(transmission, missing).reference_denominator).toBe('')
+  const ambiguous = { ...threeInspection, columns: [...threeInspection.columns,
+    { ...threeInspection.columns[4], index: 5, column_id: 'c5', name: 'Iref' }] }
+  expect(setThreeMode(transmission, ambiguous).reference_denominator).toBe('')
+  const nonnumeric = { ...threeInspection, columns: threeInspection.columns.map(c => c.index === 4 ? { ...c, numeric: false } : c) }
+  for (const input of [missing, ambiguous, nonnumeric,
+    { ...threeInspection, columns: threeInspection.columns.filter(c => c.index !== 3) },
+    { ...threeInspection, columns: threeInspection.columns.map(c => c.index === 3 ? { ...c, name: 'unknown signal' } : c) },
+  ]) expect(initialColumnMapping(input, previous).additional_fluorescence).toBeUndefined()
+})
+
+it('does not reinterpret direct absorption, chi or foil-only and ambiguous beamline scans as three measurements', () => {
+  for (const data_type of ['mu', 'chi', 'xmudat'] as const) {
+    const input = { ...threeInspection, athena_suggestion: { ...threeInspection.athena_suggestion!, mode: 'mu' as const, data_type } }
+    expect(initialColumnMapping(input, previous).additional_fluorescence).toBeUndefined()
+  }
+  for (const evidence of [{ ambiguous: true }, { foil_spectrum: true }]) {
+    const input: InspectionResponse = { ...threeInspection, beamline_reader: {
+      id: 'test', name: 'Synthetic reader', facility: 'Test', beamline: 'Test', format: 'text', evidence: 'header', confidence: 'beamline',
+      measurement: { mode: 'transmission', edge_energy: 9000, contrast: {}, notes: [], ...evidence },
+    } }
+    expect(initialColumnMapping(input, previous).additional_fluorescence).toBeUndefined()
+  }
+})
+
+it('preserves matching remembered single-mode choices while applying three-mode defaults to a new layout', () => {
+  const remembered = { ...threeInspection, remembered_columns: { version: 1, matching_columns: true, mapping: transmission, warnings: [] } }
+  expect(initialColumnMapping(remembered, previous).additional_fluorescence).toBeUndefined()
+  expect(initialColumnMapping(remembered, previous).reference_denominator).toBe('')
+  expect(initialColumnMapping({ ...remembered, remembered_columns: { ...remembered.remembered_columns, matching_columns: false } }, previous))
+    .toMatchObject({ additional_fluorescence: { numerator: ['c3'], denominator: 'c1' }, reference_denominator: 'c4' })
+})
+
+it('remaps all three measurements together and refuses a changed reference column', () => {
+  const mapping = setThreeMode(transmission, threeInspection)
+  const next = { ...threeInspection, columns: threeInspection.columns.map(c => ({ ...c, column_id: `next-${c.index}` })) }
+  expect(reuseColumnMapping(threeInspection, next, mapping)).toMatchObject({ numerator: ['next-1'], denominator: 'next-2',
+    additional_fluorescence: { numerator: ['next-3'], denominator: 'next-1' }, reference_numerator: 'next-2', reference_denominator: 'next-4' })
+  expect(reuseColumnMapping(threeInspection, { ...next, columns: next.columns.map(c => c.index === 4 ? { ...c, name: 'other signal' } : c) }, mapping)).toBeNull()
+})
+
 it('imports the reference channel a recognized beamline file carries, unless its data show no edge', () => {
   // The registry named It/Iref, but the browser cleared it on every file.
   const reader = { id: 'aps-xsd-labview', name: 'LabVIEW', facility: 'APS', beamline: '20-BM', format: 'LabVIEW', evidence: '',
@@ -302,4 +412,20 @@ it('warns before a series batch that cannot fit the project, saying how many fil
     'This batch would bring the project to 108 data (2 per file, counting each reference); a project holds at most 100. '
     + 'Only the first 25 of these 29 files fit: import the series into its own new project, or choose fewer files.')
   expect(batchCapacityWarning(mapping, inspection, [], 29)).toBeNull()
+})
+
+it('counts one shared reference with both measurements and every individual fluorescence channel', () => {
+  const mapping = setThreeMode(transmission, threeInspection)
+  expect(batchCapacityWarning(mapping, threeInspection, [], 33)).toBeNull()
+  expect(batchCapacityWarning(mapping, threeInspection, [], 34)).toMatch(/102 data \(3 per file/)
+  expect(batchCapacityWarning(mapping, { ...threeInspection, row_count: 40_000 }, [], 2)).toBeNull()
+  expect(batchCapacityWarning(mapping, { ...threeInspection, row_count: 50_000 }, [], 2)).toMatch(/about 2\.5 million stored values/)
+  const channels: ColumnMapping = { ...mapping,
+    additional_fluorescence: { ...mapping.additional_fluorescence!, numerator: ['c3', 'c5'], individual_channels: true } }
+  expect(batchCapacityWarning(channels, threeInspection, [], 25)).toBeNull()
+  expect(batchCapacityWarning(channels, threeInspection, [], 26)).toMatch(/104 data \(4 per file/)
+  expect(batchCapacityWarning({ ...channels, reference_numerator: '', reference_denominator: '' }, threeInspection, [], 34)).toMatch(/102 data \(3 per file/)
+  // A single-mode individual import keeps its historical per-sample references.
+  expect(batchCapacityWarning({ ...mapping, additional_fluorescence: null, numerator: ['c1', 'c3'], individual_channels: true },
+    threeInspection, [], 26)).toMatch(/104 data \(4 per file/)
 })

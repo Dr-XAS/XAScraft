@@ -15,13 +15,13 @@ the same captured metadata after import and after reopening a web project.
 
 **File → Beamline identification…** controls automatic recognition. The switch
 defaults to enabled, matching `operations.identify_beamline`. Saving it affects
-subsequent inspections, including **Reinspect selected file**. Already staged
+subsequent inspections when a file is selected again. Already staged
 files and imported groups retain their captured metadata. The preference is
 stored independently of project versions and Undo. Concurrent saves use a
 version check; Reload settings recovers a stale form.
 
 The file-converter switches still apply independently. For example, an
-argon-corrected BL8 file requires BL8Ar enabled before that conversion. Its
+argon-corrected BL8 file uses BL8Ar automatically unless explicitly disabled. Its
 metadata is then read from the converted file, matching native identification
 after reading; the Ar step is captured with a converted-source checksum.
 Ordinary X11A EDC import needs no converter switch.

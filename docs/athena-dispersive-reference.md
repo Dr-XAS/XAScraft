@@ -73,11 +73,13 @@ columns with group rows; `row_order` maps back to the source table.
 
 ## Automatic pixel/stripe import
 
-Enable **SLRIBL4** in File → Plugin registry. Like the native plugin, it reads
+**SLRIBL4** recognizes matching files automatically unless explicitly disabled
+in File → Plugin registry. Like the native plugin, it reads
 the first two columns without logarithm and applies the saved calibration
 before ordinary column selection. Missing calibration reports a recovery path
 to this tool or native settings import. The original source remains available
-alongside converted energy/μ data. Reinspect to use newly saved coefficients;
+alongside converted energy/μ data. Reopen import and select the source again
+to use newly saved coefficients;
 already staged arrays and imported groups retain their accepted calibration.
 This brings the registry to 20 available readers. Two other top-level native
 plugins and four nested Beamlines helpers, plus broader extension discovery,

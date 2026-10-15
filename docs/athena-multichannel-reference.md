@@ -81,8 +81,9 @@ Full column arrays and I0/signal metadata follow the retained row order.
 
 ## Review, configuration and persistence
 
-Enable either reader under **File → Plugin registry…**, then select or drop
-the acquisition in **Import data**. Review each channel independently; μ(E),
+Both readers recognize matching acquisitions automatically unless explicitly
+disabled under **File → Plugin registry…**. Select or drop the acquisition in
+**Import data**. Review each channel independently; μ(E),
 normalized, flattened and derivative previews use the staged data. Selection
 is independent of the viewed channel. Existing all/subset, regex and periodic
 selection rules apply, including Athena's explicit empty-selection-imports-all

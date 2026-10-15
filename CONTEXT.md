@@ -103,7 +103,7 @@ An adapter for one beamline's file format, which recognizes a file, converts a c
 _Avoid_: reader, importer, parser, file adapter
 
 **Plugin registry**:
-The persisted set of which file plugins are enabled, which starts with everything unchecked and can be exchanged with a desktop `athena.plugin_registry` file. Separate from a plugin's own saved configuration.
+The persisted overrides for automatic file-plugin recognition. Available file plugins are enabled unless explicitly disabled; exchanging a desktop `athena.plugin_registry` file preserves its enabled and disabled choices. Separate from a plugin's own saved configuration.
 _Avoid_: plugin settings, reader registry
 
 **XDI**:

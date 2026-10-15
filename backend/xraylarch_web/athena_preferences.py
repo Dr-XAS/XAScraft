@@ -135,7 +135,7 @@ class AthenaPreferences:
         try:
             return PluginRegistry.model_validate(self.storage.read_json(self.ident, 'plugins.json')).model_dump()
         except FileNotFoundError:
-            # Native PluginRegistry.pm starts unchecked when no YAML exists.
+            # No explicit reader overrides: recognized formats run automatically.
             return PluginRegistry().model_dump()
 
     def read_beamline(self):

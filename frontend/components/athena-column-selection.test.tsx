@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest"
 import type { ColumnMapping } from "@/lib/athena-import"
 import type { InspectionResponse } from "@/lib/contracts"
-import { numeratorRange } from "@/lib/athena-import"
+import { defaultRebin, numeratorRange } from "@/lib/athena-import"
 import { AthenaColumnSelection } from "./athena-column-selection"
 import { InstructionVisibility } from "./section-help"
 
@@ -59,6 +59,38 @@ it('offers normalization with automatic EXAFS processing for new absorption impo
 
   fireEvent.click(screen.getByLabelText('Input already normalized'))
   expect(accepted()).toMatchObject({ ...initial, is_normalized: false, exafs: null })
+})
+it('keeps ordinary import focused on columns while retaining ordering and source warnings', () => {
+  render(<Harness inspection={{ plugin_suggestions: readerSuggestions, warnings: ['Check the energy units.'] }} />)
+  for (const text of ['Rebin quick scans', 'Preprocess imported data', 'Reader columns']) {
+    expect(screen.queryByText(text)).not.toBeInTheDocument()
+  }
+  for (const label of ['Perform rebinning', 'Preprocessing standard', 'Mark each imported sample']) {
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+  }
+  expect(screen.queryByRole('button', { name: 'Use transmission columns' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Use fluorescence columns' })).not.toBeInTheDocument()
+  expect(screen.getByText('Check the energy units.')).toBeVisible()
+  fireEvent.click(screen.getByText('Ordering', { exact: true }))
+  fireEvent.click(screen.getByLabelText('Sort ascending by energy (rows at a repeated energy are averaged)'))
+  expect(accepted().sort).toBe(true)
+})
+it('retains rebin controls when rebuilding an existing rebinned spectrum from its original columns', () => {
+  render(<Harness replacement initialMapping={{ ...initial, rebin: { ...defaultRebin, enabled: true, pre: 7 } }} />)
+  fireEvent.click(screen.getByText('Rebin quick scans'))
+  expect(screen.getByLabelText('Perform rebinning')).toBeChecked()
+  expect(screen.getByLabelText('Rebin pre-edge step · eV')).toHaveValue(7)
+  fireEvent.change(screen.getByLabelText('Rebin pre-edge step · eV'), { target: { value: '5' } })
+  expect(accepted().rebin.pre).toBe(5)
+  expect(screen.queryByText('Preprocess imported data')).not.toBeInTheDocument()
+})
+it('omits obsolete preprocessing-standard advice while retaining remembered column warnings', () => {
+  const obsolete = 'The remembered preprocessing standard is missing or unusable. Choose a standard to copy parameters or align.'
+  render(<Harness inspection={{ remembered_columns: { version: 1, matching_columns: true, mapping: initial,
+    warnings: [obsolete, 'The saved detector labels changed.'] } }} />)
+  expect(screen.queryByText(obsolete)).not.toBeInTheDocument()
+  expect(screen.getByText('The saved detector labels changed.')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Use suggested columns' })).toBeEnabled()
 })
 it('keeps normalization independent of the explicit EXAFS choice when replacing columns', () => {
   render(<Harness replacement />)
@@ -115,14 +147,52 @@ it('marks an import as a reference and omits that choice while replacing columns
   rerender(<Harness replacement />)
   expect(screen.queryByRole('checkbox', { name: 'This is reference' })).not.toBeInTheDocument()
 })
+it('applies reader detector suggestions when switching single measurement modes without a separate toolbar', () => {
+  render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} initialMapping={{ ...initial, signal_multiplier: 2 }} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'fluorescence' } })
+  expect(accepted()).toMatchObject({ mode: 'fluorescence', numerator: ['c3'], denominator: 'c1', signal_multiplier: 2 })
+  expect(screen.getByRole('tab', { name: 'Fluorescence' })).toHaveAttribute('aria-selected', 'true')
+  fireEvent.click(screen.getByLabelText('Numerator detB'))
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'transmission' } })
+  expect(accepted()).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2', signal_multiplier: 2 })
+  expect(screen.queryByRole('button', { name: 'Use fluorescence columns' })).not.toBeInTheDocument()
+})
+it('uses named detector columns when switching modes without reader metadata', () => {
+  render(<Harness inspection={{ columns: columns.map(c => c.column_id === 'c3' ? { ...c, name: 'If' } : c) }} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'fluorescence' } })
+  expect(accepted()).toMatchObject({ mode: 'fluorescence', numerator: ['c3'], denominator: 'c1' })
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'transmission' } })
+  expect(accepted()).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2' })
+})
+it('preserves the reviewed energy column and units while switching single-mode detector suggestions', () => {
+  render(<Harness inspection={{ plugin_suggestions: readerSuggestions,
+    columns: [...columns, { ...columns[0], name: 'energy attained', index: 6, column_id: 'c6' }] }} />)
+  fireEvent.change(screen.getByLabelText('Energy column'), { target: { value: 'c6' } })
+  fireEvent.change(screen.getByLabelText('Energy units'), { target: { value: 'keV' } })
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'fluorescence' } })
+  expect(accepted()).toMatchObject({ energy_column: 'c6', units: 'keV', numerator: ['c3'], denominator: 'c1' })
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'transmission' } })
+  expect(accepted()).toMatchObject({ energy_column: 'c6', units: 'keV', numerator: ['c1'], denominator: 'c2' })
+})
+it.each([true, false])('keeps replacement detector choices when switching mode with reader suggestions=%s', withSuggestions => {
+  const reviewed: ColumnMapping = { ...initial, numerator: ['c3', 'c4'], denominator: ['c1', 'c2'], units: 'keV', signal_multiplier: 2 }
+  render(<Harness replacement initialMapping={reviewed} inspection={{
+    ...(withSuggestions ? { plugin_suggestions: readerSuggestions } : { columns: columns.map(c => c.column_id === 'c3' ? { ...c, name: 'If' } : c) }),
+  }} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'fluorescence' } })
+  expect(accepted()).toEqual({ ...reviewed, mode: 'fluorescence' })
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'transmission' } })
+  expect(accepted()).toEqual(reviewed)
+})
 it('imports both modes with independent detector columns and signal scales', () => {
   render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
   expect(screen.getByRole('heading', { name: 'Transmission' })).toBeInTheDocument()
-  expect(screen.getByRole('group', { name: 'Fluorescence columns' })).toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: 'Fluorescence columns' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Import both modes' })).toBeEnabled()
   expect(screen.getByLabelText('Natural log')).toBeChecked()
   expect(screen.getByLabelText('Natural log')).toBeDisabled()
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   fireEvent.click(screen.getByLabelText('Fluorescence numerator detB'))
   fireEvent.change(screen.getByLabelText('Fluorescence multiplicative constant'), { target: { value: '0.5' } })
   expect(accepted()).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
@@ -133,9 +203,63 @@ it('imports both modes with independent detector columns and signal scales', () 
   expect(accepted().additional_fluorescence.individual_channels).toBe(true)
   expect(accepted().individual_channels).toBeFalsy()
 })
+it('edits three signals in separate tabs without losing any mapping', () => {
+  render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'all' } })
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Transmission', 'Fluorescence', 'Reference'])
+  expect(screen.getByRole('tab', { name: 'Transmission' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByRole('tabpanel', { name: 'Transmission' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeEnabled()
+  expect(accepted()).toMatchObject({ numerator: ['c1'], denominator: 'c2', reference_numerator: 'c2', reference_denominator: 'c5', reference_log: true,
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' } })
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
+  fireEvent.click(screen.getByLabelText('Fluorescence numerator detB'))
+  expect(screen.getByRole('tabpanel', { name: 'Fluorescence' })).toBeVisible()
+  expect(screen.queryByRole('tabpanel', { name: 'Transmission' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Reference' }))
+  fireEvent.change(screen.getByLabelText('reference denominator'), { target: { value: 'c4' } })
+  expect(screen.getByText('Reference = ln(|it / detB|)')).toBeVisible()
+  const configured = accepted()
+  fireEvent.click(screen.getByRole('tab', { name: 'Transmission' }))
+  expect(screen.getByLabelText('Numerator i0')).toBeChecked()
+  expect(accepted()).toEqual(configured)
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
+  expect(screen.getByLabelText('Fluorescence numerator detB')).toBeChecked()
+  expect(accepted().reference_denominator).toBe('c4')
+})
+it('supports arrow keys, Home and End across the column tabs without changing data', () => {
+  render(<Harness initialMapping={{ ...initial, additional_fluorescence: { numerator: ['c3'], denominator: 'c1' },
+    reference_numerator: 'c2', reference_denominator: 'c5' }} />)
+  const before = accepted()
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Transmission' }), { key: 'ArrowRight' })
+  expect(screen.getByRole('tab', { name: 'Fluorescence' })).toHaveFocus()
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Fluorescence' }), { key: 'End' })
+  expect(screen.getByRole('tab', { name: 'Reference' })).toHaveFocus()
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Reference' }), { key: 'ArrowRight' })
+  expect(screen.getByRole('tab', { name: 'Transmission' })).toHaveFocus()
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Transmission' }), { key: 'ArrowLeft' })
+  expect(screen.getByRole('tab', { name: 'Reference' })).toHaveFocus()
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'Reference' }), { key: 'Home' })
+  expect(screen.getByRole('tab', { name: 'Transmission' })).toHaveFocus()
+  expect(accepted()).toEqual(before)
+})
+it('requires a reference choice for three-signal import when its columns are not identified', () => {
+  render(<Harness inspection={{ plugin_suggestions: readerSuggestions,
+    columns: columns.map(c => c.name === 'ref' ? { ...c, name: 'unidentified' } : c) }} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'all' } })
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeDisabled()
+  expect(screen.getByRole('alert')).toHaveTextContent('Reference tab')
+  fireEvent.click(screen.getByRole('tab', { name: 'Reference' }))
+  fireEvent.change(screen.getByLabelText('reference numerator'), { target: { value: 'c2' } })
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('reference denominator'), { target: { value: 'c5' } })
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeEnabled()
+})
 it('flips fluorescence columns independently and swaps every rendered checkbox', () => {
   render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   fireEvent.click(screen.getByLabelText('Fluorescence numerator detB'))
   const flip = screen.getByRole('button', { name: 'Flip fluorescence numerator and denominator' })
 
@@ -168,6 +292,7 @@ it('requires explicit fluorescence columns when no detector suggestion is availa
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
   expect(accepted().additional_fluorescence.numerator).toEqual([])
   expect(screen.getByRole('button', { name: 'Import both modes' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   fireEvent.click(screen.getByLabelText('Fluorescence numerator detA'))
   fireEvent.click(screen.getByRole('button', { name: 'Clear fluorescence denominator' }))
   expect(screen.getByRole('button', { name: 'Import both modes' })).toBeDisabled()
@@ -181,6 +306,7 @@ it('requires explicit fluorescence columns when no detector suggestion is availa
 it('keeps default fluorescence controls independent from transmission for restored mappings', () => {
   render(<Harness initialMapping={{ ...initial, signal_multiplier: 2, individual_channels: true,
     additional_fluorescence: { numerator: ['c3', 'c4'], denominator: 'c1' } }} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   expect(screen.getByText('μ(E) = (detA + detB) / (i0)')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Flip fluorescence numerator and denominator' })).toBeEnabled()
   expect(screen.getByLabelText('Fluorescence multiplicative constant')).toHaveValue(1)
@@ -189,18 +315,15 @@ it('keeps default fluorescence controls independent from transmission for restor
     signal_multiplier: 1, individual_channels: false })
   expect(accepted().additional_fluorescence).toBeFalsy()
 })
-it('keeps dual-mode reader suggestions separate and retains fluorescence choices when selecting one mode', () => {
+it('retains edited fluorescence columns when selecting one measurement mode', () => {
   render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   fireEvent.click(screen.getByLabelText('Fluorescence numerator detB'))
-  fireEvent.click(screen.getByRole('button', { name: 'Use transmission columns' }))
   expect(accepted().additional_fluorescence.numerator).toEqual(['c3', 'c4'])
-  fireEvent.click(screen.getByRole('button', { name: 'Use fluorescence columns' }))
-  expect(accepted()).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
-    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' } })
   expect(screen.getByLabelText('Measurement')).toHaveValue('both')
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'fluorescence' } })
-  expect(accepted()).toMatchObject({ mode: 'fluorescence', numerator: ['c3'], denominator: 'c1' })
+  expect(accepted()).toMatchObject({ mode: 'fluorescence', numerator: ['c3', 'c4'], denominator: 'c1' })
   expect(accepted().additional_fluorescence).toBeFalsy()
   expect(screen.queryByRole('group', { name: 'Fluorescence columns' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Import spectrum' })).toBeEnabled()
@@ -224,6 +347,7 @@ it('clears dual-mode importing for extracted chi and does not restore it implici
 it('freezes all additional fluorescence controls during import', () => {
   const { rerender } = render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
   fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'Fluorescence' }))
   rerender(<Harness busy inspection={{ plugin_suggestions: readerSuggestions }} />)
   for (const label of ['Fluorescence numerator detA', 'Fluorescence denominator i0',
     'Fluorescence multiplicative constant', 'Save each fluorescence channel as a separate data item']) {
@@ -268,34 +392,32 @@ it('places the file and import actions above the column controls', () => {
   expect(actions).toContainElement(screen.getByRole('button', { name: 'Import spectrum' }))
   expect(actions.compareDocumentPosition(screen.getByLabelText('Input format')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
-it('applies native transmission/fluorescence suggestions only on request and preserves other import choices', () => {
-  render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
+it('can restore reader column suggestions while replacing an existing spectrum', () => {
+  render(<Harness replacement inspection={{ plugin_suggestions: readerSuggestions }} />)
   expect(accepted()).toEqual(initial)
   fireEvent.click(screen.getByLabelText('Input already normalized'))
-  fireEvent.change(screen.getByLabelText('reference numerator'), { target: { value: 'c2' } })
-  fireEvent.click(screen.getByLabelText('Save each channel as a separate data item'))
   fireEvent.click(screen.getByRole('button', { name: 'Use fluorescence columns' }))
   expect(accepted()).toMatchObject({ numerator: ['c3'], denominator: 'c1', mode: 'fluorescence', units: 'eV',
-    data_type: 'norm', is_normalized: true, exafs: null, individual_channels: false, reference_numerator: 'c2' })
+    data_type: 'norm', is_normalized: true, exafs: true, individual_channels: false })
   expect(screen.getByLabelText('Natural log')).not.toBeChecked()
   fireEvent.click(screen.getByLabelText('Numerator detB'))
   expect(accepted().numerator).toEqual(['c3', 'c4'])
   fireEvent.click(screen.getByRole('button', { name: 'Use transmission columns' }))
-  expect(accepted()).toMatchObject({ numerator: ['c1'], denominator: 'c2', mode: 'transmission', data_type: 'norm', exafs: null, reference_numerator: 'c2' })
+  expect(accepted()).toMatchObject({ numerator: ['c1'], denominator: 'c2', mode: 'transmission', data_type: 'norm', exafs: true })
   expect(screen.getByLabelText('Natural log')).toBeChecked()
 })
 it('does not offer a nonexistent reader fluorescence mapping', () => {
-  render(<Harness inspection={{ plugin_suggestions: { transmission: readerSuggestions!.transmission } }} />)
+  render(<Harness replacement inspection={{ plugin_suggestions: { transmission: readerSuggestions!.transmission } }} />)
   expect(screen.getByRole('button', { name: 'Use transmission columns' })).toBeEnabled()
   expect(screen.queryByRole('button', { name: 'Use fluorescence columns' })).not.toBeInTheDocument()
 })
 it('hides energy reader suggestions for extracted chi input', () => {
-  render(<Harness inspection={{ plugin_suggestions: readerSuggestions }} />)
+  render(<Harness replacement inspection={{ plugin_suggestions: readerSuggestions }} />)
   fireEvent.change(screen.getByLabelText('Input format'), { target: { value: 'chi' } })
   expect(screen.queryByLabelText('Reader column suggestions')).not.toBeInTheDocument()
 })
 it('prevents reader suggestion changes while importing', () => {
-  render(<Harness busy inspection={{ plugin_suggestions: readerSuggestions }} />)
+  render(<Harness replacement busy inspection={{ plugin_suggestions: readerSuggestions }} />)
   expect(screen.getByRole('button', { name: 'Use transmission columns' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Use fluorescence columns' })).toBeDisabled()
 })
@@ -372,6 +494,7 @@ it("adds a range to selected numerator buttons, skips energy, and clears all on 
 it("sends individual-channel and reference toggles and clears references for chi", () => {
   render(<Harness />)
   fireEvent.click(screen.getByLabelText("Save each channel as a separate data item"))
+  fireEvent.click(screen.getByRole("tab", { name: "Reference" }))
   fireEvent.change(screen.getByLabelText("reference numerator"), { target: { value: "c2" } })
   fireEvent.change(screen.getByLabelText("reference denominator"), { target: { value: "c5" } })
   fireEvent.click(screen.getByLabelText("Reference natural log"))
@@ -381,7 +504,8 @@ it("sends individual-channel and reference toggles and clears references for chi
   fireEvent.change(screen.getByLabelText("Input format"), { target: { value: "chi" } })
   expect(accepted()).toMatchObject({ data_type: "chi", reference_numerator: "", reference_denominator: "" })
   expect(screen.getByLabelText("Energy units")).toBeDisabled()
-  expect(screen.getByLabelText("reference numerator")).toBeDisabled()
+  expect(screen.queryByLabelText("reference numerator")).not.toBeInTheDocument()
+  expect(screen.queryByRole("tab", { name: "Reference" })).not.toBeInTheDocument()
 })
 it("exposes source contents and freezes mapping controls during import", () => {
   render(<Harness busy />)
@@ -479,6 +603,26 @@ const twentyBm = (measurement: object, suggestions: object) => ({ beamline_reade
   measurement: { mode: 'transmission' as const, edge_energy: 8980, notes: [], contrast: {}, ...measurement } } })
 const sample = { energy_column: 'c0', numerator: ['c1'], denominator: 'c2', mode: 'transmission' as const, units: 'eV' as const, data_type: 'mu' as const }
 const foilColumns = { ...sample, numerator: ['c2'], denominator: 'c5' }
+it('can remove the reference after explicitly choosing three signals', () => {
+  render(<Harness inspection={twentyBm({}, { ...readerSuggestions })} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'all' } })
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeEnabled()
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'both' } })
+  expect(screen.getByLabelText('Measurement')).toHaveValue('both')
+  expect(screen.getByRole('button', { name: 'Import both modes' })).toBeEnabled()
+  expect(accepted()).toMatchObject({ reference_numerator: '', reference_denominator: '' })
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+it('switches an explicit combined import to one spectrum when the user identifies a foil scan', () => {
+  render(<Harness inspection={twentyBm({ ambiguous: true }, { ...readerSuggestions, foil: foilColumns })} />)
+  fireEvent.change(screen.getByLabelText('Measurement'), { target: { value: 'all' } })
+  expect(screen.getByRole('button', { name: 'Import 3 spectra' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('radio', { name: /A foil scan:/ }))
+  expect(screen.getByRole('button', { name: 'Import spectrum' })).toBeEnabled()
+  expect(accepted()).toMatchObject({ numerator: ['c2'], denominator: 'c5', reference_numerator: '', reference_denominator: '' })
+  expect(accepted().additional_fluorescence).toBeUndefined()
+  expect(screen.getByLabelText('Measurement')).toHaveValue('transmission')
+})
 it('imports nothing from a scan that may be a dilute sample or a foil until the user says which', () => {
   // A marginal I0/It edge beside a clear foil edge used to be resolved by an
   // absolute step floor that declared the sample position empty.
@@ -501,6 +645,6 @@ it('names each channel’s own contrast on the sample-or-foil choice', () => {
 })
 it("reports the foil's own contrast on the offer that imports It/Iref as the spectrum", () => {
   // The tooltip quoted the I0/It contrast (no edge) behind an It/Iref offer.
-  render(<Harness inspection={twentyBm({ foil_spectrum: true, contrast: { transmission: -1, reference: 550 } }, { transmission: foilColumns })} />)
+  render(<Harness replacement inspection={twentyBm({ foil_spectrum: true, contrast: { transmission: -1, reference: 550 } }, { transmission: foilColumns })} />)
   expect(screen.getByRole('button', { name: /Use transmission columns/ })).toHaveAttribute('title', expect.stringMatching(/^it\/ref edge step 550 times/))
 })

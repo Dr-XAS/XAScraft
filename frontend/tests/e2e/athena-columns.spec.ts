@@ -100,11 +100,23 @@ test('shared batch shows one progress bar until every file is imported', async (
   }
 })
 
-test('official MRCAT quick scan compares original and rebinned data and imports a matching batch', async ({ page }, info) => {
+test('official MRCAT quick scan keeps its native energy grid before explicit postprocessing', async ({ page }, info) => {
   test.setTimeout(90000)
   const data = readFileSync(fileURLToPath(new URL('../../../backend/tests/fixtures/demeter-uhup.101', import.meta.url)))
   const raw = data.toString().split(/\r?\n/).filter(line => /^\s*16999|^\s*17\d{3}\./.test(line)).map(line => line.trim().split(/\s+/).map(Number))
   expect(raw).toHaveLength(2006)
+  // The bundled scan begins with 25 measurements at one energy. Ordinary
+  // import averages their detector counts before forming the logarithm.
+  const bins = new Map<number, { numerator: number; denominator: number }>()
+  for (const [energy, numerator, denominator] of raw) {
+    const bin = bins.get(energy) ?? { numerator: 0, denominator: 0 }
+    bin.numerator += numerator
+    bin.denominator += denominator
+    bins.set(energy, bin)
+  }
+  const energy = [...bins.keys()]
+  const mu = [...bins.values()].map(bin => Math.log(bin.numerator / bin.denominator))
+  expect(energy).toHaveLength(1982)
   await page.goto('/')
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles([
@@ -113,8 +125,6 @@ test('official MRCAT quick scan compares original and rebinned data and imports 
   ])
   const panel = page.getByRole('dialog')
   await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toBeVisible()
-  // This oracle uses native default sign/scale, not another test's accepted
-  // import choices. Changed layouts intentionally retain the last multiplier.
   if (await panel.getByRole('button', { name: 'Use suggested columns' }).count()) {
     await panel.getByRole('button', { name: 'Use suggested columns' }).click()
   }
@@ -123,30 +133,13 @@ test('official MRCAT quick scan compares original and rebinned data and imports 
   await panel.getByLabel('Numerator mcs3', { exact: true }).check()
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
   await panel.getByLabel('Denominator mcs4', { exact: true }).check()
-  await panel.getByText('Rebin quick scans', { exact: true }).click()
-  await panel.getByRole('button', { name: 'Use Craft default grid' }).click()
-  await panel.getByLabel('Perform rebinning', { exact: true }).check()
-  await expect.poll(async () => (await curves(panel)).length).toBe(2)
+  await expect(panel.getByText('Rebin quick scans', { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('Preprocess imported data', { exact: true })).toHaveCount(0)
   const plotted = await curves(panel)
-  expect(plotted[0].x).toHaveLength(2006)
-  expect(plotted[1].x).toHaveLength(396)
-  for (const i of [0, 24, 200, 1000, 2005]) {
-    expect(plotted[0].x[i]).toBe(raw[i][0])
-    expect(plotted[0].y[i]).toBeCloseTo(Math.log(raw[i][1] / raw[i][2]), 12)
-  }
-  await panel.getByLabel('Plot original data', { exact: true }).uncheck()
-  expect((await curves(panel))[0]).toEqual(plotted[1])
-  await panel.getByLabel('Plot original data', { exact: true }).check()
-  await panel.screenshot({ path: info.outputPath('quick-scan-rebin-desktop.png') })
-  await page.setViewportSize({ width: 390, height: 844 })
-  await panel.getByText('Preview selected columns', { exact: true }).scrollIntoViewIfNeeded()
-  await expect.poll(async () => panel.getByLabel('Imported signal preview plot').evaluate(node => {
-    const svg = node.querySelector('.main-svg')
-    return svg ? Math.abs(svg.getBoundingClientRect().width - node.getBoundingClientRect().width) : 1000
-  })).toBeLessThan(4)
-  await expect(panel.locator('.js-line').first()).toBeAttached()
-  await panel.screenshot({ path: info.outputPath('quick-scan-rebin-mobile.png') })
-  await page.setViewportSize({ width: 1400, height: 1000 })
+  expect(plotted).toHaveLength(1)
+  expect(plotted[0].x).toEqual(energy)
+  for (const index of [0, 24, 200, 1000, 1981]) expect(plotted[0].y[index]).toBeCloseTo(mu[index], 12)
+  await panel.screenshot({ path: info.outputPath('quick-scan-full-resolution-import.png') })
   const accepted: Promise<any>[] = []
   page.on('response', r => { if (r.url().endsWith('/import')) accepted.push(r.json()) })
   await panel.getByRole('radio', { name: 'Yes, use the same parameters', exact: true }).check()
@@ -156,11 +149,12 @@ test('official MRCAT quick scan compares original and rebinned data and imports 
   expect(projects).toHaveLength(2)
   expect(projects[1].groups).toHaveLength(2)
   for (const group of projects[1].groups) {
-    expect(group.energy).toEqual(plotted[1].x)
-    expect(group.mu).toEqual(plotted[1].y)
+    expect(group.energy).toEqual(energy)
+    expect(group.mu).toHaveLength(1982)
+    for (const index of [0, 24, 200, 1000, 1981]) expect(group.mu[index]).toBeCloseTo(mu[index], 12)
     expect(group.processing_error).toBeNull()
-    expect(group.source.rebin_original.energy).toEqual(raw.map(row => row[0]))
-    expect(group.source.rebin_original.column_arrays.column_0002).toEqual(raw.map(row => row[1]))
+    expect(group.source).not.toHaveProperty('rebin_original')
+    expect(group.source.warnings.join(' ')).toContain('Averaged 24 rows')
   }
   await page.reload()
   await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
@@ -282,6 +276,7 @@ test('imports transmission and fluorescence together across a shared real-Cu bat
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
   await panel.getByLabel('Denominator it', { exact: true }).check()
   await panel.getByRole('spinbutton', { name: 'Multiplicative constant', exact: true }).fill('1.25')
+  await panel.getByRole('tab', { name: 'Fluorescence', exact: true }).click()
   await panel.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
   await panel.getByLabel('Fluorescence numerator deta', { exact: true }).check()
   await panel.getByLabel('Fluorescence numerator detb', { exact: true }).check()
@@ -373,7 +368,7 @@ test("column preview, reference, invalid mapping recovery and imported values", 
   await expect(panel.getByLabel("Imported signal preview plot").locator(".js-line")).toHaveCount(0)
   await panel.getByRole("button", { name: "Clear denominator", exact: true }).click()
   await panel.getByLabel("Denominator it", { exact: true }).check()
-  await panel.getByText("Reference channel & ordering", { exact: true }).click()
+  await panel.getByRole("tab", { name: "Reference", exact: true }).click()
   await panel.getByRole("combobox", { name: "reference numerator", exact: true }).selectOption({ label: "i0 · column 2" })
   await panel.getByRole("combobox", { name: "reference denominator", exact: true }).selectOption({ label: "ref · column 6" })
   await expect.poll(async () => (await curves(panel)).length).toBe(2)
@@ -513,17 +508,15 @@ test("switching to chi clears absorption transforms and keeps raw k values", asy
   expect(raw[0].y.every(y => y === 10000)).toBe(true)
 })
 
-test("imports a batch with standard parameters, reference alignment and sample-only marking", async ({ page }, info) => {
+test('imported sample and reference retain their measured scales and energy shifts until explicit postprocessing', async ({ page }) => {
   test.setTimeout(90000)
   const panel = await openColumns(page)
-  await panel.getByText('Reference channel & ordering', { exact: true }).click()
+  await panel.getByRole('tab', { name: 'Reference', exact: true }).click()
   await panel.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption({ label: 'i0 · column 2' })
   await panel.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption({ label: 'ref · column 6' })
-  let accepted = page.waitForResponse(r => r.url().endsWith('/import'))
+  const accepted = page.waitForResponse(r => r.url().endsWith('/import'))
   await panel.getByRole('button', { name: 'Import spectrum', exact: true }).click()
-  const initialResponse = await accepted; expect(initialResponse.ok()).toBe(true)
-  const initial = await initialResponse.json()
-  expect(initial.groups.map((g: { marked: boolean }) => g.marked)).toEqual([false, false])
+  const initial = await (await accepted).json()
   await expect(panel).not.toBeVisible()
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles([3.5, 4.5].map(shift => ({
@@ -532,47 +525,29 @@ test("imports a batch with standard parameters, reference alignment and sample-o
   })))
   const batch = page.getByRole('dialog')
   await expect(batch.getByRole('combobox', { name: 'Energy units', exact: true })).toHaveValue('keV')
-  await batch.getByText('Reference channel & ordering', { exact: true }).click()
+  await batch.getByRole('tab', { name: 'Reference', exact: true }).click()
   await batch.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption({ label: 'ref · column 3' })
   await batch.getByLabel('Reference natural log', { exact: true }).uncheck()
-  await batch.getByText('Preprocess imported data', { exact: true }).click()
-  await batch.getByRole('combobox', { name: 'Preprocessing standard', exact: true }).selectOption(initial.groups[0].id)
-  await batch.getByLabel('Set parameters to the standard', { exact: true }).check()
-  await batch.getByLabel('Align to the standard', { exact: true }).check()
-  await batch.getByLabel('Mark each imported sample', { exact: true }).check()
-  await expect(batch.getByText(/original energy axis/)).toBeVisible()
-  const beforePreprocessing = await curves(batch)
-  expect(beforePreprocessing).toHaveLength(2)
-  expect(beforePreprocessing[0].x[200]).toBeCloseTo(measured[200][0] + 3.5, 9)
-  expect(beforePreprocessing[0].y[200]).toBeCloseTo(2 * measured[200][1], 12)
-  expect(beforePreprocessing[1].y[200]).toBeCloseTo(measured[200][1], 12)
-  await batch.screenshot({ path: info.outputPath('import-preprocessing.png') })
+  await expect(batch.getByText('Preprocess imported data', { exact: true })).toHaveCount(0)
   const imports: Promise<Record<string, any>>[] = []
   page.on('response', response => { if (response.url().endsWith('/import')) imports.push(response.json()) })
   await batch.getByRole('radio', { name: 'Yes, use the same parameters', exact: true }).check()
   await batch.getByRole('button', { name: 'Import 2 files', exact: true }).click()
   await expect(batch).not.toBeVisible()
-  expect(imports).toHaveLength(2)
   const finished = await imports[1]
   expect(finished.groups).toHaveLength(6)
   expect(finished.groups.slice(0, 2)).toEqual(initial.groups)
-  for (const [index, shift] of [[2, -3.5], [4, -4.5]]) {
+  for (const [index, shift] of [[2, 3.5], [4, 4.5]]) {
     const sample = finished.groups[index], ref = finished.groups[index + 1]
-    expect(sample.marked).toBe(true); expect(ref.marked).toBe(false)
-    expect(sample.parameters.energy_shift).toBe(shift)
-    expect(ref.parameters.energy_shift).toBe(shift)
-    expect(sample.source.import_preprocessing.alignment.used_references).toBe(true)
-    expect(sample.source.import_preprocessing.copy_parameters).toBe(true)
-    expect(sample.processing_error).toBeNull(); expect(ref.processing_error).toBeNull()
+    expect(sample.marked).toBe(false); expect(ref.marked).toBe(false)
+    expect(sample.parameters.energy_shift).toBe(0)
+    expect(ref.parameters.energy_shift).toBe(0)
+    expect(sample.energy[200]).toBeCloseTo(measured[200][0] + shift, 9)
     expect(sample.mu[200]).toBeCloseTo(2 * measured[200][1], 12)
+    expect(ref.mu[200]).toBeCloseTo(measured[200][1], 12)
     expect(sample.reference_id).toBe(ref.id)
+    expect(sample.processing_error).toBeNull(); expect(ref.processing_error).toBeNull()
   }
-  await page.reload()
-  await expect(page.getByRole('heading', { name: /^Data 6\b/ })).toBeVisible()
-  await page.getByRole('button', { name: 'Import data', exact: true }).click()
-  await page.getByLabel('Choose data files', { exact: true }).setInputFiles({ name: 'new-choice.dat', mimeType: 'text/plain', buffer: content })
-  await page.getByText('Preprocess imported data', { exact: true }).click()
-  await expect(page.getByLabel('Mark each imported sample', { exact: true })).toBeChecked()
 })
 
 test("XAS-QA-007: retrying an import whose response was lost does not import the scan twice", async ({ page }) => {
@@ -613,6 +588,7 @@ test("XAS-QA-001: the fluorescence multiplier stays readable in a narrow dual-mo
   test.setTimeout(60000)
   const panel = await openColumns(page)
   await panel.getByRole("combobox", { name: "Measurement", exact: true }).selectOption("both")
+  await panel.getByRole("tab", { name: "Fluorescence", exact: true }).click()
   const fluorescence = panel.getByRole("group", { name: "Fluorescence columns", exact: true })
   const constant = fluorescence.getByLabel("Fluorescence multiplicative constant", { exact: true })
   await constant.fill("0.5")
