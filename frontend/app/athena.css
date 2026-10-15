@@ -297,6 +297,12 @@ html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="fit"] { --viewer-acc
 .ath-param-current { padding: 8px 12px; display: flex; align-items: center; gap: 7px; background: var(--ath-surface-muted); border-bottom: 1px solid var(--ath-line); }
 .ath-param-current strong { font-size: var(--text-label); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .ath-app .ath-param-current button { color: var(--ath-muted); font-size: var(--text-body); padding: 4px 3px; }
+.ath-frozen-status { position: relative; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; color: var(--ath-muted); font-size: var(--text-caption); cursor: help; }
+.ath-frozen-status [role=tooltip] { position: absolute; right: 0; top: calc(100% + 7px); z-index: 5; width: 210px; padding: 8px 10px; border: 1px solid var(--ath-line); border-radius: 5px; background: var(--ath-popover); color: var(--ath-ink); font-size: var(--text-label); line-height: var(--leading-body); box-shadow: 0 4px 12px rgb(24 24 27 / 12%); visibility: hidden; }
+.ath-frozen-status:hover [role=tooltip], .ath-frozen-status:focus [role=tooltip] { visibility: visible; }
+.ath-app :is(.ath-param-fields, .ath-apply)[data-frozen=true] :is(input, select, button):disabled { color: var(--ath-muted); background: var(--ath-surface-muted); border-color: var(--ath-line); cursor: not-allowed; opacity: 1; }
+.ath-app :is(.ath-param-fields, .ath-apply)[data-frozen=true] input[type=checkbox]:disabled { accent-color: var(--ath-muted); }
+.ath-apply[data-frozen=true] > .ath-check { color: var(--ath-muted); }
 /* Keep absolute screen-reader hints inside the scroller as viewer heights change. */
 .ath-param-fields { position: relative; flex: 1 1 0px; height: 0; margin: 0; border: 0; padding: 0; min-height: 0; overflow: auto; }
 .ath-param-fields:disabled { opacity: .65; }

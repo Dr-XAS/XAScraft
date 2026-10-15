@@ -432,6 +432,11 @@ function selectGroup(label: string) {
   fireEvent.click(screen.getByRole("button", { name: name => name.startsWith(label) }))
 }
 
+function freezeCurrentData() {
+  fireEvent.click(screen.getByRole("button", { name: "Actions for current data" }))
+  fireEvent.click(screen.getByRole("menuitem", { name: "Freeze current data" }))
+}
+
 function openGroupMenu() {
   fireEvent.click(within(screen.getByRole("navigation", { name: /main menu/i })).getByRole("button", { name: "Data" }))
 }
@@ -2318,6 +2323,58 @@ describe("AthenaWorkbench native context actions", () => {
     return screen.getByRole('menu', { name: 'Actions for Foil scan' })
   }
 
+  it.each([false, true])('freezes current data from the row menu and restores editable controls on unfreeze (apply to marked: %s)', async applyMarked => {
+    const project = await openSaved()
+    const panel = screen.getByRole('tabpanel', { name: 'Processing' })
+    const applyToMarked = within(panel).getByRole('checkbox', { name: /^Apply to marked data/ })
+    if (applyMarked) fireEvent.click(applyToMarked)
+    const pick = armPick('E₀')
+    expect(within(panel).queryByRole('button', { name: /^(Unfreeze|Freeze) data$/ })).toBeNull()
+    expect(within(panel).queryByLabelText('Data frozen')).toBeNull()
+
+    // This menu names the current data even when invoked on a different row.
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Sample scan/ }), { clientX: 40, clientY: 80 })
+    const menu = screen.getByRole('menu', { name: 'Actions for Foil scan' })
+    const labels = within(menu).getAllByRole('menuitem').map(item => item.textContent)
+    expect(labels[labels.indexOf('Processing settings…') + 1]).toBe('Freeze current data')
+    const frozen = nextProject(project, { foil: { frozen: true } })
+    api.mockResolvedValueOnce(frozen)
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Freeze current data' }))
+    await waitForCommand(project.id, {
+      version: project.version, action: 'metadata', group_ids: ['foil'], options: { frozen: true }, response_mode: 'selection',
+    })
+    expect(within(panel).getByLabelText('Data frozen')).toHaveAccessibleDescription('Unfreeze from the data context menu to edit parameters.')
+    const parameterFields = panel.querySelector('.ath-param-fields')!
+    const controls = parameterFields.querySelectorAll('input, select')
+    expect(controls.length).toBeGreaterThan(20)
+    controls.forEach(control => expect(control).toBeDisabled())
+    expect(within(panel).getByRole('button', { name: 'Select E₀…' })).toBeDisabled()
+    expect(applyToMarked).toBeDisabled()
+    expect(applyToMarked).toHaveProperty('checked', applyMarked)
+    expect(screen.getByRole('checkbox', { name: 'Mark Foil scan' })).toBeEnabled()
+    act(() => pick(8999, 'E'))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Select E₀…' }))
+    fireEvent.change(within(panel).getByRole('spinbutton', { name: 'Rbkg Å' }), { target: { value: '2.5' } })
+    expect(plotProps('current').picking).toBe(false)
+    expect(plotProps('current').active?.parameters).toEqual(project.groups[0].parameters)
+    expect(within(panel).getByRole('spinbutton', { name: 'Rbkg Å' })).toHaveValue(1)
+    expect(api).toHaveBeenCalledTimes(2)
+
+    const thawed = nextProject(frozen, { foil: { frozen: false } })
+    api.mockResolvedValueOnce(thawed)
+    fireEvent.click(within(groupContext()).getByRole('menuitem', { name: 'Unfreeze current data' }))
+    await waitForCommand(project.id, {
+      version: frozen.version, action: 'metadata', group_ids: ['foil'], options: { frozen: false }, response_mode: 'selection',
+    })
+    expect(within(panel).queryByLabelText('Data frozen')).toBeNull()
+    expect(within(panel).getByRole('spinbutton', { name: 'Rbkg Å' })).toBeEnabled()
+    expect(within(panel).getByRole('combobox', { name: 'Polynomial degree' })).toBeEnabled()
+    expect(within(panel).getByRole('checkbox', { name: 'Flatten normalized data' })).toBeEnabled()
+    expect(within(panel).getByRole('button', { name: 'Select E₀…' })).toBeEnabled()
+    expect(applyToMarked).toBeEnabled()
+    expect(api).toHaveBeenCalledTimes(3)
+  })
+
   it.each(['marked', 'all'] as const)('copies every Processing section to %s groups from the tab', async scope => {
     const initial = projectFixture()
     initial.groups[0].marked = true
@@ -2591,8 +2648,8 @@ describe("AthenaWorkbench native context actions", () => {
     const oxideApplied = await finishParameterDrafts(project, [{ groupId: 'oxide', options: { rbkg: 4 } }])
     const frozen = nextProject(oxideApplied, { oxide: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
+    freezeCurrentData()
+    await waitFor(() => expect(screen.getByLabelText('Data frozen')).toBeVisible())
     selectGroup('Foil scan'); editNumber(/^Rbkg/, 2.5)
     const foilApplied = await finishParameterDrafts(frozen, [{ groupId: 'foil', options: { rbkg: 2.5 } }])
     fireEvent.change(screen.getByRole('textbox', { name: 'Search data' }), { target: { value: 'Foil' } })
@@ -2739,8 +2796,8 @@ describe("AthenaWorkbench native context actions", () => {
     const project = await openSaved()
     const frozen = nextProject(project, { foil: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
+    freezeCurrentData()
+    await waitFor(() => expect(screen.getByLabelText('Data frozen')).toBeVisible())
     const trigger = screen.getByRole('button', { name: 'Actions for Rbkg' })
     expect(trigger).toBeEnabled()
     expect(screen.getByRole('spinbutton', { name: 'Rbkg Å' })).toBeDisabled()
@@ -2933,8 +2990,8 @@ describe("AthenaWorkbench native context actions", () => {
     const project = await openSaved(initial)
     const frozen = nextProject(project, { foil: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole('button', { name: 'Freeze data' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unfreeze data' })).toBeEnabled())
+    freezeCurrentData()
+    await waitFor(() => expect(screen.getByLabelText('Data frozen')).toBeVisible())
     fireEvent.click(screen.getByRole('button', { name: 'Edit data information' }))
     const dialog = screen.getByRole('dialog', { name: 'Data information' })
     expect(within(dialog).getByRole('spinbutton', { name: 'Importance' })).toBeDisabled()
@@ -3428,14 +3485,14 @@ describe("AthenaWorkbench E₀ selection", () => {
     const initial = projectFixture()
     if (kind === "chi") initial.groups.forEach(g => { g.data_type = "chi" })
     if (kind === "difference") initial.groups.forEach(g => { g.source.operation = "difference" })
-    if (kind === "frozen") initial.groups.forEach(g => { g.frozen = true })
+    if (kind === "frozen") initial.groups.forEach(g => { g.frozen = g.id !== "foil"; g.marked = g.frozen })
     if (kind === "unmarked") initial.groups.forEach(g => { g.marked = false })
     localStorage.setItem(storageKey, initial.id)
     api.mockResolvedValueOnce(initial)
     render(<AthenaWorkbench />)
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Opening project · complete"))
     const dialog = await openE0Dialog()
-    if (kind === "unmarked") fireEvent.change(within(dialog).getByRole("combobox", { name: "E₀ targets" }), { target: { value: "marked" } })
+    if (kind === "unmarked" || kind === "frozen") fireEvent.change(within(dialog).getByRole("combobox", { name: "E₀ targets" }), { target: { value: "marked" } })
     const button = within(dialog).getByRole("button", { name: "Apply E₀" })
     expect(button).toBeDisabled()
     expect(within(dialog).getByText(/No supported, unfrozen data/)).toBeVisible()
@@ -5788,8 +5845,8 @@ describe("AthenaWorkbench parameter copy and reset", () => {
     const oxideApplied = await finishParameterDrafts(project, [{ groupId: "oxide", options: { rbkg: 4 } }])
     const frozen = nextProject(oxideApplied, { oxide: { frozen: true } })
     api.mockResolvedValueOnce(frozen)
-    fireEvent.click(screen.getByRole("button", { name: /^Freeze data$/i }))
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Unfreeze data$/i })).toBeEnabled())
+    freezeCurrentData()
+    await waitFor(() => expect(screen.getByLabelText("Data frozen")).toBeVisible())
     selectGroup("Foil scan")
     editNumber(/^Rbkg/, 2.9)
     const processed = await finishParameterDrafts(frozen, [{ groupId: "foil", options: { rbkg: 2.9 } }])
