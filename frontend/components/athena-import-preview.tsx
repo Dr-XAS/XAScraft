@@ -13,7 +13,6 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
   projectId: string; version: number; uploadId: string; mapping: ColumnMapping; disabled?: boolean; automaticExafs?: boolean
 }) {
   const athenaApi = useAthenaApi()
-  const [paused, setPaused] = useState(false)
   const [showReference, setShowReference] = useState(true)
   const [retry, setRetry] = useState(0)
   const [state, setState] = useState<{ key: string; value?: ColumnPreview; error?: string } | null>(null)
@@ -22,9 +21,8 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
   const previewPayload = columnPayload(mapping, { automaticExafs })
   delete previewPayload.is_reference
   const key = JSON.stringify({ projectId, version, uploadId, mapping: previewPayload })
-  const [manualKey, setManualKey] = useState("")
   useEffect(() => {
-    if (disabled || (paused && manualKey !== key) || problem) return
+    if (disabled || problem) return
     const controller = new AbortController()
     let current = true
     const timeout = setTimeout(() => {
@@ -36,22 +34,19 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
     return () => { current = false; clearTimeout(timeout); controller.abort() }
     // key contains the complete immutable request; changing any column cancels stale work.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, paused, manualKey, retry, disabled, problem])
+  }, [key, retry, disabled, problem])
   const isCurrent = state?.key === key
-  const value = problem ? undefined : isCurrent ? state?.value : paused ? state?.value : undefined
+  const value = !problem && isCurrent ? state?.value : undefined
   const error = problem ?? (isCurrent ? state?.error : undefined)
   const traces = value?.traces.filter(t => (showReference || t.role !== "reference") && (showOriginal || t.stage !== 'original')) ?? []
   const hasReference = !!(mapping.reference_numerator || mapping.reference_denominator)
   const plottedReference = traces.some(t => t.role === "reference")
   return <section className={styles.previewPanel} aria-label="Column selection preview">
     <div className={styles.previewTools}><strong>Preview selected columns <SectionHelp label="Selected columns preview">All selected detector signals before normalization or background removal. Switching a column tab changes the editing panel; transmission, fluorescence, and reference remain plotted together.</SectionHelp></strong>
-      <label className="ath-check"><input type="checkbox" checked={paused} onChange={e => { setPaused(e.target.checked); setManualKey("") }} />Pause plotting <SectionHelp label="Pause plotting">Pause automatic preview updates while changing columns or processing options. Resume to inspect the current mapping before import.</SectionHelp></label>
-      <button type="button" disabled={disabled || !!problem} onClick={() => { setManualKey(key); setRetry(n => n + 1); setState(null) }}>Replot</button>
       {hasReference && <label className="ath-check"><input type="checkbox" checked={showReference} onChange={e => setShowReference(e.target.checked)} />Plot reference <SectionHelp label="Plot reference">Overlay the reference signal calculated from the reference columns, so its edge and polarity can be checked before import.</SectionHelp></label>}
       {mapping.rebin?.enabled && <label className="ath-check"><input type="checkbox" checked={showOriginal} onChange={e => setShowOriginal(e.target.checked)} />Plot original data <SectionHelp label="Plot original data">Compare the unreduced signal with the rebinned preview to see whether the new grid preserves spectral features.</SectionHelp></label>}
     </div>
-    {paused && <p role="status">Plotting paused{value && !isCurrent ? " — the displayed curve uses the previous column selection." : "."} Replot updates once.</p>}
-    <div className={styles.plot} aria-label="Imported signal preview plot" aria-busy={!paused && !isCurrent && !problem}>
+    <div className={styles.plot} aria-label="Imported signal preview plot" aria-busy={!isCurrent && !problem}>
       {value ? <Plot data={traces.map((trace, index) => ({ x: trace.x.slice(), y: trace.y.slice(), name: trace.label,
         type: "scatter", mode: "lines", opacity: trace.stage === 'original' ? .45 : 1,
         line: { color: trace.role === "reference" ? "#b96342" : colors[index % colors.length], dash: trace.role === "reference" ? "solid" : trace.stage === 'original' ? 'dot' : "solid", width: 1.8 },
@@ -64,9 +59,10 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
           uirevision: state?.key, hovermode: "closest" }}
         config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["select2d", "lasso2d"], toImageButtonOptions: { filename: "craft-column-preview" } }}
         style={{ width: "100%", height: "100%" }} useResizeHandler />
-        : <p>{error ? "Correct the selection or use Replot to retry." : paused ? "Choose Replot to display the selected columns." : "Updating preview…"}</p>}
+        : <p>{problem ? "Choose valid columns to preview." : error ? "Preview unavailable." : "Updating preview…"}</p>}
     </div>
     {error && <p role="alert" className="ath-error">{error}</p>}
+    {error && !problem && <button type="button" disabled={disabled} onClick={() => { setRetry(n => n + 1); setState(null) }}>Retry preview</button>}
     {value && <p className="ath-hint">{value.points.toLocaleString()} source points{value.rebin_results ? " · rebinned spectra will be imported; original data are retained." : value.traces.some(t => t.x.length < value.points) ? " · display preserves local minima and maxima; every point is imported." : " · all points displayed."}</p>}
     {value?.rebin_results?.map(result => <p className="ath-hint" key={result.id}>{result.label}: {result.source_points.toLocaleString()} → {result.output_points.toLocaleString()} points · grid E₀ {result.e0.toFixed(3)} eV</p>)}
     {value?.warnings.map(note => <p key={note} className="ath-warning">{note}</p>)}

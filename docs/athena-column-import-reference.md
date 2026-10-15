@@ -77,9 +77,12 @@ requires energy data and is cleared when switching to extracted chi(k).
 column numbers, the selected expression, and a live Plotly figure. Each change
 requests `/preview-columns` after a 180 ms debounce. Cancelled or superseded
 responses cannot replace the current selection's plot. During automatic
-refresh the previous curve is hidden. Pausing preserves the previous curve
-with an explicit stale-selection caption; Replot updates once. Reference
-visibility can be toggled without repeating the calculation.
+refresh the previous curve is hidden. The import preview always updates
+automatically; the native pause and manual-replot controls are not included.
+**Retry preview** appears only after a failed API preview request and retries
+the current selection. Invalid local column settings must be corrected before
+a preview can run. Reference visibility can be toggled without repeating the
+calculation.
 
 `athena_columns.map_columns` is shared by preview and import. It evaluates
 every point for direct signal, logarithmic transmission, and fluorescence or
@@ -146,7 +149,7 @@ used; applying recalculates the replacement and affected background dependents.
   invalid late detector channels, bounded original-file text, extrema
   preservation, and HTTP immutability/version conflicts.
 - `frontend/components/athena-import-preview.test.tsx`: debouncing, stale
-  success/failure replies, cancellation, retry, pause/replot, upload/version
+  success/failure replies, cancellation, automatic refresh, conditional retry, upload/version
   isolation, plot data/axes, references and display-sampling warnings. Plotly
   is mocked here; these are component contracts rather than browser evidence.
 - `frontend/components/athena-column-selection.test.tsx`: range parsing,
@@ -163,7 +166,8 @@ used; applying recalculates the replacement and affected background dependents.
   counts whose inverse formulas recover the original mu. This fixture is
   explicitly a transformation of measured data, not an independently measured
   detector record. Chromium tests compare actual Plotly data, preview results
-  and persisted groups, and capture desktop/mobile views.
+  and persisted groups, verify automatic updates after detector/scale edits,
+  and capture desktop/mobile views.
 
 Passing counts and actual browser results are recorded in the
 [verification log](athena-verification.md). These checks use the Larch backend
