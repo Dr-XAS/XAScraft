@@ -122,7 +122,7 @@ type ParameterSelection = { section: ParameterSection } | { parameter: keyof Par
 type AutoApplyPlan = { token: number; projectId: string; sourceId: string; mode: "current" | "marked"; targetIds: string[]; status: "queued" | "failed" }
 type ParameterSubmission = { sourceId: string; parameters: Parameters }
 type GroupDropTarget = { id: string; position: "before" | "after" }
-type SpectrumDropTarget = GroupDropTarget | { folderId: string }
+type SpectrumDropTarget = GroupDropTarget | { folderId: string } | { ungrouped: true; anchor?: GroupDropTarget }
 type GroupReorderFocus = { id: string; handle: HTMLButtonElement }
 type GroupFolderDraft = { id: string | null; name: string; groupIds: string[] }
 type ProjectSaveDraft = { projectId: string; format: "prj" | "json"; markedOnly: boolean; filename: string }
@@ -1986,6 +1986,31 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       }
     })
   }
+  function moveSpectraOutOfFolders(ids: string[], anchor?: GroupDropTarget) {
+    const current = projectRef.current
+    if (!current || busy || !can("project") || parameterActionBlocked()) return
+    const moving = new Set(ids)
+    if (!current.group_folders?.some(folder => folder.group_ids.some(id => moving.has(id)))) return
+    const moved = current.groups.filter(group => moving.has(group.id))
+    const remaining = current.groups.filter(group => !moving.has(group.id))
+    const targetIndex = anchor && groupSort === "manual" ? remaining.findIndex(group => group.id === anchor.id) : -1
+    const insertion = targetIndex < 0 ? remaining.length : targetIndex + (anchor?.position === "after" ? 1 : 0)
+    remaining.splice(insertion, 0, ...moved)
+    // Keep an emptied folder available so data can be dragged back into it.
+    const folders = current.group_folders.map(folder => ({ ...folder, group_ids: folder.group_ids.filter(id => !moving.has(id)) }))
+    setProject({ ...current, groups: remaining, group_folders: folders })
+    const label = `${moved.length} ${moved.length === 1 ? "spectrum" : "spectra"}`
+    setReorderAnnouncement(`Moving ${label} out of groups.`)
+    void task(`Move ${label} out of groups`, async () => {
+      await command("project", [], { group_folders: folders, group_order: remaining.map(group => group.id) })
+      setReorderAnnouncement(`Moved ${label} out of groups.`)
+    }).then(succeeded => {
+      if (!succeeded) {
+        if (projectRef.current === current) setProject(current)
+        setReorderAnnouncement(`Could not move ${label}. Groups unchanged.`)
+      }
+    })
+  }
   function toggleGroupFolder(folderId: string) {
     if (!project) return
     setCollapsedGroupFolders(previous => {
@@ -2117,9 +2142,10 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     submitGroupOrder(id, current.groups.map(group => visible.has(group.id) ? reordered[cursor++] : group.id))
   }
   function clearGroupDropIndicator() {
-    document.querySelectorAll<HTMLElement>("#athena-data-groups [data-drop-position], #athena-data-groups [data-drop-folder]").forEach(element => {
+    document.querySelectorAll<HTMLElement>("#athena-data-groups [data-drop-position], #athena-data-groups [data-drop-folder], #athena-data-groups [data-drop-ungrouped]").forEach(element => {
       delete element.dataset.dropPosition
       delete element.dataset.dropFolder
+      delete element.dataset.dropUngrouped
     })
     groupDropTargetRef.current = null
   }
@@ -2177,9 +2203,21 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     if (!next && heading && contains(heading)) {
       clearGroupDropIndicator(); return
     }
+    const allRows = Array.from(list.querySelectorAll<HTMLElement>(".ath-group[data-group-id]"))
+    const hit = allRows.find(contains)
+    const canUngroup = can("project") && projectRef.current?.group_folders?.some(item => item.group_ids.some(id => drag.ids.includes(id)))
+    if (!folder && canUngroup) {
+      if (hit?.dataset.reorderScope === "root:ungrouped" && !drag.ids.includes(hit.dataset.groupId!)) {
+        const rect = hit.getBoundingClientRect()
+        next = { ungrouped: true }
+        if (groupSort === "manual") next.anchor = { id: hit.dataset.groupId!, position: clientY < rect.top + rect.height / 2 ? "before" : "after" }
+        indicator = hit
+      } else if (!hit) {
+        next = { ungrouped: true }
+        indicator = list.querySelector<HTMLElement>(".ath-group-ungroup-drop") ?? undefined
+      }
+    }
     if (!next && groupSort === "manual" && canCommand("reorder")) {
-      const allRows = Array.from(list.querySelectorAll<HTMLElement>(".ath-group[data-group-id]"))
-      const hit = allRows.find(contains)
       // Crossing another folder must never silently reorder within the source folder.
       if ((!folder || `folder:${folder.dataset.folderId}` === drag.scope) && (!hit || hit.dataset.reorderScope === drag.scope)) {
         const rows = allRows.filter(row => !drag.ids.includes(row.dataset.groupId!) && row.dataset.reorderScope === drag.scope)
@@ -2191,11 +2229,16 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       }
     }
     const previous = groupDropTargetRef.current
-    if (JSON.stringify(previous) === JSON.stringify(next)) return
+    // Root drops in sorted views share a target but may highlight different rows.
+    if (JSON.stringify(previous) === JSON.stringify(next) && (!next || indicator?.matches("[data-drop-position], [data-drop-folder], [data-drop-ungrouped]"))) return
     clearGroupDropIndicator()
     groupDropTargetRef.current = next
     if (next && indicator) {
       if ("folderId" in next) indicator.dataset.dropFolder = "true"
+      else if ("ungrouped" in next) {
+        indicator.dataset.dropUngrouped = "true"
+        if (next.anchor) indicator.dataset.dropPosition = next.anchor.position
+      }
       else indicator.dataset.dropPosition = next.position
     }
   }
@@ -2259,6 +2302,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     cancelGroupDrag()
     if (!drag.started || !target || !current || busy || parameterUpdatePending || current.id !== drag.projectId || current.version !== drag.version) return
     if ("folderId" in target) moveSpectraIntoFolder(drag.ids, target.folderId)
+    else if ("ungrouped" in target) moveSpectraOutOfFolders(drag.ids, target.anchor)
     else moveGroupTo(drag.id, target, drag.ids)
   }
   const toolsMenu = ["calibrate", "align", "merge", "difference", "sum", "rebin", "deglitch", "truncate", "smooth", "convolve", "deconvolve", "self_absorption", "dispersive", "xrf_xas", "xrf_view", "multi_electron", "copy_series"] as const satisfies readonly Exclude<ModalName, null>[]
@@ -2433,7 +2477,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     const canAssignReference = group.data_type !== "chi" && canOpen("reference")
     const folder = groupFolderByGroupId.get(group.id)
     const reorderCount = project ? visibleReorderIds(project, group.id).length : 0
-    return <div key={group.id} role="listitem" data-group-id={group.id} data-group-folder-id={folder?.id} data-reorder-scope={project ? groupFolderScope(project, group.id) : "root:ungrouped"} data-move-selected={moveSelection.has(group.id) || undefined} className={`ath-group ${active?.id === group.id ? "selected" : ""}`}><button type="button" className="ath-group-drag-handle" aria-label={`Reorder ${group.label}`} aria-describedby="ath-group-reorder-help" aria-keyshortcuts="ArrowUp ArrowDown" title={groupSort !== "manual" && !groupFolders.length ? "Switch to Manual order to reorder spectra" : "Drag selected or marked spectra into a group. In Manual order, drag to reorder or use the Up and Down arrow keys."} disabled={!!busy || parameterUpdatePending || !((canCommand("reorder") && groupSort === "manual" && reorderCount > 1) || (can("project") && groupFolders.length > 0))} onPointerDown={event => beginGroupDrag(event, group)} onPointerMove={updateGroupDrag} onPointerUp={finishGroupDrag} onPointerCancel={cancelGroupDrag} onLostPointerCapture={event => { if (groupDragRef.current?.pointerId === event.pointerId) cancelGroupDrag() }} onKeyDown={event => {
+    return <div key={group.id} role="listitem" data-group-id={group.id} data-group-folder-id={folder?.id} data-reorder-scope={project ? groupFolderScope(project, group.id) : "root:ungrouped"} data-move-selected={moveSelection.has(group.id) || undefined} className={`ath-group ${active?.id === group.id ? "selected" : ""}`}><button type="button" className="ath-group-drag-handle" aria-label={`Reorder ${group.label}`} aria-describedby="ath-group-reorder-help" aria-keyshortcuts="ArrowUp ArrowDown" title={groupSort !== "manual" && !groupFolders.length ? "Switch to Manual order to reorder spectra" : "Drag selected or marked spectra into a group, or onto the outer list to move them out. In Manual order, drag to reorder or use the Up and Down arrow keys."} disabled={!!busy || parameterUpdatePending || !((canCommand("reorder") && groupSort === "manual" && reorderCount > 1) || (can("project") && groupFolders.length > 0))} onPointerDown={event => beginGroupDrag(event, group)} onPointerMove={updateGroupDrag} onPointerUp={finishGroupDrag} onPointerCancel={cancelGroupDrag} onLostPointerCapture={event => { if (groupDragRef.current?.pointerId === event.pointerId) cancelGroupDrag() }} onKeyDown={event => {
       if (event.key === "Escape" && groupDragRef.current?.id === group.id) { event.preventDefault(); cancelGroupDrag(); return }
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
       event.preventDefault(); cancelGroupDrag(); moveGroupBy(group.id, event.key === "ArrowUp" ? -1 : 1)
@@ -2528,11 +2572,11 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
         </div>
         <div className="ath-sidebar-actions" role="group" aria-label="Project actions">{!integrated && <button type="button" disabled={!project || !!busy || parameterUpdatePending} onClick={() => openTool("open")}><FolderOpen size={15} />Open project</button>}<button type="button" onClick={() => openTool("journal")} disabled={!project || !!busy || parameterUpdatePending || !can("project")} aria-label="Project journal"><FileText size={15} /></button></div>
         <label className="ath-search"><Search size={14} /><input aria-describedby="ath-group-search-help" aria-label="Search data" placeholder="Find a spectrum…" value={search} onChange={e => { cancelGroupDrag(); setSearch(e.target.value) }} /><SectionHelp label="Search data" id="ath-group-search-help">Filter visible data by their labels. Hidden data keep their marks and can still be included in marked or all-data operations.</SectionHelp></label>
-        <div className="ath-group-sort-row"><label><ArrowUpDown size={13} aria-hidden="true" /><span>Sort by<SectionHelp label="Sort spectra">Show newest or oldest data first, sort names A–Z, or group by type. Newest and oldest use the order data were added to or created in the project. Folders stay together. Choose Manual order to drag data into a new order.</SectionHelp></span><select aria-label="Sort spectra" aria-describedby="ath-group-sort-help" value={groupSort} onChange={event => changeGroupSort(event.target.value as GroupSort)}><option value="manual">Manual order</option><option value="newest">Newest first</option><option value="added">Oldest first</option><option value="name">Name A–Z</option><option value="tag">Type</option></select></label><span id="ath-group-sort-help" className="ath-sr-only">Sorting changes only the view and keeps folders together. Newest and oldest use the order each spectrum was added to or created in the project. Type order is trans, fluo, ref, theory, then untagged. Switch to Manual order to reorder spectra.</span></div>
-        <div className="ath-mark-toolbar"><label><input type="checkbox" aria-label="Mark all data" disabled={!project?.groups.length || !!busy || !canCommand("metadata")} checked={!!project?.groups.length && marked.length === project.groups.length} onChange={e => markSpectra(project!.groups.map(g => g.id), e.target.checked)} />{marked.length} marked<SectionHelp label="Mark data">Marking chooses data for batch operations and the multiple-spectra viewer. The highlighted current data is independent of these marks.</SectionHelp></label><button type="button" aria-label="Assign reference foil" title="Assign a reference to selected or marked spectra" disabled={!project?.groups.length || !!busy || parameterUpdatePending || !canOpen("reference")} onClick={() => openReferencePicker()}><Link2 size={13} />Ref</button><span className="ath-group-list-tools"><button type="button" aria-label="Create empty group" title="Create an empty group" disabled={!project || !!busy || parameterUpdatePending || !can("project")} onClick={() => createGroupFolder()}><FolderPlus size={13} />Group</button><span className="ath-reorder-hint" id="ath-group-reorder-help" title={groupSort === "manual" ? undefined : "Switch to Manual order to reorder spectra"}>{groupSort === "manual" ? <><GripVertical size={12} />Drag to reorder<span className="ath-sr-only"> within the same group, or drag into another group. Use the Up and Down arrow keys for precise movement.</span></> : <><ArrowUpDown size={12} />Sorted view<span className="ath-sr-only">. Switch to Manual order to reorder spectra.</span></>}</span></span><span className="ath-sr-only" aria-live="polite">{reorderAnnouncement}</span></div>
+        <div className="ath-group-sort-row"><label><ArrowUpDown size={13} aria-hidden="true" /><span>Sort by<SectionHelp label="Sort spectra">Show newest or oldest data first, sort names A–Z, or group by type. Newest and oldest use the order data were added to or created in the project. Folders stay together. Choose Manual order to drag data into a new order.</SectionHelp></span><select aria-label="Sort spectra" aria-describedby="ath-group-sort-help" value={groupSort} onChange={event => changeGroupSort(event.target.value as GroupSort)}><option value="manual">Manual order</option><option value="newest">Newest first</option><option value="added">Oldest first</option><option value="name">Name A–Z</option><option value="tag">Type</option></select></label><span id="ath-group-sort-help" className="ath-sr-only">Sorting changes only the view and keeps folders together. Newest and oldest use the order each spectrum was added to or created in the project. Type order is trans, fluo, ref, theory, then untagged. Drag into a group or onto the outer list to move out. Switch to Manual order to reorder spectra.</span></div>
+        <div className="ath-mark-toolbar"><label><input type="checkbox" aria-label="Mark all data" disabled={!project?.groups.length || !!busy || !canCommand("metadata")} checked={!!project?.groups.length && marked.length === project.groups.length} onChange={e => markSpectra(project!.groups.map(g => g.id), e.target.checked)} />{marked.length} marked<SectionHelp label="Mark data">Marking chooses data for batch operations and the multiple-spectra viewer. The highlighted current data is independent of these marks.</SectionHelp></label><button type="button" aria-label="Assign reference foil" title="Assign a reference to selected or marked spectra" disabled={!project?.groups.length || !!busy || parameterUpdatePending || !canOpen("reference")} onClick={() => openReferencePicker()}><Link2 size={13} />Ref</button><span className="ath-group-list-tools"><button type="button" aria-label="Create empty group" title="Create an empty group" disabled={!project || !!busy || parameterUpdatePending || !can("project")} onClick={() => createGroupFolder()}><FolderPlus size={13} />Group</button><span className="ath-reorder-hint" id="ath-group-reorder-help" title={groupSort === "manual" ? undefined : "Switch to Manual order to reorder spectra"}>{groupSort === "manual" ? <><GripVertical size={12} />Drag to reorder<span className="ath-sr-only"> within the same group, drag into another group, or onto the outer list to move out. Use the Up and Down arrow keys for precise movement.</span></> : <><ArrowUpDown size={12} />Sorted view<span className="ath-sr-only">. Drag into a group or onto the outer list to move out. Switch to Manual order to reorder spectra.</span></>}</span></span><span className="ath-sr-only" aria-live="polite">{reorderAnnouncement}</span></div>
         {moveSelection.size > 0 && <p className="ath-multiselect-help"><span>{moveSelection.size} selected for moving <button type="button" onClick={() => setMoveSelection(new Set())}>Clear</button></span></p>}
         <div ref={groupDragBadgeRef} className="ath-group-drag-badge" hidden aria-hidden="true" />
-        <div className="ath-group-list" role="list" onContextMenu={event => showContext(event, { kind: "group" })} onKeyDown={event => { if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) showContext(event, { kind: "group" }) }}>{renderDataGroupList()}</div>
+        <div className="ath-group-list" role="list" onContextMenu={event => showContext(event, { kind: "group" })} onKeyDown={event => { if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) showContext(event, { kind: "group" }) }}>{renderDataGroupList()}{groupFolders.length > 0 && can("project") && <div className="ath-group-ungroup-drop" role="region" aria-label="Ungrouped data drop area">Drop here to move out of group</div>}</div>
         {!project?.groups.length && !groupFolders.length && <div className="ath-empty-groups"><Layers size={30} strokeWidth={1} /><p>No spectra yet.<SectionHelp label="Importing spectra">Import files together to compare, align, and merge your spectra.</SectionHelp></p></div>}
       </aside>}
       spectrum={<section id="athena-spectrum-viewer" className="ath-center">

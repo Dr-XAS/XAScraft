@@ -2133,6 +2133,168 @@ describe("AthenaWorkbench direct folder interactions", () => {
     expect(document.querySelector("[data-dragging], [data-drop-folder]")).toBeNull()
   })
 
+  function ungroupProject() {
+    return projectFixture({ group_folders: [{ id: "source", name: "Source", group_ids: ["sample", "oxide"] }] })
+  }
+
+  function ungroupDragLayout() {
+    bounds(screen.getByRole("list"), 0, 400)
+    const source = screen.getByRole("group", { name: "Source data group" })
+    bounds(source, 60, 220)
+    bounds(source.querySelector(".ath-group-folder-heading")!, 60, 100)
+    bounds(spectrumRow("foil"), 0, 60)
+    bounds(spectrumRow("sample"), 100, 160)
+    bounds(spectrumRow("oxide"), 160, 220)
+    bounds(spectrumRow("unused"), 220, 280)
+    const dropArea = screen.getByRole("region", { name: "Ungrouped data drop area" })
+    bounds(dropArea, 280, 340)
+    return { source, dropArea }
+  }
+
+  it.each([
+    [230, ["foil", "oxide", "sample", "unused"]],
+    [270, ["foil", "oxide", "unused", "sample"]],
+  ] as const)("drags one folder member out at root-row y=%s and preserves the chosen manual position", async (y, expectedOrder) => {
+    const project = await openSaved(ungroupProject())
+    const { source } = ungroupDragLayout()
+    fireEvent.click(spectrumTitle("sample"), { ctrlKey: true })
+    const title = spectrumTitle("sample")
+    fireEvent(title, pointer("pointerdown", 100, 130))
+    fireEvent(title, pointer("pointermove", 100, y))
+    expect(spectrumRow("unused")).toHaveAttribute("data-drop-ungrouped", "true")
+    expect(spectrumRow("sample")).toHaveAttribute("data-dragging", "true")
+    expect(spectrumRow("oxide")).not.toHaveAttribute("data-dragging")
+    const group_folders = [{ id: "source", name: "Source", group_ids: ["oxide"] }]
+    const group_order = [...expectedOrder]
+    api.mockResolvedValueOnce({ ...project, version: project.version + 1, group_folders,
+      groups: group_order.map(id => project.groups.find(item => item.id === id)!),
+    })
+    fireEvent(title, pointer("pointerup", 100, y))
+    await waitForCommand(project.id, { version: project.version, action: "project", group_ids: [], options: { group_folders, group_order } })
+    await waitForWorkbenchIdle()
+    expect(listedGroupIds()).toEqual(group_order)
+    expect(listedGroupIds(source)).toEqual(["oxide"])
+    expect(spectrumRow("sample")).not.toHaveAttribute("data-group-folder-id")
+    expect(screen.getByRole("checkbox", { name: "Mark Sample scan" })).toBeChecked()
+    expect(plotProps().active?.id).toBe("foil")
+    expect(document.querySelector("[data-dragging], [data-drop-folder], [data-drop-position], [data-drop-ungrouped]")).toBeNull()
+  })
+
+  it("drags a marked batch into blank root space with no root rows and retains the emptied folder", async () => {
+    const project = await openSaved(folderProject())
+    const { source } = folderDragLayout()
+    const dropArea = screen.getByRole("region", { name: "Ungrouped data drop area" })
+    bounds(dropArea, 320, 360)
+    const handle = screen.getByRole("button", { name: "Reorder Sample scan" })
+    fireEvent(handle, pointer("pointerdown", 15, 230))
+    const plotRenders = plot.mock.calls.length
+    for (let x = 70; x <= 170; x += 10) fireEvent(handle, pointer("pointermove", x, 340))
+    expect(dropArea).toHaveAttribute("data-drop-ungrouped", "true")
+    expect(spectrumRow("sample")).toHaveAttribute("data-dragging", "true")
+    expect(spectrumRow("oxide")).toHaveAttribute("data-dragging", "true")
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(plot).toHaveBeenCalledTimes(plotRenders)
+    const response = deferred<AthenaProject>()
+    api.mockReturnValueOnce(response.promise)
+    fireEvent(handle, pointer("pointerup", 100, 340))
+    const group_folders = [
+      { id: "pair", name: "Pair", group_ids: ["foil", "unused"] },
+      { id: "source", name: "Source", group_ids: [] },
+    ]
+    const group_order = ["foil", "unused", "sample", "oxide"]
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "project", group_ids: [], options: { group_folders, group_order },
+    }))
+    expect(listedGroupIds(source)).toEqual([])
+    expect(screen.getByRole("checkbox", { name: "Mark all spectra in Source" })).toBeDisabled()
+    expect(spectrumRow("sample")).not.toHaveAttribute("data-group-folder-id")
+    await act(async () => response.resolve({ ...project, version: project.version + 1, group_folders,
+      groups: group_order.map(id => project.groups.find(item => item.id === id)!),
+    }))
+    await waitForWorkbenchIdle()
+    expect(screen.getByRole("group", { name: "Source data group" })).toBeVisible()
+    expect(listedGroupIds()).toEqual(group_order)
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(plotProps().active?.id).toBe("foil")
+    expect(document.querySelector("[data-dragging], [data-drop-ungrouped]")).toBeNull()
+  })
+
+  it("moves a folder member to the root in Name order while keeping the sorted view", async () => {
+    const project = await openSaved(ungroupProject())
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort spectra" }), { target: { value: "name" } })
+    const { source } = ungroupDragLayout()
+    bounds(spectrumRow("oxide"), 100, 160)
+    bounds(spectrumRow("sample"), 160, 220)
+    fireEvent.click(spectrumTitle("sample"), { ctrlKey: true })
+    const handle = screen.getByRole("button", { name: "Reorder Sample scan" })
+    fireEvent(handle, pointer("pointerdown", 15, 190))
+    fireEvent(handle, pointer("pointermove", 100, 230))
+    expect(spectrumRow("unused")).toHaveAttribute("data-drop-ungrouped", "true")
+    expect(document.querySelector("[data-drop-position]")).toBeNull()
+    const group_folders = [{ id: "source", name: "Source", group_ids: ["oxide"] }]
+    const group_order = ["foil", "oxide", "unused", "sample"]
+    api.mockResolvedValueOnce({ ...project, version: project.version + 1, group_folders,
+      groups: group_order.map(id => project.groups.find(item => item.id === id)!),
+    })
+    fireEvent(handle, pointer("pointerup", 100, 230))
+    await waitForCommand(project.id, { version: project.version, action: "project", group_ids: [], options: { group_folders, group_order } })
+    await waitForWorkbenchIdle()
+    expect(screen.getByRole("combobox", { name: "Sort spectra" })).toHaveValue("name")
+    expect(listedGroupIds(source)).toEqual(["oxide"])
+    expect(Array.from(document.querySelectorAll<HTMLElement>(".ath-group[data-reorder-scope='root:ungrouped']"), row => row.dataset.groupId)).toEqual(["foil", "sample", "unused"])
+  })
+
+  it("restores folder membership and root order when dragging out cannot be saved", async () => {
+    await openSaved(ungroupProject())
+    const { source, dropArea } = ungroupDragLayout()
+    fireEvent.click(spectrumTitle("sample"), { ctrlKey: true })
+    const title = spectrumTitle("sample")
+    fireEvent(title, pointer("pointerdown", 100, 130))
+    fireEvent(title, pointer("pointermove", 100, 310))
+    expect(dropArea).toHaveAttribute("data-drop-ungrouped", "true")
+    const response = deferred<AthenaProject>()
+    api.mockReturnValueOnce(response.promise)
+    fireEvent(title, pointer("pointerup", 100, 310))
+    expect(listedGroupIds(source)).toEqual(["oxide"])
+    expect(spectrumRow("sample")).not.toHaveAttribute("data-group-folder-id")
+    await act(async () => response.reject(new Error("Moving data out could not be saved.")))
+    expect(await screen.findByRole("alert")).toHaveTextContent("Moving data out could not be saved.")
+    expect(listedGroupIds(source)).toEqual(["sample", "oxide"])
+    expect(listedGroupIds()).toEqual(["foil", "sample", "oxide", "unused"])
+    expect(spectrumRow("sample")).toHaveAttribute("data-group-folder-id", "source")
+    expect(plotProps().active?.id).toBe("foil")
+    expect(document.querySelector("[data-dragging], [data-drop-ungrouped]")).toBeNull()
+  })
+
+  it.each(["Escape", "pointercancel", "outside"])("cancels a drag-out on %s without saving", async cancellation => {
+    await openSaved(ungroupProject())
+    const { source, dropArea } = ungroupDragLayout()
+    const handle = screen.getByRole("button", { name: "Reorder Sample scan" })
+    fireEvent(handle, pointer("pointerdown", 15, 130))
+    fireEvent(handle, pointer("pointermove", 100, 310))
+    expect(dropArea).toHaveAttribute("data-drop-ungrouped", "true")
+    if (cancellation === "Escape") fireEvent.keyDown(document, { key: "Escape" })
+    else if (cancellation === "pointercancel") fireEvent(handle, pointer("pointercancel", 100, 310))
+    else fireEvent(handle, pointer("pointermove", 300, 310))
+    expect(document.querySelector("[data-drop-ungrouped]")).toBeNull()
+    fireEvent(handle, pointer("pointerup", cancellation === "outside" ? 300 : 100, 310))
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(listedGroupIds(source)).toEqual(["sample", "oxide"])
+    expect(document.querySelector("[data-dragging], [data-drop-ungrouped]")).toBeNull()
+  })
+
+  it("does not save when already ungrouped data are dropped in root blank space", async () => {
+    await openSaved(ungroupProject())
+    const { dropArea } = ungroupDragLayout()
+    const handle = screen.getByRole("button", { name: "Reorder Unused reference" })
+    fireEvent(handle, pointer("pointerdown", 15, 250))
+    fireEvent(handle, pointer("pointermove", 100, 310))
+    expect(dropArea).not.toHaveAttribute("data-drop-ungrouped")
+    fireEvent(handle, pointer("pointerup", 100, 310))
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(listedGroupIds()).toEqual(["foil", "sample", "oxide", "unused"])
+  })
+
   it.each(["Escape", "pointercancel"])("cleans up a pending folder drag on %s without saving", async cancellation => {
     await openSaved(folderProject())
     folderDragLayout()
