@@ -18,7 +18,7 @@ import { ArtemisTheorySummary } from "./artemis-theory-summary"
 import styles from "../artemis-fitting.module.css"
 
 const componentLabels: Record<ComplexComponent, string> = { mag: "|χ(R)|", re: "Re χ(R)", im: "Im χ(R)", pha: "Phase χ(R)" }
-const componentDashes: Record<ComplexComponent, string> = { mag: "solid", re: "dash", im: "dot", pha: "dashdot" }
+const componentDashes: Record<ComplexComponent, string> = { mag: "solid", re: "dashdot", im: "dot", pha: "dash" }
 
 function rComponent(values: { mag: number[]; re: number[]; im: number[] }, component: ComplexComponent): number[] {
   if (component !== "pha") return values[component]

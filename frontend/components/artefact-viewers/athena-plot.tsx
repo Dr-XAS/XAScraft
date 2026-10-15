@@ -10,7 +10,7 @@ import { DEFAULT_R_PLOT_RANGE, spectrumTraceCoordinates, type PlotSpace } from "
 
 export type Space = PlotSpace
 export type ComplexComponent = "mag" | "re" | "im" | "pha"
-const componentDashes: Record<ComplexComponent, string> = { mag: "solid", re: "dash", im: "dot", pha: "dashdot" }
+const componentDashes: Record<ComplexComponent, string> = { mag: "solid", re: "dashdot", im: "dot", pha: "dash" }
 function complexComponentTitle(component: string, space: Space) {
   return component === "mag" ? `|χ(${space})|` : component === "pha" ? `Phase χ(${space}) (rad)` : `${component === "re" ? "Re" : "Im"}[χ(${space})]`
 }
@@ -147,7 +147,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
         // data beyond the FT cutoff. Both curves use the transform's k-weight
         // and identical display scaling; q is already weighted by the FFT.
         const kTrace = spectrumTraceCoordinates(g, "k", energyMode)
-        if (kTrace) add(kTrace.x, transform(kTrace.y), `χ(k) · ${name}`, color, multipleComponents ? "longdash" : "dash", true)
+        if (kTrace) add(kTrace.x, transform(kTrace.y), `χ(k) · ${name}`, color, multipleComponents ? "longdash" : "dashdot", true)
       }
     }
     const current = displayed.find(trace => trace.g.id === activeId)
@@ -163,7 +163,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       // Larch fills bkg outside its fitted support with mu. Show only the
       // selected spline interval, on the already shifted result energy axis.
       const fitted = a.bkg && backgroundInSplineRange(current.g, a.energy, a.bkg)
-      if (fitted) add(fitted.x, current.transform(fitted.y), `Background μ₀(E) · ${current.g.label}`, "#ddaa58", "dash")
+      if (fitted) add(fitted.x, current.transform(fitted.y), `Background μ₀(E) · ${current.g.label}`, "#ddaa58", "dashdot")
     }
     if (current && a && current.g.result && plotScope === "current" && space === "E" && energyMode === "mu"
       && current.g.data_type !== "detector" && current.g.data_type !== "chi" && !isDifferenceGroup(current.g)) {
@@ -181,7 +181,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       ] as const) {
         if (!enabled || a[key]?.length !== a.energy.length) continue
         const legendgroup = `${current.g.id}:${key}`
-        const line = add(a.energy, current.transform(a[key]), `${label} line · ${current.g.label}`, color, "dash")
+        const line = add(a.energy, current.transform(a[key]), `${label} line · ${current.g.label}`, color, "dashdot")
         if (line) line.legendgroup = legendgroup
         if (e0 === null) continue
         const points = ([start, end] as const).flatMap((bound, index) => {
@@ -232,7 +232,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
         if (row) {
           const x = row.x as number[], label = String(row.label ?? "")
           add(x, (row.observed ?? []) as number[], `Observed · ${label}`, "#16736b", "solid", true)
-          add(x, (row.fit ?? []) as number[], `Fit · ${label}`, "#c37b38", "dash")
+          add(x, (row.fit ?? []) as number[], `Fit · ${label}`, "#c37b38", "dashdot")
           add(x, (row.residual ?? []) as number[], `Residual · ${label}`, "#7470b0")
         }
         xTitle = analysis.options.array === "chi" || analysis.options.array === "weighted_chi" ? "k (Å⁻¹)" : "Energy (eV)"
@@ -248,7 +248,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
           const label = names[index] ?? `Spectrum ${index + 1}`
           const x = (spectrum.x ?? []) as number[]
           add(x, (spectrum.observed ?? []) as number[], `Observed · ${label}`, seriesColors[index], "solid", true)
-          add(x, (spectrum.fit ?? []) as number[], `Fit · ${label}`, seriesColors[index], "dash")
+          add(x, (spectrum.fit ?? []) as number[], `Fit · ${label}`, seriesColors[index], "dashdot")
         })
         xTitle = analysis.options.array === "chi" || analysis.options.array === "weighted_chi" ? "k (Å⁻¹)" : "Energy (eV)"
         yTitle = "Signal / fit"
@@ -261,7 +261,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       } else {
         const x = (result.x ?? []) as number[]
         add(x, (result.observed ?? []) as number[], "Observed", "#16736b", "solid", true)
-        add(x, (result.fit ?? []) as number[], "Fit", "#c37b38", "dash")
+        add(x, (result.fit ?? []) as number[], "Fit", "#c37b38", "dashdot")
         add(x, (result.residual ?? []) as number[], "Residual", "#7470b0")
         xTitle = analysis.options.array === "chi" || analysis.options.array === "weighted_chi" ? "k (Å⁻¹)" : "Energy (eV)"
         yTitle = "Signal / fit"

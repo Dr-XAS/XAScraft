@@ -20,7 +20,7 @@ export function AthenaReaderPreview({ value, required, reviewed, onReviewed, dis
     {open && <div className={styles.plot} aria-label="I0 correction plot"><Plot
       data={value.traces.map((trace, index) => ({ x: trace.x.slice(), y: trace.y.slice(), name: trace.label, type: 'scatter', mode: 'lines',
         line: { color: ['#b96342', '#7470b0', '#467cac', '#16736b'][index], width: 1.8,
-          dash: trace.role === 'pre' || trace.role === 'post' ? 'dash' : 'solid' } }))}
+          dash: trace.role === 'pre' || trace.role === 'post' ? 'dashdot' : 'solid' } }))}
       layout={{ autosize: true, margin: { l: 65, r: 15, t: 80, b: 55 }, showlegend: true,
         legend: { orientation: 'h', x: 0, y: 1.05, yanchor: 'bottom' },
         xaxis: { title: { text: 'Energy (eV)' }, zeroline: false }, yaxis: { title: { text: 'I0 signal' }, zeroline: false },

@@ -548,7 +548,7 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
   ])("independently toggles each line with background disabled: $preEdge/$postEdge", ({ preEdge, postEdge, names }) => {
     show({ plotScope: "current", preEdge, postEdge })
     expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", ...names])
-    handoff().data.slice(1).forEach(trace => expect(trace.line?.dash).toBe("dash"))
+    handoff().data.slice(1).forEach(trace => expect(trace.line?.dash).toBe("dashdot"))
   })
 
   it("keeps the background independent of both line selections", () => {
@@ -806,7 +806,7 @@ describe("AthenaPlot k and q comparison", () => {
       expect(k.y).toEqual(scale(a.weighted_chi))
       expect(k.name).toContain("χ(k)")
       expect(k.name).toContain(`k-weight ${sample.result!.effective.kweight}`)
-      expect(k.line).toMatchObject({ color: q.line?.color, dash: "dash" })
+      expect(k.line).toMatchObject({ color: q.line?.color, dash: "dashdot" })
       expect(k.mode).toBe("lines+markers")
       expect(k.yaxis).toBeUndefined()
     }

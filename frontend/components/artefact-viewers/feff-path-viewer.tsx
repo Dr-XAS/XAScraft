@@ -139,7 +139,7 @@ function PathContributions({ state, rows, shown, filter, onFilter, sort, onSort,
     // it, and in magnitude the parts do not add.
     curves.partial
       ? { type: "scatter", mode: "lines", name: `${totalLabel} · all ${curves.included} included paths`, x: curves.x.slice(), y: curves.full.slice(),
-        line: { color: "#8a948e", width: 1.6, dash: "dash" }, hovertemplate: hover }
+        line: { color: "#8a948e", width: 1.6, dash: "dashdot" }, hovertemplate: hover }
       : { type: "scatter", mode: "lines", name: curves.count ? `${scoped ? "Selected source" : "Model"} · sum of all ${curves.included} included paths` : `${totalLabel} · all ${curves.included} included paths`,
         x: curves.x.slice(), y: curves.full.slice(), line: { color: "#2d3b33", width: 2 }, hovertemplate: hover },
     ...(curves.partial ? [{ type: "scatter", mode: "lines", name: `Sum of shown paths · ${curves.count} of ${curves.included}`,
@@ -179,7 +179,7 @@ function PathContributions({ state, rows, shown, filter, onFilter, sort, onSort,
           }} config={{ responsive: true, displaylogo: false, toImageButtonOptions: { filename: `feff-path-contributions-${space}`, scale: 2 } }}
           useResizeHandler style={{ width: "100%", height: "100%" }} onError={() => setPlotError(true)} /></div>
         </ResizablePlotCard>)}
-      {preview && <p className={styles.note}>Starting values only: no fit has been run and no measured spectrum is used. The shaded band is the fit range. Magnitudes do not add — the complex contributions are summed before the magnitude is taken, so the sum can be smaller than a single path.{scoped ? " Contributions cover only the selected source." : ""}{curves?.partial ? ` While a filter hides paths, the solid sum covers only the paths shown and the dashed curve includes all paths in ${scoped ? "the selected source" : "the starting model"}.` : ""}</p>}
+      {preview && <p className={styles.note}>Starting values only: no fit has been run and no measured spectrum is used. The shaded band is the fit range. Magnitudes do not add — the complex contributions are summed before the magnitude is taken, so the sum can be smaller than a single path.{scoped ? " Contributions cover only the selected source." : ""}{curves?.partial ? ` While a filter hides paths, the solid sum covers only the paths shown and the dash-dot curve includes all paths in ${scoped ? "the selected source" : "the starting model"}.` : ""}</p>}
     </>}
     <div className={styles.filters} role="group" aria-label="Path filters">
       <label><span>Legs<SectionHelp label="Filter by legs">Show all paths, single scattering with two legs, or multiple scattering with three or more legs. These filters change the displayed list, not which paths are included in the fit.</SectionHelp></span><select aria-label="Filter by legs" value={filter.legs} onChange={event => onFilter({ ...filter, legs: event.target.value as PathFilter["legs"] })}>

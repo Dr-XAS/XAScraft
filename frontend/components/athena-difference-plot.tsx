@@ -33,7 +33,7 @@ export function AthenaDifferencePlot({ preview, view, labels, standardLabel, pic
         if (input.error || plottedInputs.has(key)) continue
         // Each original input has its own saved k grid and weighting. Neither
         // the difference multiplier nor inversion applies to these overlays.
-        if (add(input.k, input.weighted_chi, `${input.label} · original ${input.role} · k-weight ${input.kweight ?? "unknown"}`, color, input.role === "DATA" ? "dot" : "dash")) {
+        if (add(input.k, input.weighted_chi, `${input.label} · original ${input.role} · k-weight ${input.kweight ?? "unknown"}`, color, input.role === "DATA" ? "dot" : "dashdot")) {
           plottedInputs.add(key); plottedWeights.push(input.kweight)
         }
       }
@@ -42,7 +42,7 @@ export function AthenaDifferencePlot({ preview, view, labels, standardLabel, pic
       if (preview.options.plot_inputs) {
         add(result.energy, result.data, `${labels[result.group_id] ?? result.group_id} · DATA (${result.data_form})`, color, "dot")
         // The backend already applied the standard multiplier.
-        add(result.energy, result.standard, `${standardLabel} · scaled STANDARD (${result.standard_form}) for ${labels[result.group_id] ?? result.group_id}`, color, "dash")
+        add(result.energy, result.standard, `${standardLabel} · scaled STANDARD (${result.standard_form}) for ${labels[result.group_id] ?? result.group_id}`, color, "dashdot")
       }
     }
   }

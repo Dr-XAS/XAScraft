@@ -187,7 +187,7 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
               ? { title: { text: 'Probing depth 1/(μ_in/sin θ_in + μ_f/sin θ_out) (µm)' }, automargin: true, rangemode: 'tozero' }
               : { title: { text: 'Normalized μ(E)' }, automargin: true },
             shapes: slab === undefined ? [] : [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: slab, y1: slab,
-              line: { color: '#bb6542', width: 1.5, dash: 'dash' } }],
+              line: { color: '#bb6542', width: 1.5, dash: 'dashdot' } }],
             annotations: slab === undefined ? [] : [{ xref: 'paper', x: 1, xanchor: 'right', yref: 'y', y: slab, yanchor: 'bottom',
               text: `sample thickness ${slab} µm`, showarrow: false }],
             uirevision: `${project.id}:${activeId}:${view}` }}

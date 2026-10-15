@@ -85,7 +85,7 @@ for (const name of ['feff-copper-xmu.dat', 'feff-nio-xmu.dat']) {
         await expect.poll(() => plot.evaluate(node => {
           const traces = (node as HTMLElement & { data: { line: { color: string; dash: string } }[] }).data
           return { sameColor: traces[0].line.color === traces[1].line.color, dash: traces[1].line.dash }
-        })).toEqual({ sameColor: true, dash: 'dash' })
+        })).toEqual({ sameColor: true, dash: 'dashdot' })
       }
     }
     const download = page.waitForEvent('download')
