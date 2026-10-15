@@ -6,9 +6,10 @@ import { FitCurvesIcon } from "./athena-viewer-icons"
 
 export type ParameterTab = "processing" | "fitting"
 
-export function AthenaParameterTabs({ tab, select, processing, fitting, onProcessingContextMenu }: {
+export function AthenaParameterTabs({ tab, select, heading, processing, fitting, onProcessingContextMenu }: {
   tab: ParameterTab
   select: (tab: ParameterTab) => void
+  heading?: ReactNode
   processing: ReactNode
   /** Pass null to drop the fitting tab entirely: a linked integration project cannot be fitted. */
   fitting: ReactNode | null
@@ -17,7 +18,7 @@ export function AthenaParameterTabs({ tab, select, processing, fitting, onProces
   const id = useId()
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const tabs = ["processing", "fitting"] as const
-  if (fitting === null) return <>{processing}</>
+  if (fitting === null) return <>{heading}{processing}</>
   return <>
     <div className="ath-parameter-tabs" role="tablist" aria-label="Parameter workflow">
       {tabs.map((value, index) => <button key={value} type="button"
@@ -41,6 +42,7 @@ export function AthenaParameterTabs({ tab, select, processing, fitting, onProces
         <span>{value === "processing" ? "Processing" : "EXAFS fitting"}</span>
       </button>)}
     </div>
+    {heading}
     {tabs.map(value => <div key={value} className="ath-parameter-tab-panel"
       id={`${id}-${value}-panel`} role="tabpanel" aria-labelledby={`${id}-${value}-tab`}
       hidden={tab !== value} tabIndex={0}>

@@ -285,11 +285,12 @@ html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="fit"] { --viewer-acc
 .ath-parameters { grid-area: processing; background: var(--ath-surface); display: flex; flex-direction: column; min-width: 0; }
 .ath-parameters .ath-panel-heading { border-bottom: 1px solid var(--ath-line); }
 .ath-parameters .ath-panel-heading svg { color: var(--ath-muted); }
-.ath-parameter-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--ath-line); }
-.ath-app .ath-parameter-tabs button { scroll-margin-top: 8px; min-width: 0; min-height: 38px; border-radius: 0; border-bottom: 2px solid transparent; justify-content: center; gap: 6px; font-size: var(--text-section); line-height: var(--leading-heading); white-space: normal; }
+.ath-parameter-tabs { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; background: var(--ath-surface-muted); border-bottom: 1px solid var(--ath-line); }
+.ath-app .ath-parameter-tabs button { scroll-margin-top: 8px; min-width: 0; min-height: 44px; border-radius: 0; border-bottom: 3px solid transparent; justify-content: center; gap: 8px; font-size: var(--text-section); font-weight: 600; line-height: var(--leading-heading); white-space: normal; }
+.ath-app .ath-parameter-tabs button:focus-visible { outline-offset: -3px; }
 .ath-parameter-tabs button svg { flex: 0 0 20px; }
 .ath-parameter-tabs button span { min-width: 0; overflow-wrap: anywhere; }
-.ath-app .ath-parameter-tabs button[aria-selected=true] { color: var(--ath-primary); background: var(--ath-primary-soft); border-bottom-color: var(--ath-primary); }
+.ath-app .ath-parameter-tabs button[aria-selected=true] { color: var(--ath-primary); background: color-mix(in srgb, var(--ath-primary) 14%, var(--ath-surface)); border-bottom-color: var(--ath-primary); }
 .ath-parameter-tab-panel { min-width: 0; min-height: 0; height: 0; flex: 1 1 0px; display: flex; flex-direction: column; }
 .ath-parameter-tab-panel[hidden] { display: none; }
 .ath-param-current { padding: 8px 12px; display: flex; align-items: center; gap: 7px; background: var(--ath-surface-muted); border-bottom: 1px solid var(--ath-line); }
