@@ -1275,6 +1275,41 @@ describe("ArtemisStructures", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 
+  it("picks a canonical element without searching until Search structures is requested", async () => {
+    setup()
+    fireEvent.change(screen.getByLabelText("CIF search query"), { target: { value: "CuSP" } })
+    await click("Pick element")
+    const picker = screen.getByRole("dialog", { name: "Pick element" })
+    fireEvent.change(within(picker).getByLabelText("Find element"), { target: { value: "sulfur" } })
+    fireEvent.click(within(picker).getByRole("button", { name: "S · Sulfur · Atomic number 16" }))
+    expect(screen.getByLabelText("CIF element filter")).toHaveValue("S")
+    expect(screen.getByLabelText("CIF search query")).toHaveValue("CuSP")
+    expect(screen.queryByRole("dialog", { name: "Pick element" })).not.toBeInTheDocument()
+    expect(screen.getByRole("dialog", { name: "Crystal structures" })).toBeVisible()
+    expect(api.mock.calls.some(([url]) => url.startsWith("/structures?"))).toBe(false)
+
+    await click("Search structures")
+    const searches = api.mock.calls.filter(([url]) => url.startsWith("/structures?"))
+    expect(searches).toHaveLength(1)
+    const params = new URLSearchParams(searches[0][0].split("?")[1])
+    expect(params.get("element")).toBe("S")
+    expect(params.get("q")).toBe("CuSP")
+  })
+
+  it("preserves a typed element on picker cancellation and clears it only on request", async () => {
+    setup()
+    fireEvent.change(screen.getByLabelText("CIF element filter"), { target: { value: "Fe" } })
+    await click("Pick element")
+    const picker = screen.getByRole("dialog", { name: "Pick element" })
+    fireEvent(picker, new Event("cancel", { bubbles: true, cancelable: true }))
+    expect(screen.getByLabelText("CIF element filter")).toHaveValue("Fe")
+    expect(screen.getByRole("dialog", { name: "Crystal structures" })).toBeVisible()
+    await click("Pick element")
+    await click("Clear selection")
+    expect(screen.getByLabelText("CIF element filter")).toHaveValue("")
+    expect(api.mock.calls.some(([url]) => url.startsWith("/structures?"))).toBe(false)
+  })
+
   it("searches only on request and supports an element filter with literal URL encoding", async () => {
     setup()
     fireEvent.change(screen.getByLabelText("Structure source"), { target: { value: "amcsd" } })

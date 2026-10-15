@@ -44,7 +44,9 @@
 .panel button.attachButton:not(:disabled):hover { background: var(--ath-attach-hover, #216940); color: var(--ath-primary-foreground); }
 .help, .source, .citation { color: var(--ath-muted, #647669); font-size: var(--text-caption); line-height: var(--leading-body); margin: 7px 0; overflow-wrap: anywhere; }
 .searchFields, .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; margin: 10px 0; }
-.searchFields { grid-template-columns: minmax(0, 1fr) 80px; }
+.searchFields { grid-template-columns: minmax(0, 1fr) 112px; }
+.elementFilter { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.panel button.elementPicker { width: 100%; min-height: 30px; padding: 4px 7px; gap: 5px; font-size: 11px; color: var(--ath-primary, #6d28d9); }
 .searchFields label, .grid label { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ath-muted, #647669); font-size: var(--text-label); }
 .searchResults { margin: 10px 0; max-height: 250px; overflow-y: auto; }
 .panel button.result { display: flex; width: 100%; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; white-space: normal; margin: 5px 0; padding: 8px; }

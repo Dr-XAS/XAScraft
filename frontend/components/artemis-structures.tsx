@@ -4,6 +4,7 @@ import { SectionHelp } from "./section-help"
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Pencil, Search, Trash2, Upload, X } from "lucide-react"
 import { CifViewer } from "./artefact-viewers/cif-viewer"
+import { ElementPicker } from "./artefacts/element-picker"
 import { useCifRadius } from "@/lib/cif-radius-context"
 import { CIF_VIEWER_MIN_RADIUS, CIF_VIEWER_MAX_RADIUS } from "@/lib/cif-viewer"
 import { useFirstShell } from "@/lib/use-first-shell"
@@ -694,7 +695,11 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
       <div className={styles.searchFields}>
         <label><span>{provider === "auto" ? "Formula, mineral, or structure ID" : provider === "materials_project" ? "Formula, chemical system, or MP ID" : "Mineral, formula, or AMCSD ID"}<SectionHelp label="Structure search">{provider === "amcsd" ? "Search the local AMCSD database snapshot by mineral, formula, or AMCSD ID." : "Search by formula such as Cu2O, chemical system such as Cu-O, or material ID such as mp-30. AMCSD also supports mineral names and numeric IDs."} Formula searches include structures with the same elements in different proportions, with exact formula matches first. For example, LiMnNiO2 also finds LiMn0.5Ni0.5O2.</SectionHelp></span><input aria-label={`${searchProviderLabel} search query`} value={query} placeholder={provider === "amcsd" ? "e.g. copper or 13088" : "e.g. LiMnNiO2, Cu-O, mp-30"} disabled={controlsDisabled}
           onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void findStructures() } }} /></label>
-        <label><span>Contains element<SectionHelp label="Structure element filter">Filter for structures containing this chemical symbol, for example Cu. This does not select the absorbing element or restrict the structure to a pure element.</SectionHelp></span><input aria-label={`${searchProviderLabel} element filter`} value={element} placeholder="e.g. Cu" maxLength={2} disabled={controlsDisabled} onChange={event => setElement(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void findStructures() } }} /></label>
+        <div className={styles.elementFilter}>
+          <label><span>Contains element<SectionHelp label="Structure element filter">Filter for structures containing this chemical symbol, for example Cu. Type a symbol or choose one from the periodic table. This does not select the absorbing element or restrict the structure to a pure element.</SectionHelp></span><input aria-label={`${searchProviderLabel} element filter`} value={element} placeholder="e.g. Cu" maxLength={2} disabled={controlsDisabled} onChange={event => setElement(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void findStructures() } }} /></label>
+          {open && <ElementPicker value={element || null} onChange={symbol => setElement(symbol ?? "")} disabled={controlsDisabled} className={styles.elementPicker}
+            style={{ "--ep-background": "var(--ath-canvas)", "--ep-surface": "var(--ath-popover)", "--ep-ink": "var(--ath-ink)", "--ep-muted": "var(--ath-muted)", "--ep-border": "var(--ath-line)", "--ep-accent": "var(--ath-primary)" }} />}
+        </div>
       </div>
       <p className={styles.help}>Exact formula matches appear first, followed by other proportions of the same elements.</p>
       <button type="button" disabled={controlsDisabled || busy === "search" || (!query.trim() && !element.trim())} onClick={findStructures}><Search size={13} />{busy === "search" ? "Searching…" : provider === "auto" ? "Search structures" : `Search ${searchProviderLabel}`}</button>
