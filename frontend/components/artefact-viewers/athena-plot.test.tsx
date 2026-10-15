@@ -202,7 +202,7 @@ describe("AthenaPlot display options", () => {
     show({ showGrid: false, showDataPoints: true, plotScope: "current", background: true })
     const [spectrum, background] = handoff().data
     expect(spectrum).toMatchObject({ mode: "lines+markers", marker: { color: spectrum.line?.color, size: 4 } })
-    expect(background).toMatchObject({ mode: "lines", name: "Background μ₀(E) · Sample" })
+    expect(background).toMatchObject({ mode: "lines", name: "Background μ₀(E)" })
     expect(background.marker).toBeUndefined()
     expect(handoff().layout.xaxis.showgrid).toBe(false)
     expect(handoff().layout.yaxis.showgrid).toBe(false)
@@ -542,9 +542,9 @@ describe("AthenaPlot backgrounds and displayed groups", () => {
 describe("AthenaPlot individual pre-edge and post-edge lines", () => {
   it.each([
     { preEdge: false, postEdge: false, names: [] },
-    { preEdge: true, postEdge: false, names: ["Pre-edge line · Sample"] },
-    { preEdge: false, postEdge: true, names: ["Post-edge line · Sample"] },
-    { preEdge: true, postEdge: true, names: ["Pre-edge line · Sample", "Post-edge line · Sample"] },
+    { preEdge: true, postEdge: false, names: ["Pre-edge line"] },
+    { preEdge: false, postEdge: true, names: ["Post-edge line"] },
+    { preEdge: true, postEdge: true, names: ["Pre-edge line", "Post-edge line"] },
   ])("independently toggles each line with background disabled: $preEdge/$postEdge", ({ preEdge, postEdge, names }) => {
     show({ plotScope: "current", preEdge, postEdge })
     expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", ...names])
@@ -553,11 +553,11 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
 
   it("keeps the background independent of both line selections", () => {
     const rendered = show({ plotScope: "current", background: true })
-    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Background μ₀(E) · Sample"])
+    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Background μ₀(E)"])
     rendered.unmount()
     show({ plotScope: "current", background: true, preEdge: true, postEdge: true })
     expect(handoff().data.map(trace => trace.name)).toEqual([
-      "Sample", "Background μ₀(E) · Sample", "Pre-edge line · Sample", "Post-edge line · Sample",
+      "Sample", "Background μ₀(E)", "Pre-edge line", "Post-edge line",
     ])
   })
 
@@ -571,7 +571,7 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
     freeze(sample)
     show({ groups: [group("First"), sample], active: staleActive, plotScope: "current", preEdge: true, postEdge: true, offset: 10 })
     const { data } = handoff()
-    expect(data.map(trace => trace.name)).toEqual(["First", "Scaled", "Pre-edge line · Scaled", "Post-edge line · Scaled"])
+    expect(data.map(trace => trace.name)).toEqual(["First", "Scaled", "Pre-edge line", "Post-edge line"])
     expect(data[1].y).toEqual([15, 17, 19])
     expect(data[2].y).toEqual([13.2, 13.4, 13.6])
     expect(data[3].y).toEqual([17, 19, 21])
@@ -648,7 +648,7 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
     sample.result!.effective = {}
     sample.parameters = { ...sample.parameters, e0: null, pre1: null, pre2: null, norm1: null, norm2: null }
     const missing = show({ groups: [sample], active: sample, plotScope: "current", preEdge: true, postEdge: true })
-    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Pre-edge line · Sample", "Post-edge line · Sample"])
+    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Pre-edge line", "Post-edge line"])
     missing.unmount()
 
     sample.result!.effective = { e0: 8980, pre1: -20, pre2: -10, norm1: 10, norm2: 20 }
@@ -695,7 +695,7 @@ describe("AthenaPlot individual pre-edge and post-edge lines", () => {
     const sample = group()
     sample.result!.arrays.pre_edge = [0.1]
     const rendered = show({ groups: [sample], active: sample, plotScope: "current", preEdge: true, postEdge: true })
-    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Post-edge line · Sample"])
+    expect(handoff().data.map(trace => trace.name)).toEqual(["Sample", "Post-edge line"])
     rendered.unmount()
     delete sample.result!.arrays.post_edge
     show({ groups: [sample], active: sample, plotScope: "current", preEdge: true, postEdge: true })

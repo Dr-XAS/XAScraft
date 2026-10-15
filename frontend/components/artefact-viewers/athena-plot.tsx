@@ -163,7 +163,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       // Larch fills bkg outside its fitted support with mu. Show only the
       // selected spline interval, on the already shifted result energy axis.
       const fitted = a.bkg && backgroundInSplineRange(current.g, a.energy, a.bkg)
-      if (fitted) add(fitted.x, current.transform(fitted.y), `Background μ₀(E) · ${current.g.label}`, "#ddaa58", "dashdot")
+      if (fitted) add(fitted.x, current.transform(fitted.y), plotScope === "current" ? "Background μ₀(E)" : `Background μ₀(E) · ${current.g.label}`, "#ddaa58", "dashdot")
     }
     if (current && a && current.g.result && plotScope === "current" && space === "E" && energyMode === "mu"
       && current.g.data_type !== "detector" && current.g.data_type !== "chi" && !isDifferenceGroup(current.g)) {
@@ -181,7 +181,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       ] as const) {
         if (!enabled || a[key]?.length !== a.energy.length) continue
         const legendgroup = `${current.g.id}:${key}`
-        const line = add(a.energy, current.transform(a[key]), `${label} line · ${current.g.label}`, color, "dashdot")
+        const line = add(a.energy, current.transform(a[key]), `${label} line`, color, "dashdot")
         if (line) line.legendgroup = legendgroup
         if (e0 === null) continue
         const points = ([start, end] as const).flatMap((bound, index) => {
