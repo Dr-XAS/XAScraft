@@ -736,8 +736,11 @@ export function ArtemisStructures({ children, contextKey, spectrumEdge, projectI
         </div>
         {structure.provider === "materials_project" && <p className={styles.help}>DFT-relaxed structure · <a href={`https://materialsproject.org/materials/${encodeURIComponent(structure.id)}`} target="_blank" rel="noreferrer">View on Materials Project</a><br />Database version: {structure.provenance?.database_version ?? "unavailable"}. Saved CIFs retain the retrieved geometry.</p>}
         {open && <div ref={viewerAnchor}><CifViewer key={`${structure.provider ?? "amcsd"}:${structure.id}`} structure={structure} selectedSite={site ? Number(site) : undefined} analysis={shellState} radialAnalysis={radialState} displayRadius={displayRadius} onDisplayRadiusChange={changeDisplayRadius} radiusDisabled={controlsDisabled} /></div>}
-        <p className={styles.help}>{structure.formula} · {structure.space_group}<br />a {numberText(structure.cell.a)}, b {numberText(structure.cell.b)}, c {numberText(structure.cell.c)} Å<br />α {numberText(structure.cell.alpha)}, β {numberText(structure.cell.beta)}, γ {numberText(structure.cell.gamma)}°</p>
-        <details className={styles.textDetails}><summary>View CIF</summary><pre>{structure.cif}</pre></details>
+        <details className={styles.textDetails}>
+          <summary>View CIF</summary>
+          <p className={styles.help}>{structure.formula} · {structure.space_group}<br />a {numberText(structure.cell.a)}, b {numberText(structure.cell.b)}, c {numberText(structure.cell.c)} Å<br />α {numberText(structure.cell.alpha)}, β {numberText(structure.cell.beta)}, γ {numberText(structure.cell.gamma)}°</p>
+          <pre>{structure.cif}</pre>
+        </details>
         {structure.warnings.map((warning, i) => <p className={styles.warning} key={i}>{warning}</p>)}
         {!structure.supported ? <p className={styles.warning} role="status">This structure cannot be used for FEFF generation. Choose an ordered structure with supported atomic sites.</p> : dialogMode !== "structure" && <>
           <div className={styles.grid}>
