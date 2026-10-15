@@ -4,9 +4,12 @@ import { SectionHelp } from "../section-help"
 import { useEffect, useRef, useState } from "react"
 import { isTheoryGroup, type AthenaGroup } from "@/lib/athena"
 import type { ArtemisFitResult } from "@/lib/artemis"
+import { exportBundle } from "@/lib/artemis-fit-utils"
+import { downloadArtemisText } from "@/lib/artemis-structures"
 import { ThemedPlot as Plot } from "../themed-plot"
 import { ResizablePlotCard } from "./athena-plot-card"
 import { ViewerPanel } from "./viewer-panel"
+import type { ViewerExportItem } from "./viewer-export-menu"
 import { ViewerControlField, ViewerControlGroup, ViewerDisplayControls, ViewerToggle } from "./viewer-display-controls"
 import { ViewerKWeightControl } from "./viewer-kweight-control"
 import { ViewerComplexComponents } from "./viewer-complex-components"
@@ -135,7 +138,33 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
   const amplitudeTitle = components.filter(component => component !== "pha").map(component => componentLabels[component]).join(", ")
   const yTitle = space === "k" ? `k<sup>${plottedWeight}</sup>χ(k) (Å<sup>−${plottedWeight}</sup>)`
     : amplitudeTitle ? `${amplitudeTitle} (Å<sup>−${plottedWeight + 1}</sup>)` : "Phase χ(R) (rad)"
-  return <ViewerPanel title={isTheory ? "EXAFS theory" : "EXAFS fit"} label={isTheory ? "EXAFS theory results" : "EXAFS fit results"} viewerId="fit" className={styles.viewer} help={<>
+  const exportStem = `artemis-${isTheory ? "theory" : "fit"}-${space}-k${plottedWeight}`
+  const exportItems: ViewerExportItem[] = [{
+    id: "curves-csv", label: "Data (CSV)", disabled: !x?.length || !curves.length || loading || !!error,
+    onSelect: () => {
+      if (!visible || !x?.length || !curves.length || loading || error) return
+      const quote = (value: string) => `"${value.replace(/"/g, '""')}"`
+      const comment = (value: string) => value.replace(/[\r\n]+/g, " ")
+      const csv = [
+        `# ${isTheory ? "Theoretical EXAFS; no fit performed" : "EXAFS fit curves"}`,
+        `# Data: ${comment(visible.group_label)}; project=${visible.project_id}; version=${visible.version}`,
+        `# Plot space=${space}; k-weight=${plottedWeight}; values exclude display offsets`,
+        ...(space === "r" ? ["# R is not phase corrected; phase components are in radians"] : []),
+        [quote(space === "k" ? "k (Å⁻¹)" : "R (Å)"), ...curves.map(curve => quote(space === "r" && !multipleComponents ? `${componentLabels[curve.component]} · ${curve.name}` : curve.name))].join(","),
+        ...x.map((value, index) => [value, ...curves.map(curve => curve.y[index] ?? "")].join(",")),
+      ].join("\n") + "\n"
+      downloadArtemisText(`${exportStem}.csv`, csv, "text/csv")
+    },
+  }]
+  if (theory) exportItems.push({ id: "theory-json", label: "Theory + sources (JSON)", onSelect: () =>
+    downloadArtemisText("artemis-theory.json", JSON.stringify({ schema: "artemis-theory/v1", source: group?.source, result: theory }, null, 2), "application/json") })
+  if (fit) exportItems.push(
+    { id: "fit-report", label: "Fit report (TXT)", onSelect: () => downloadArtemisText("artemis-fit-report.txt", fit.report, "text/plain") },
+    { id: "fit-json", label: fit.request ? "Fit + model (JSON)" : "Fit result (JSON)", onSelect: () => downloadArtemisText("artemis-fit.json",
+      fit.request ? exportBundle(fit.request, fit, { project_id: fit.project_id, group_id: fit.group_id, group_label: fit.group_label }) : JSON.stringify(fit, null, 2), "application/json") },
+  )
+  return <ViewerPanel title={isTheory ? "EXAFS theory" : "EXAFS fit"} label={isTheory ? "EXAFS theory results" : "EXAFS fit results"} viewerId="fit" className={styles.viewer}
+    exportItems={exportItems} exportDisabled={!visible} exportFilename={exportStem} help={<>
     {isTheory ? "The saved FEFF paths are summed at the supplied simulation parameters. No measured data or fit is involved. The original simulation Fourier settings are used. " : "Build a FEFF path model in the EXAFS fitting tab, then run the fit to compare data and model."}
     {visible && <>{!isTheory && (space === "r" && components.includes("mag") ? "Residual is |FT(data − model)|, not the difference of magnitudes. " : "Residual = data − model. ")}
       {!isTheory && space === "r" && components.includes("pha") && "Residual phase is the phase of FT(data − model), not the difference of phases. "}
@@ -195,6 +224,6 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
       </ViewerDisplayControls>}
       {warnings.length > 0 && <ul className={styles.warnings}>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
     </ResizablePlotCard>
-    {theory ? <ArtemisTheorySummary result={theory} /> : fit && <ArtemisFitReport result={fit} savedPaths={fit.archive ? group?.artemis?.history.find(record => record.id === fit.archive!.id)?.model.paths : undefined} />}
+    {theory ? <ArtemisTheorySummary result={theory} /> : fit && <ArtemisFitReport result={fit} showExportActions={false} savedPaths={fit.archive ? group?.artemis?.history.find(record => record.id === fit.archive!.id)?.model.paths : undefined} />}
   </ViewerPanel>
 }

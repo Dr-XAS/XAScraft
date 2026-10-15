@@ -1,0 +1,6 @@
+.control { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.control .trigger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 3px 6px; border: 0; border-radius: 4px; background: transparent; color: var(--ath-muted); font: inherit; font-weight: 400; line-height: var(--leading-control); cursor: pointer; }
+.control .trigger:hover:not(:disabled) { color: var(--ath-primary); background: var(--ath-primary-soft); }
+.control .trigger:focus-visible { outline: 2px solid var(--ath-primary); outline-offset: 2px; }
+.control .trigger:disabled { cursor: default; opacity: 0.5; }
+.error { max-width: 320px; color: var(--ath-error-ink, #a33928); font-size: var(--text-body); }

@@ -94,7 +94,8 @@ test("mounted persistent Athena completes its authorized lifecycle", async ({ pa
     await expect(page.getByRole("spinbutton", { name: "E₀ eV", exact: true })).toHaveValue("8988")
 
     const download = page.waitForEvent("download")
-    await page.getByRole("button", { name: "CSV", exact: true }).click()
+    await page.getByRole("button", { name: "Export Single spectrum viewer", exact: true }).click()
+    await page.getByRole("menuitem", { name: "Data (CSV)", exact: true }).click()
     const saved = await download
     await saved.saveAs(info.outputPath("authorized-group.csv"))
     expect(saved.suggestedFilename()).toContain(".csv")

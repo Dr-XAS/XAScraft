@@ -2,12 +2,19 @@ import "@testing-library/jest-dom/vitest"
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { ArtemisStructure } from "@/lib/artemis-structures"
+import { downloadArtemisText, type ArtemisStructure } from "@/lib/artemis-structures"
+import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 import type { FirstShell } from "@/lib/first-shell"
 import { CifViewer } from "./cif-viewer"
 
 const { createViewer } = vi.hoisted(() => ({ createViewer: vi.fn() }))
 vi.mock("3dmol", () => ({ createViewer }))
+vi.mock("@/lib/artemis-structures", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/artemis-structures")>(), downloadArtemisText: vi.fn(),
+}))
+vi.mock("@/lib/viewer-image-export", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/viewer-image-export")>(), downloadViewerDataUrl: vi.fn(),
+}))
 vi.mock("@/lib/use-first-shell", () => ({ useFirstShell: () => ({ shell: null, loading: false, error: "", retry: () => {} }) }))
 vi.mock("@/lib/use-radial-shells", () => ({ useRadialShells: () => ({ data: null, loading: false, error: "", retry: () => {}, settings: { radius: 6, tolerance: 0.05 }, setSettings: () => {} }) }))
 
@@ -39,7 +46,7 @@ function renderer() {
     addLabel: vi.fn((text: string, options: unknown) => ({ text, options })), removeLabel: vi.fn(),
     addSphere: vi.fn(), addCustom: vi.fn(), removeShape: vi.fn(), getView: vi.fn(() => [0, 0, 0, 0, 0, 0, 1, 0]), setView: vi.fn(),
     getModel: vi.fn((): { selectedAtoms: typeof selectedAtoms } | undefined => ({ selectedAtoms })), targetedObjects: vi.fn(() => [] as { clickable: { index: number } }[]),
-    zoomTo: vi.fn(), zoom: vi.fn(), render: vi.fn(), stopAnimate: vi.fn(),
+    zoomTo: vi.fn(), zoom: vi.fn(), render: vi.fn(), stopAnimate: vi.fn(), pngURI: vi.fn(() => "data:image/png;base64,Y2lm"),
     divwatcher: { disconnect: vi.fn() }, intwatcher: { disconnect: vi.fn() },
   }
 }
@@ -80,6 +87,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe("CifViewer", () => {
+  it("exports the exact CIF source and current structure image without resetting the camera", async () => {
+    const attached = structure({ filename: "uploaded_sample.cif" })
+    render(<CifViewer structure={attached} />)
+    const instance = await ready()
+    instance.zoomTo.mockClear()
+    const exportButton = screen.getByRole("button", { name: /export/i })
+    fireEvent.click(exportButton)
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "CIF source (.cif)" })) })
+    expect(downloadArtemisText).toHaveBeenLastCalledWith("uploaded_sample.cif", attached.cif, "chemical/x-cif")
+    fireEvent.click(exportButton)
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Structure data (JSON)" })) })
+    expect(downloadArtemisText).toHaveBeenLastCalledWith("uploaded_sample.json", JSON.stringify(attached, null, 2), "application/json")
+    fireEvent.click(exportButton)
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Image (PNG)" })) })
+    expect(instance.pngURI).toHaveBeenCalledOnce()
+    expect(downloadViewerDataUrl).toHaveBeenLastCalledWith("uploaded_sample.png", "data:image/png;base64,Y2lm")
+    expect(instance.zoomTo).not.toHaveBeenCalled()
+  })
+
   it("reports the hovered bond's endpoint distance, independently of the center atom", async () => {
     const attached = structure()
     attached.sites.push({ ...attached.sites[1], index: 8, element: "S", species: "S", x: 0.2, y: 0.1, z: 0.15 })

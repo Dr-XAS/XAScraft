@@ -50,7 +50,7 @@ function PathValue({ value, parameter, errorbars }: {
     <span className={styles.pathUncertainty}>{errorbars && finite(parameter.stderr) && parameter.stderr >= 0 ? `± ${format(parameter.stderr, 3)}` : "± Unavailable"}</span>}</>
 }
 
-export function ArtemisFitReport({ result, savedPaths = NO_PATHS }: { result: ArtemisFitResult; savedPaths?: readonly ArtemisPath[] }) {
+export function ArtemisFitReport({ result, savedPaths = NO_PATHS, showExportActions = true }: { result: ArtemisFitResult; savedPaths?: readonly ArtemisPath[]; showExportActions?: boolean }) {
   const { statistics: stats, transform } = result
   const previewPaths = useMemo(() => result.paths.map(path => ({ id: path.id, filename: path.filename,
     metadata: fitPreviewMetadata(path, savedPaths) })), [result.paths, savedPaths])
@@ -196,9 +196,9 @@ export function ArtemisFitReport({ result, savedPaths = NO_PATHS }: { result: Ar
       <ul className={styles.backendNotes}>{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
     </details>}
 
-    <footer className={styles.downloads}>
+    {showExportActions && <footer className={styles.downloads}>
       <button type="button" title="Download the complete original fit report" onClick={() => download("artemis-fit-report.txt", result.report, "text/plain")}><Download size={14} aria-hidden="true" />Download report</button>
       {result.request && <button type="button" onClick={() => download("artemis-fit.json", exportBundle(result.request!, result, { project_id: result.project_id, group_id: result.group_id, group_label: result.group_label }))}><FileJson size={14} aria-hidden="true" />Download fit + model JSON</button>}
-    </footer>
+    </footer>}
   </section>
 }

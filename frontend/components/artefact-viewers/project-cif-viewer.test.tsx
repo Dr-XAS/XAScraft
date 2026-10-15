@@ -73,6 +73,7 @@ describe("ProjectCifViewer", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument()
     expect(screen.queryByRole("combobox", { name: "Viewed CIF structure" })).not.toBeInTheDocument()
     expect(screen.getByText("No CIF attached")).toBeVisible()
+    expect(screen.getByRole("button", { name: /export/i })).toBeDisabled()
     expect(screen.getByText(/Attach a CIF in the EXAFS fitting tab/)).not.toBeVisible()
     fireEvent.mouseEnter(screen.getByRole("button", { name: "About CIF structure viewer" }))
     expect(screen.getByText(/Attach a CIF in the EXAFS fitting tab/)).toBeVisible()

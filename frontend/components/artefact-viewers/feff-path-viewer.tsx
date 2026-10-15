@@ -1,14 +1,14 @@
 "use client"
 
 import { SectionHelp } from "../section-help"
-import { useId, useMemo, useState } from "react"
+import { useCallback, useId, useMemo, useState } from "react"
 import type { ArtemisPath } from "@/lib/artemis"
 import { format } from "@/lib/artemis-fit-utils"
 import {
   ALL_PATHS, filterPathRows, sortPathRows, useArtemisPathPreview,
   type ArtemisPreviewRequest, type ArtemisPreviewState, type PathFilter, type PathRow, type PathSortKey,
 } from "@/lib/artemis-path-preview"
-import type { ArtemisStructureAttachment } from "@/lib/artemis-structures"
+import { downloadArtemisText, type ArtemisStructureAttachment } from "@/lib/artemis-structures"
 import { CIF_VIEWER_DEFAULT_RADIUS } from "@/lib/cif-viewer"
 import { ThemedPlot as Plot } from "../themed-plot"
 import { resolveFeffMultipathContext } from "@/lib/feff-multipath-context"
@@ -213,7 +213,13 @@ function PathContributions({ state, rows, shown, filter, onFilter, sort, onSort,
 
 const NO_STRUCTURES: ArtemisStructureAttachment[] = []
 
-function PathWorkspace({ paths: allPaths, attachments: allAttachments, model }: { paths: FeffPathSummary[]; attachments: ArtemisStructureAttachment[]; model: ArtemisPreviewRequest | null }) {
+function PathWorkspace({ paths: allPaths, attachments: allAttachments, model, exportFilename, onImageExportReady }: {
+  paths: FeffPathSummary[]
+  attachments: ArtemisStructureAttachment[]
+  model: ArtemisPreviewRequest | null
+  exportFilename: string
+  onImageExportReady: (exportImage: (() => void) | null) => void
+}) {
   const sources = useMemo(() => groupFeffPathSources(allPaths, allAttachments), [allPaths, allAttachments])
   const [sourceChoice, setSourceChoice] = useState("")
   const source = sources.find(item => item.key === sourceChoice) ?? sources[0]
@@ -332,6 +338,7 @@ function PathWorkspace({ paths: allPaths, attachments: allAttachments, model }: 
     </label></div>
     <FeffPathScene paths={scenePaths} activePathId={focused.path.id} selectedLeg={selectedLeg} context={context.atoms}
       contextLabel={context.source ? context.sourceLabel : undefined} radius={context.radius} maxRadius={context.maxRadius} onRadiusChange={setRadius}
+      exportFilename={exportFilename} onImageExportReady={onImageExportReady}
       legend={legend}
       structureControls={source.siteIndex === undefined && context.candidates.length > 1 ? <div className={structureStyles.controls}><label><span>Project CIF<SectionHelp label="FEFF local structure source">Choose the matching attached CIF and site for surrounding atoms. A verified match is needed to expand equivalent scattering paths.</SectionHelp></span>
         <select aria-label="FEFF local structure source" value={context.attachmentId ? JSON.stringify([context.attachmentId, context.siteIndex]) : ""} onChange={event => setStructureChoice(event.target.value)}>
@@ -365,11 +372,20 @@ export function FeffPathViewer({ paths, groupLabel, onOpenModel, attachments = N
   /** The fitting editor's current model, or null while its numbers cannot be read. */
   model?: ArtemisPreviewRequest | null
 }) {
-  return <ViewerPanel title="FEFF path viewer" viewerId="feff" className={styles.panel} help="Add or generate FEFF paths in the EXAFS fitting tab to inspect their geometry here.">
+  const [exportImage, setExportImage] = useState<(() => void) | null>(null)
+  const onImageExportReady = useCallback((exporter: (() => void) | null) => setExportImage(() => exporter), [])
+  const exportFilename = `${(groupLabel || "spectrum").replace(/[^a-zA-Z0-9_-]+/g, "_")}-feff-paths`
+  return <ViewerPanel title="FEFF path viewer" viewerId="feff" className={styles.panel} help="Add or generate FEFF paths in the EXAFS fitting tab to inspect their geometry here."
+    exportFilename={exportFilename} exportDisabled={!paths.length} exportItems={[
+      { id: "paths-json", label: "Path data (JSON)", disabled: !paths.length, onSelect: () => downloadArtemisText(`${exportFilename}.json`, JSON.stringify({
+        group_label: groupLabel ?? null, paths, model,
+      }, null, 2), "application/json") },
+      { id: "structure-png", label: "3D structure image (PNG)", disabled: !exportImage, onSelect: () => exportImage?.() },
+    ]}>
     <div className={styles.content}>
       <div className={styles.heading}><span>Current spectrum <strong>{groupLabel ?? "None selected"}</strong></span><button type="button" onClick={onOpenModel}>{paths.length ? "Edit paths" : "Open EXAFS fitting"}</button></div>
       {!paths.length ? <p className={styles.empty}>No FEFF paths</p>
-        : <PathWorkspace paths={paths} attachments={attachments} model={model} />}
+        : <PathWorkspace paths={paths} attachments={attachments} model={model} exportFilename={exportFilename} onImageExportReady={onImageExportReady} />}
     </div>
   </ViewerPanel>
 }

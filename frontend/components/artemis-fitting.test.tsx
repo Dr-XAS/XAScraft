@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useState, type ReactNode } from "react"
 import { athenaApi, type AthenaGroup, type AthenaProject, type Parameters } from "@/lib/athena"
 import { artemisApi, type ArtemisModelDraft, type ArtemisExample, type ArtemisExampleSetup, type ArtemisFitRequest, type ArtemisFitResult, type ArtemisInspectedPath } from "@/lib/artemis"
-import type { ArtemisStructureAttachment } from "@/lib/artemis-structures"
+import { downloadArtemisText, type ArtemisStructureAttachment } from "@/lib/artemis-structures"
 import { ApiRequestError } from "@/lib/backend-client"
 import { ArtemisFittingPanel, type ArtemisModelActions } from "./artemis-fitting"
 import { InstructionVisibility } from "./section-help"
@@ -23,6 +23,7 @@ vi.mock("./artemis-structures", () => ({ ArtemisStructures: (props: NonNullable<
 } }))
 vi.mock("@/lib/artemis", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/artemis")>(), artemisApi: vi.fn() }))
 vi.mock("@/lib/athena", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/athena")>(), athenaApi: vi.fn() }))
+vi.mock("@/lib/artemis-structures", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/artemis-structures")>(), downloadArtemisText: vi.fn() }))
 const api = vi.mocked(artemisApi)
 
 const parameters: Parameters = {
@@ -125,6 +126,7 @@ async function runFit() {
 
 beforeEach(() => {
   api.mockReset(); vi.mocked(athenaApi).mockReset(); plot.mockClear(); localStorage.clear()
+  vi.mocked(downloadArtemisText).mockClear()
   api.mockImplementation(async (url, body) => {
     if (url === "/paths/inspect") { const input = body as { filename: string; content: string }; return path(input.filename, input.content) }
     if (url.endsWith("/fit-saved")) return savedFit(body)
@@ -604,6 +606,34 @@ describe("ArtemisFittingPanel", () => {
 })
 
 describe("ArtemisFitResultViewer", () => {
+  it("exports original fit curves without display offsets and retains the saved report and model", async () => {
+    const result = resultWithPaths()
+    result.group_label = 'Synthetic "Cu", foil'
+    result.request = { version: result.version, parameters: result.parameters, paths: [], transform: result.transform }
+    const original = structuredClone(result)
+    render(<ArtemisFitResultViewer result={result} group={group()} />)
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Offset spacing" }), { target: { value: "2" } })
+    expect(plot.mock.calls.at(-1)![0].data[2].y[1]).toBeCloseTo(-1.9)
+    expect(screen.queryByRole("button", { name: "Download report" })).not.toBeInTheDocument()
+    const selectExport = async (name: string) => {
+      fireEvent.click(screen.getByRole("button", { name: /export/i }))
+      await act(async () => fireEvent.click(screen.getByRole("menuitem", { name })))
+    }
+    await selectExport("Data (CSV)")
+    expect(downloadArtemisText).toHaveBeenLastCalledWith("artemis-fit-r-k2.csv", expect.stringContaining("1,2,1.9,0.1,2.5,0.6\n"), "text/csv")
+    expect(vi.mocked(downloadArtemisText).mock.calls[0][1]).toContain("values exclude display offsets")
+    await selectExport("Fit report (TXT)")
+    expect(downloadArtemisText).toHaveBeenLastCalledWith("artemis-fit-report.txt", result.report, "text/plain")
+    await selectExport("Fit + model (JSON)")
+    const bundle = JSON.parse(vi.mocked(downloadArtemisText).mock.calls.at(-1)![1])
+    expect(bundle.request).toEqual(result.request)
+    expect(bundle.result.report).toBe(result.report)
+    expect(bundle.result.parameters).toEqual(result.parameters)
+    expect(bundle.result.request).toBeUndefined()
+    expect(result).toEqual(original)
+    expect(api).not.toHaveBeenCalled()
+  })
+
   it("keeps an actual fit of a theory spectrum accessible", () => {
     const source = { ...group(), data_type: "chi" as const, source: { tags: ["theory"] } }
     render(<ArtemisFitResultViewer projectId="p" version={4} group={source} result={resultWithPaths()} />)
@@ -673,7 +703,9 @@ describe("ArtemisFitResultViewer", () => {
     fireEvent.change(screen.getByLabelText("EXAFS fit k-weight"), { target: { value: "3" } })
     expect(await screen.findByRole("alert")).toHaveTextContent("does not match this saved result")
     expect(screen.queryByTestId("fit-plot")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Download report" })).toBeEnabled()
+    fireEvent.click(screen.getByRole("button", { name: "Export EXAFS fit" }))
+    expect(screen.getByRole("menuitem", { name: "Fit report (TXT)" })).toBeEnabled()
+    fireEvent.keyDown(screen.getByRole("menu", { name: "Export EXAFS fit" }), { key: "Escape" })
     api.mockRejectedValueOnce(new Error("This saved fit does not retain unweighted χ(0)."))
     fireEvent.change(screen.getByLabelText("EXAFS fit k-weight"), { target: { value: "0" } })
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("does not retain unweighted χ(0)"))
@@ -804,7 +836,9 @@ describe("ArtemisFitResultViewer", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Magnitude" }))
     expect(screen.getByText("No components selected", { exact: true })).toBeVisible()
     expect(screen.queryByTestId("fit-plot")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Download report" })).toBeEnabled()
+    fireEvent.click(screen.getByRole("button", { name: "Export EXAFS fit" }))
+    expect(screen.getByRole("menuitem", { name: "Fit report (TXT)" })).toBeEnabled()
+    fireEvent.keyDown(screen.getByRole("menu", { name: "Export EXAFS fit" }), { key: "Escape" })
     fireEvent.click(screen.getByRole("button", { name: "k space" }))
     expect(screen.getByTestId("fit-plot")).toBeInTheDocument()
     expect(plot.mock.calls.at(-1)![0].data).toHaveLength(5)
@@ -935,7 +969,8 @@ describe("ArtemisFitResultViewer", () => {
     view.rerender(<ArtemisFitResultViewer result={result} group={group()} />)
     act(() => { plot.mock.calls.at(-1)![0].onError() })
     expect(screen.getByRole("alert")).toHaveTextContent("Could not render")
-    expect(screen.getByRole("button", { name: "Download report" })).toBeEnabled()
+    fireEvent.click(screen.getByRole("button", { name: "Export EXAFS fit" }))
+    expect(screen.getByRole("menuitem", { name: "Fit report (TXT)" })).toBeEnabled()
   })
 })
 

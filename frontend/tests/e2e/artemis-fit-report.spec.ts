@@ -92,14 +92,16 @@ test("real EXAFS fit has a readable report and preserves original downloads", as
   const screenshotStyle = "nextjs-portal { visibility: hidden; }"
   await report.screenshot({ path: info.outputPath("fit-report-desktop.png"), style: screenshotStyle })
   await summary.screenshot({ path: info.outputPath("fit-summary-desktop.png"), style: screenshotStyle })
+  await page.getByRole("button", { name: "Export EXAFS fit", exact: true }).click()
   const downloading = page.waitForEvent("download")
-  await report.getByRole("button", { name: "Download report", exact: true }).click()
+  await page.getByRole("menu", { name: "Export EXAFS fit", exact: true }).getByRole("menuitem", { name: "Fit report (TXT)", exact: true }).click()
   const reportPath = info.outputPath("artemis-fit-report.txt")
   await (await downloading).saveAs(reportPath)
   expect(await readFile(reportPath, "utf8")).toBe(result.report)
 
+  await page.getByRole("button", { name: "Export EXAFS fit", exact: true }).click()
   const modelDownloading = page.waitForEvent("download")
-  await report.getByRole("button", { name: "Download fit + model JSON", exact: true }).click()
+  await page.getByRole("menu", { name: "Export EXAFS fit", exact: true }).getByRole("menuitem", { name: "Fit + model (JSON)", exact: true }).click()
   const modelPath = info.outputPath("artemis-fit.json")
   await (await modelDownloading).saveAs(modelPath)
   const bundle = JSON.parse(await readFile(modelPath, "utf8"))

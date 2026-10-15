@@ -21,9 +21,10 @@ type AthenaContextMenuProps = {
   anchor: { x: number; y: number }
   onClose: () => void
   returnFocus?: HTMLElement | null
+  keepOpenOnTriggerPointerDown?: boolean
 }
 
-export function AthenaContextMenu({ label, items, anchor, onClose, returnFocus }: AthenaContextMenuProps) {
+export function AthenaContextMenu({ label, items, anchor, onClose, returnFocus, keepOpenOnTriggerPointerDown = false }: AthenaContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const buttons = useRef(new Map<string, HTMLButtonElement>())
   const closed = useRef(false)
@@ -92,6 +93,7 @@ export function AthenaContextMenu({ label, items, anchor, onClose, returnFocus }
   useLayoutEffect(() => {
     const outside = (event: Event) => {
       if (event.target instanceof Node && menuRef.current?.contains(event.target)) return
+      if (keepOpenOnTriggerPointerDown && event.target instanceof Node && returnFocus?.contains(event.target)) return
       close(false)
     }
     const scroll = (event: Event) => {

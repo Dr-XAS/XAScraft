@@ -147,7 +147,7 @@ describe("AthenaWavelet", () => {
     const next = deferred()
     api.mockResolvedValueOnce(result()).mockReturnValueOnce(next.promise)
     const view = render(<AthenaWavelet kWeight={null} projectId="p" version={4} group={group()} />)
-    const exportButton = screen.getByRole("button", { name: "Export CSV" })
+    const exportButton = screen.getByRole("button", { name: "Export Wavelet plotter" })
     expect(exportButton).toBeDisabled()
     fireEvent.click(exportButton)
     expect(createObjectURL).not.toHaveBeenCalled()
@@ -165,6 +165,7 @@ describe("AthenaWavelet", () => {
     // The range controls update Fourier companions; CSV still contains the full current wavelet grid.
     fireEvent.change(screen.getByRole("slider", { name: "k minimum" }), { target: { value: "1" } })
     fireEvent.click(exportButton)
+    fireEvent.click(screen.getByRole("menuitem", { name: "Data (CSV)" }))
     expect(createObjectURL).toHaveBeenCalledOnce()
     expect(blobs[0].type).toBe("text/csv;charset=utf-8")
     const read = new Promise<string>((resolve, reject) => {
@@ -371,7 +372,7 @@ describe("AthenaWavelet", () => {
     expect(screen.getByLabelText("2D wavelet heatmap")).toBe(heatmap)
     expect(screen.getByLabelText("Fourier magnitude |χ(R)|")).toBe(companions)
     expect(screen.getByRole("slider", { name: "k minimum" })).toHaveValue("1")
-    expect(screen.getByRole("button", { name: "Export CSV" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "Export Wavelet plotter" })).toBeEnabled()
 
     fireEvent.change(screen.getByRole("slider", { name: "k minimum" }), { target: { value: "1.5" } })
     await calculate()

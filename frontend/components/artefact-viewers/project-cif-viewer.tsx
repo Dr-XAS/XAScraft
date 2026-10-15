@@ -18,7 +18,7 @@ export function ProjectCifViewer({ attachments = [], selectedId, selectedSite, o
   // refreshes must not rebuild the same geometry and reset the user's camera.
   const structure = useMemo(() => selected?.structure, [selected?.id, selected?.sha256])
   const [radius, setRadius] = useCifRadius(structure?.cif)
-  if (!selected || !structure) return <ViewerPanel title="CIF structure viewer" viewerId="cif" className="ath-project-cif-viewer" help="Attach a CIF in the EXAFS fitting tab to view its structure here.">
+  if (!selected || !structure) return <ViewerPanel title="CIF structure viewer" viewerId="cif" className="ath-project-cif-viewer" exportImages={false} exportDisabled help="Attach a CIF in the EXAFS fitting tab to view its structure here.">
     <p className="ath-cif-empty">No CIF attached</p>
   </ViewerPanel>
 

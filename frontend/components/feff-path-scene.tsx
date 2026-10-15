@@ -4,6 +4,7 @@ import { SectionHelp } from "./section-help"
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react"
 import type { GLViewer, Vector2 } from "3dmol"
 import { createCifRenderer } from "@/lib/cif-renderer"
+import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 import { drawFeffScene, feffSceneAtoms, type FeffContextAtom, type FeffScenePath } from "@/lib/feff-scene"
 import { AtomLegend } from "./atom-legend"
 import { LocalStructureControls } from "./local-structure-controls"
@@ -17,7 +18,7 @@ export type { FeffContextAtom, FeffScenePath } from "@/lib/feff-scene"
 const EMPTY_CONTEXT: FeffContextAtom[] = []
 
 export function FeffPathScene({ paths, activePathId, selectedLeg, context = EMPTY_CONTEXT, contextLabel,
-  radius = 3.5, maxRadius = 10, onRadiusChange, structureControls, legend }: {
+  radius = 3.5, maxRadius = 10, onRadiusChange, structureControls, legend, exportFilename = "feff-paths", onImageExportReady }: {
   paths: FeffScenePath[]
   activePathId?: string
   selectedLeg: number | null
@@ -28,6 +29,8 @@ export function FeffPathScene({ paths, activePathId, selectedLeg, context = EMPT
   onRadiusChange?: (value: number) => void
   structureControls?: ReactNode
   legend?: ReactNode
+  exportFilename?: string
+  onImageExportReady?: (exportImage: (() => void) | null) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const plotId = useId()
@@ -102,6 +105,16 @@ export function FeffPathScene({ paths, activePathId, selectedLeg, context = EMPT
       setError("Unable to render this path. Path coordinates remain available below.")
     }
   }, [ready, paths, activePath, atoms, elements, contextKey, selectedLeg, labels, bonds, themeRevision])
+
+  useEffect(() => {
+    onImageExportReady?.(ready && !error && atoms.length ? () => {
+      const scene = viewer.current
+      if (!scene) throw new Error("The 3D scattering path is not ready to export.")
+      scene.render()
+      downloadViewerDataUrl(`${exportFilename}.png`, scene.pngURI())
+    } : null)
+    return () => onImageExportReady?.(null)
+  }, [ready, error, atoms.length, exportFilename, onImageExportReady])
 
   return <section className={structureStyles.viewer} aria-label="FEFF local structure">
     <div className={structureStyles.heading}>

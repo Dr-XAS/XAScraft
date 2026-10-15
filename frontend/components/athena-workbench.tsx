@@ -2531,6 +2531,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     return <AthenaSpectrumViewer viewer={viewer} state={state}
       weightedPlot={viewer === "single" ? singleWeightedPlot : multipleWeightedPlot}
       active={active} analysis={analysis} analysisVisible={viewer === "single" && analysisVisible}
+      canExport={!!project && can("export")} exportPending={!!busy || parameterUpdatePending}
       seriesTarget={lcfPlotted ? { id: lcfPlotted.group_id, label: lcfPlotted.label } : undefined}
       savedKWeight={savedKWeight(viewer === "single" ? singleGroups : marked)} canChangeKWeight={can("plot")} draftE0={draftE0}
       onChangeSpace={space => { if (viewer === "single") changeSpace(space); else { state.setSpace(space); state.setRange([null, null]) } }}

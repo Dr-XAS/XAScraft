@@ -1,13 +1,20 @@
 import "@testing-library/jest-dom/vitest"
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { FeffPathViewer, type FeffPathSummary } from "./feff-path-viewer"
 import { feffArrow } from "../feff-path-scene"
 import { buildFeffPathGeometry } from "@/lib/feff-path-geometry"
-import type { ArtemisStructureAttachment } from "@/lib/artemis-structures"
+import { downloadArtemisText, type ArtemisStructureAttachment } from "@/lib/artemis-structures"
+import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 
 const { createViewer } = vi.hoisted(() => ({ createViewer: vi.fn() }))
 vi.mock("3dmol", () => ({ createViewer, Vector2: class { constructor(public x: number, public y: number) {} } }))
+vi.mock("@/lib/artemis-structures", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/artemis-structures")>(), downloadArtemisText: vi.fn(),
+}))
+vi.mock("@/lib/viewer-image-export", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/viewer-image-export")>(), downloadViewerDataUrl: vi.fn(),
+}))
 // The contribution plot has its own suite; keep Plotly out of the scene tests.
 vi.mock("next/dynamic", () => ({ default: () => () => <div data-testid="contribution-plot" /> }))
 const site = (x: number, y = 0, ipot = 1) => ({ atom: "Cu", x, y, z: 0, ipot })
@@ -42,7 +49,7 @@ const mockScene = () => {
   const scene = {
     clear: vi.fn(), addSphere: vi.fn(), addCylinder: vi.fn(), addArrow: vi.fn(), addLabel: vi.fn(),
     getView: vi.fn(() => [0, 0, 0, 20, 0, 0, 0, 1]), setView: vi.fn(), zoomTo: vi.fn(), zoom: vi.fn(), rotate: vi.fn(),
-    render: vi.fn(), stopAnimate: vi.fn(),
+    render: vi.fn(), stopAnimate: vi.fn(), pngURI: vi.fn(() => "data:image/png;base64,ZmVmZg=="),
     addModel: vi.fn((xyz: string) => ({ selectedAtoms: () => {
       const atoms = xyz.split("\n").slice(2).filter(Boolean).map((row, index) => {
         const [elem, ...values] = row.split(" ")
@@ -88,6 +95,21 @@ async function ready() {
 }
 
 describe("FeffPathViewer", () => {
+  it("exports path geometry and the current 3D camera view from the heading", async () => {
+    render(<FeffPathViewer paths={paths} groupLabel="Copper foil" onOpenModel={vi.fn()} />)
+    const scene = await ready()
+    scene.zoomTo.mockClear()
+    const exportButton = screen.getByRole("button", { name: /export/i })
+    fireEvent.click(exportButton)
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Path data (JSON)" })) })
+    expect(downloadArtemisText).toHaveBeenLastCalledWith("Copper_foil-feff-paths.json", JSON.stringify({ group_label: "Copper foil", paths, model: null }, null, 2), "application/json")
+    fireEvent.click(exportButton)
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "3D structure image (PNG)" })) })
+    expect(scene.pngURI).toHaveBeenCalledOnce()
+    expect(downloadViewerDataUrl).toHaveBeenLastCalledWith("Copper_foil-feff-paths.png", "data:image/png;base64,ZmVmZg==")
+    expect(scene.zoomTo).not.toHaveBeenCalled()
+  })
+
   it("toggles in-canvas legends, overlays paths with shared atoms once, and keeps excluded paths viewable", async () => {
     const openModel = vi.fn()
     render(<FeffPathViewer paths={paths} groupLabel="Copper foil" onOpenModel={openModel} />)

@@ -16,7 +16,10 @@ export function ArtemisSimulationViewer({ result, actions }: { result: Simulatio
   const plotId = useId()
   const weight = result.k.weight
   const stem = `${result.source.request.absorber}-${result.source.request.edge}-site-${result.source.request.site_index}-simulation`
-  return <ViewerPanel title="Simulated EXAFS" help={<>FEFF paths are summed before Fourier transformation. |χ(R)| is not phase corrected; its peaks are not bond distances. Download simulation JSON retains the exact CIF, FEFF input, path files, parameters and curves.</>}>
+  return <ViewerPanel title="Simulated EXAFS" exportFilename={`${stem}-${space}`} exportItems={[
+    { id: "simulation-csv", label: "Data (CSV)", onSelect: () => downloadArtemisText(`${stem}-${space}.csv`, simulationCsv(result, space), "text/csv") },
+    { id: "simulation-json", label: "Simulation + sources (JSON)", onSelect: () => downloadArtemisText(`${stem}.json`, JSON.stringify(result, null, 2), "application/json") },
+  ]} help={<>FEFF paths are summed before Fourier transformation. |χ(R)| is not phase corrected; its peaks are not bond distances. Export simulation JSON to retain the exact CIF, FEFF input, path files, parameters and curves.</>}>
     <ResizablePlotCard storageKey="artemis.simulation.height.v1" defaultHeight={390}
       plotSelector="[data-simulation-plot]" resizeLabel="Resize simulated EXAFS plot height" controlsId={plotId}>
     <div id={plotId} data-simulation-plot className={styles.plot} aria-label={`Simulated EXAFS ${space} plot`}>
@@ -29,13 +32,10 @@ export function ArtemisSimulationViewer({ result, actions }: { result: Simulatio
         config={{ responsive: true, displaylogo: false, toImageButtonOptions: { filename: `${stem}-${space}`, scale: 2 } }}
         style={{ width: "100%", height: "100%" }} useResizeHandler />
     </div>
-    <ViewerDisplayControls label="Simulation display and export" className={styles.controls}>
+    <ViewerDisplayControls label="Simulation display options" className={styles.controls}>
       <button type="button" aria-pressed={space === "k"} onClick={() => setSpace("k")}>χ(k)</button>
       <button type="button" aria-pressed={space === "r"} onClick={() => setSpace("r")}>|χ(R)|</button>
       <SectionHelp label="Simulation plot space">χ(k) shows the summed FEFF paths with the simulated k-weight. |χ(R)| shows the magnitude of their Fourier transform; its peaks are not phase-corrected distances.</SectionHelp>
-      <button type="button" onClick={() => downloadArtemisText(`${stem}-${space}.csv`, simulationCsv(result, space), "text/csv")}>Download {space === "k" ? "χ(k)" : "χ(R)"} CSV</button>
-      <button type="button" onClick={() => downloadArtemisText(`${stem}.json`, JSON.stringify(result, null, 2), "application/json")}>Download simulation JSON</button>
-      <SectionHelp label="Simulation downloads">CSV exports the plotted space as numeric arrays. JSON retains the exact CIF, FEFF input, path files, simulation parameters and both spaces for reproducibility.</SectionHelp>
       {actions}
     </ViewerDisplayControls>
     </ResizablePlotCard>

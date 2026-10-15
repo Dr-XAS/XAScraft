@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { artemisApi } from "@/lib/artemis"
 import type { AthenaGroup } from "@/lib/athena"
+import { downloadArtemisText } from "@/lib/artemis-structures"
 import { simulationFixture } from "@/tests/fixtures/artemis-simulation"
 import { ArtemisFitResultViewer } from "./artemis-fit-result-viewer"
 import type { ArtemisTheoryResult } from "./artemis-theory-result"
@@ -11,6 +12,7 @@ type PlotProps = { data: { name: string; y: number[]; customdata: number[][] }[]
 const plot = vi.hoisted(() => vi.fn((_props: PlotProps) => <div data-testid="theory-plot" />))
 vi.mock("next/dynamic", () => ({ default: () => plot }))
 vi.mock("@/lib/artemis", async original => ({ ...await original<typeof import("@/lib/artemis")>(), artemisApi: vi.fn() }))
+vi.mock("@/lib/artemis-structures", async original => ({ ...await original<typeof import("@/lib/artemis-structures")>(), downloadArtemisText: vi.fn() }))
 const api = vi.mocked(artemisApi)
 
 function group(id = "theory"): AthenaGroup {
@@ -39,11 +41,25 @@ function deferred() {
 
 beforeEach(() => {
   vi.useFakeTimers(); api.mockReset(); plot.mockClear(); localStorage.clear()
+  vi.mocked(downloadArtemisText).mockClear()
   api.mockImplementation(async (path, body) => result(path.split("/")[4], (body as { kweight: number | null }).kweight ?? 2))
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe("theory spectra in the EXAFS viewer", () => {
+  it("exports theory source files with its current curves without recalculating", async () => {
+    const source = group()
+    render(<ArtemisFitResultViewer projectId="p" version={4} group={source} />)
+    await calculate()
+    fireEvent.click(screen.getByRole("button", { name: "Export EXAFS theory" }))
+    await act(async () => fireEvent.click(screen.getByRole("menuitem", { name: "Theory + sources (JSON)" })))
+    const saved = JSON.parse(vi.mocked(downloadArtemisText).mock.calls.at(-1)![1])
+    expect(saved.source).toEqual(source.source)
+    expect(saved.result.k).toEqual(result().k)
+    expect(saved.result.simulation).toEqual(result().simulation)
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
   it("shows total and individual paths, signed Fourier components and supplied values without fit statistics", async () => {
     render(<ArtemisFitResultViewer projectId="p" version={4} group={group()} />)
     expect(screen.getByText("Loading theory path contributions…")).toBeInTheDocument()

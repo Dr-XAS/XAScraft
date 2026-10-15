@@ -3,7 +3,8 @@
 import { SectionHelp } from "../section-help"
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react"
 import type { AtomSpec, GLViewer } from "3dmol"
-import type { ArtemisStructure } from "@/lib/artemis-structures"
+import { downloadArtemisText, type ArtemisStructure } from "@/lib/artemis-structures"
+import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 import { buildCifGeometry, CIF_VIEWER_DEFAULT_RADIUS, CIF_VIEWER_MAX_CELL_REPEATS, CIF_VIEWER_MAX_RADIUS, CIF_VIEWER_MIN_RADIUS, type CifVector } from "@/lib/cif-viewer"
 import { clearCifHover, createCifRenderer } from "@/lib/cif-renderer"
 import { bindCifAtomPicking, drawCifMeasurement, measurementAngle, measurementDistance } from "@/lib/cif-measurement"
@@ -350,5 +351,17 @@ export function CifViewer({ structure, structureControls, selectedSite, onSiteCh
       <ClusterCoordination geometry={geometry} unavailableReason={coordinationUnavailable} />
     </div>}
   </>
-  return <ViewerPanel title="CIF structure viewer" viewerId="cif" help={viewerHelp} actions={actions} className={styles.viewer}>{content}</ViewerPanel>
+  const exportStem = (structure.filename?.replace(/\.cif$/i, "") || structure.mineral || structure.formula || "structure").replace(/[^a-zA-Z0-9_-]+/g, "_")
+  return <ViewerPanel title="CIF structure viewer" viewerId="cif" help={viewerHelp} actions={actions} className={styles.viewer}
+    exportImages={false} exportFilename={exportStem} exportItems={[
+      { id: "cif", label: "CIF source (.cif)", disabled: !structure.cif, onSelect: () => downloadArtemisText(`${exportStem}.cif`, structure.cif, "chemical/x-cif") },
+      { id: "structure-json", label: "Structure data (JSON)", onSelect: () => downloadArtemisText(`${exportStem}.json`, JSON.stringify(structure, null, 2), "application/json") },
+      { id: "structure-png", label: "Image (PNG)", disabled: !ready || !!error || !geometry.atoms.length, onSelect: () => {
+        const instance = viewer.current
+        if (!instance) throw new Error("The 3D structure is not ready to export.")
+        clearHover()
+        instance.render()
+        downloadViewerDataUrl(`${exportStem}.png`, instance.pngURI())
+      } },
+    ]}>{content}</ViewerPanel>
 }

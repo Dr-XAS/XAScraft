@@ -2,14 +2,16 @@
 
 import { SectionHelp } from "../section-help"
 import { useState, type ReactNode } from "react"
-import { Download } from "lucide-react"
 import { isDifferenceGroup, type AthenaGroup, type Analysis } from "@/lib/athena"
+import { downloadArtemisText } from "@/lib/artemis-structures"
 import { viewerLabels } from "@/lib/athena-viewer-order"
 import { AthenaPlot, type Space } from "./athena-plot"
 import { AthenaColorLegend } from "./athena-color-legend"
 import { automaticPlotRange } from "./athena-plot-range"
 import { ResizablePlotCard } from "./athena-plot-card"
 import { ViewerPanel } from "./viewer-panel"
+import { spectrumDataCsv } from "./athena-spectrum-export"
+import type { ViewerExportItem } from "./viewer-export-menu"
 import { ViewerKWeightControl } from "./viewer-kweight-control"
 import { ViewerComplexComponents } from "./viewer-complex-components"
 import { ViewerControlField, ViewerControlGroup, ViewerDisplayControls, ViewerToggle } from "./viewer-display-controls"
@@ -60,12 +62,14 @@ interface Props {
   onOptionsMenuOpen: () => void
   onPickX?: (x: number, space: Space) => void
   onExport?: () => void
+  canExport?: boolean
+  exportPending?: boolean
 }
 
 /** Shared panel for independent current-spectrum and marked-spectrum views. */
 export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, analysis,
   analysisVisible: showingAnalysis, seriesTarget, savedKWeight, canChangeKWeight, draftE0, pickPrompt,
-  onChangeSpace, onSpecialPlot, onOptionsMenuOpen, onPickX, onExport }: Props) {
+  onChangeSpace, onSpecialPlot, onOptionsMenuOpen, onPickX, onExport, canExport = !!onExport, exportPending = false }: Props) {
   const { space, kWeight: viewerKWeight, setKWeight, energyMode, setEnergyMode, component, components, setComponents, plotScope,
     background, setBackground, preEdge, setPreEdge, postEdge, setPostEdge,
     showWindow, setShowWindow, showGrid, setShowGrid,
@@ -86,7 +90,19 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
   const displayedRange = range.map(value => energyRangeValue(value, draftE0, relativeRange, -1)) as [number | null, number | null]
   const displayedAutomaticRange = automaticRange.map(value => energyRangeValue(value, draftE0, relativeRange, -1)) as [number | null, number | null]
   const absoluteRangeValue = (value: number | null) => energyRangeValue(value, draftE0, relativeRange, 1)
-  return <ViewerPanel title={viewerLabels[viewer]} viewerId={viewer} help={viewer === "single" ? "Plots the highlighted data, independently of its mark. Plot display choices stay local to this viewer." : "Plots the marked data in project order. Its display choices are independent of the single spectrum viewer."}><ResizablePlotCard storageKey={`athena.plot.${viewer}.height.v1`} resizeLabel={`Resize ${viewer === "single" ? "single spectrum" : "multiple spectra"} plot height`} controlsId={`athena-${viewer}-spectrum-viewer`}><div className="ath-plot-top"><div className="ath-space-tabs" role="tablist" aria-label="Plot space">{(["E", "k", "R", "q"] as Space[]).map(s => <button key={s} role="tab" aria-selected={space === s && !showingAnalysis} onContextMenu={event => { event.preventDefault(); onSpecialPlot?.(s) }} title="Right-click for Craft’s special plot" onClick={() => onChangeSpace(s)}><b>{s}</b><span>{{ E: "Energy", k: "EXAFS", R: "Fourier", q: "Back transform" }[s]}</span></button>)}</div><SectionHelp label="Plot space">E shows absorption versus energy; k shows EXAFS oscillations; R shows the Fourier transform; q shows the R-filtered back transform. R peaks are not phase-corrected bond lengths. Right-click a space for its Craft comparison plot.</SectionHelp></div>
+  const filename = `${viewer === "single" ? active?.label || "spectrum" : "marked-spectra"}-${showingAnalysis ? "analysis" : space}`
+  const exportItems: ViewerExportItem[] = showingAnalysis && analysis ? [{
+    id: "analysis-json", label: "Analysis data (JSON)",
+    onSelect: () => downloadArtemisText(`${filename}.json`, JSON.stringify(analysis, null, 2), "application/json"),
+  }] : [{
+    id: "data-csv", label: "Data (CSV)", disabled: viewer === "single" ? !onExport : !selectedGroups.length,
+    onSelect: () => viewer === "single" ? onExport?.()
+      : downloadArtemisText(`${filename}.csv`, spectrumDataCsv(selectedGroups, space, viewerKWeight), "text/csv;charset=utf-8"),
+  }]
+  return <ViewerPanel title={viewerLabels[viewer]} viewerId={viewer}
+    exportItems={exportItems} exportFilename={filename}
+    exportDisabled={!canExport || exportPending || weightedPlot.loading || !!weightedPlot.error || (!selectedGroups.length && !showingAnalysis)}
+    help={viewer === "single" ? "Plots the highlighted data, independently of its mark. Plot display choices stay local to this viewer." : "Plots the marked data in project order. Its display choices are independent of the single spectrum viewer."}><ResizablePlotCard storageKey={`athena.plot.${viewer}.height.v1`} resizeLabel={`Resize ${viewer === "single" ? "single spectrum" : "multiple spectra"} plot height`} controlsId={`athena-${viewer}-spectrum-viewer`}><div className="ath-plot-top"><div className="ath-space-tabs" role="tablist" aria-label="Plot space">{(["E", "k", "R", "q"] as Space[]).map(s => <button key={s} role="tab" aria-selected={space === s && !showingAnalysis} onContextMenu={event => { event.preventDefault(); onSpecialPlot?.(s) }} title="Right-click for Craft’s special plot" onClick={() => onChangeSpace(s)}><b>{s}</b><span>{{ E: "Energy", k: "EXAFS", R: "Fourier", q: "Back transform" }[s]}</span></button>)}</div><SectionHelp label="Plot space">E shows absorption versus energy; k shows EXAFS oscillations; R shows the Fourier transform; q shows the R-filtered back transform. R peaks are not phase-corrected bond lengths. Right-click a space for its Craft comparison plot.</SectionHelp></div>
         {plotScope === "selected" && <div className="ath-plot-scope"><span className="ath-plot-scope-note">{selectedGroups.length} checked {selectedGroups.length === 1 ? "group" : "groups"}</span></div>}
         <div className="ath-plot-controls">
         {space !== "E" && <ViewerKWeightControl label={`${viewer === "single" ? "Single spectrum" : "Multiple spectra"} k-weight`} value={viewerKWeight} savedWeight={savedKWeight} onChange={setKWeight} disabled={!canChangeKWeight || !selectedGroups.length || showingAnalysis} />}
@@ -124,7 +140,7 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
             <ViewerToggle label="Show legend" help="Show each curve’s name beside the plot. Click a legend entry to hide a curve temporarily; double-click to isolate it." checked={showLegend} onChange={setShowLegend} />
           </ViewerControlGroup>
           <span className="ath-plot-summary">{showingAnalysis ? "Analysis result" : `${selectedGroups.length} ${selectedGroups.length === 1 ? "spectrum" : "spectra"}`}{space === "R" && !showingAnalysis && " · R is not phase corrected"}</span>
-          <ViewerControlGroup label="Spectrum plot range" align="end">{space === "E" && <ViewerToggle label="Relative to E₀" help="Enter the range limits as energy offsets from the current data’s E₀, in eV. The plotted energy axis remains absolute; this changes how the limits are entered." title={draftE0 === null ? "E₀ is unavailable for the current spectrum" : `Use the current spectrum’s E₀ (${draftE0} eV) as zero`} checked={relativeRange} disabled={showingAnalysis || draftE0 === null} onChange={setRangeRelativeToE0} />}<ViewerControlField label="Range" help={`Set the visible horizontal minimum and maximum in ${space === "E" ? "eV" : space === "R" ? "Å" : "Å⁻¹"}. ${space === "R" ? "Clear either bound to restore its default (0–6 Å)." : "Clear either bound to use the full available range."} These limits zoom the plot without trimming data or changing transform ranges.`}><PlotRangeInput label="Plot minimum" value={showingAnalysis ? null : displayedRange[0]} automatic={displayedAutomaticRange[0]} disabled={showingAnalysis || automaticRange[0] === null} onChange={value => setRange([absoluteRangeValue(value), range[1]])} /></ViewerControlField><span>to</span><PlotRangeInput label="Plot maximum" value={showingAnalysis ? null : displayedRange[1]} automatic={displayedAutomaticRange[1]} disabled={showingAnalysis || automaticRange[1] === null} onChange={value => setRange([range[0], absoluteRangeValue(value)])} />{onExport && <><button title="Export current data" onClick={onExport}><Download size={14} />CSV</button><SectionHelp label="Spectrum CSV export">Download the current data’s arrays in the displayed E, k, R, or q space as CSV. Viewer colors, vertical offsets, and display ranges do not alter the saved arrays.</SectionHelp></>}</ViewerControlGroup>
+          <ViewerControlGroup label="Spectrum plot range" align="end">{space === "E" && <ViewerToggle label="Relative to E₀" help="Enter the range limits as energy offsets from the current data’s E₀, in eV. The plotted energy axis remains absolute; this changes how the limits are entered." title={draftE0 === null ? "E₀ is unavailable for the current spectrum" : `Use the current spectrum’s E₀ (${draftE0} eV) as zero`} checked={relativeRange} disabled={showingAnalysis || draftE0 === null} onChange={setRangeRelativeToE0} />}<ViewerControlField label="Range" help={`Set the visible horizontal minimum and maximum in ${space === "E" ? "eV" : space === "R" ? "Å" : "Å⁻¹"}. ${space === "R" ? "Clear either bound to restore its default (0–6 Å)." : "Clear either bound to use the full available range."} These limits zoom the plot without trimming data or changing transform ranges.`}><PlotRangeInput label="Plot minimum" value={showingAnalysis ? null : displayedRange[0]} automatic={displayedAutomaticRange[0]} disabled={showingAnalysis || automaticRange[0] === null} onChange={value => setRange([absoluteRangeValue(value), range[1]])} /></ViewerControlField><span>to</span><PlotRangeInput label="Plot maximum" value={showingAnalysis ? null : displayedRange[1]} automatic={displayedAutomaticRange[1]} disabled={showingAnalysis || automaticRange[1] === null} onChange={value => setRange([range[0], absoluteRangeValue(value)])} /></ViewerControlGroup>
         </ViewerDisplayControls>
       </ResizablePlotCard></ViewerPanel>
 }
