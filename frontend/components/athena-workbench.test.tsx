@@ -1333,7 +1333,7 @@ describe("AthenaWorkbench data group reordering", () => {
 })
 
 describe("AthenaWorkbench data group sorting", () => {
-  it("separates the saved manual order from immutable Added order and only enables manual reordering", async () => {
+  it("sorts newest and oldest by addition order independently of manual order without changing the project", async () => {
     const alpha = group("a", "Alpha")
     const beta = group("b", "Beta")
     const charlie = group("c", "Charlie")
@@ -1344,14 +1344,25 @@ describe("AthenaWorkbench data group sorting", () => {
     const sort = screen.getByRole("combobox", { name: "Sort spectra" })
 
     expect(sort).toHaveValue("manual")
+    expect(within(sort).getAllByRole("option").map(option => option.textContent))
+      .toEqual(["Manual order", "Newest first", "Oldest first", "Name A–Z", "Type"])
     expect(listedGroupIds()).toEqual(["b", "a", "c"])
     expect(within(screen.getByRole("list")).getAllByRole("button", { name: /^Reorder / }).every(handle => !handle.hasAttribute("disabled"))).toBe(true)
+
+    fireEvent.change(sort, { target: { value: "newest" } })
+
+    expect(listedGroupIds()).toEqual(["c", "b", "a"])
+    expect(within(screen.getByRole("list")).getAllByRole("button", { name: /^Reorder / }).every(handle => handle.hasAttribute("disabled"))).toBe(true)
+    expect(localStorage.getItem("athena.group-sort.v1")).toBe("newest")
 
     fireEvent.change(sort, { target: { value: "added" } })
 
     expect(listedGroupIds()).toEqual(["a", "b", "c"])
     expect(within(screen.getByRole("list")).getAllByRole("button", { name: /^Reorder / }).every(handle => handle.hasAttribute("disabled"))).toBe(true)
     expect(localStorage.getItem("athena.group-sort.v1")).toBe("added")
+
+    fireEvent.change(sort, { target: { value: "manual" } })
+    expect(listedGroupIds()).toEqual(["b", "a", "c"])
     expect(api).toHaveBeenCalledTimes(1)
   })
 
@@ -1405,7 +1416,7 @@ describe("AthenaWorkbench data group sorting", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Sort spectra" }), { target: { value: "tag" } })
 
     expect(listedGroupIds()).toEqual(["trans", "sample", "fluo", "linked", "trans-ref", "theory", "plain"])
-    expect(screen.getByText(/Tag order is trans, fluo, ref, theory, then untagged/)).toBeInTheDocument()
+    expect(screen.getByText(/Type order is trans, fluo, ref, theory, then untagged/)).toBeInTheDocument()
     expect(within(screen.getByRole("button", { name: /^Transmission reference/ })).getByText("trans")).toBeVisible()
     expect(within(screen.getByRole("button", { name: /^Transmission reference/ })).getByText("ref")).toBeVisible()
     expect(within(screen.getByRole("button", { name: /^Linked reference/ })).getByText("ref · 1")).toBeVisible()
@@ -1440,15 +1451,20 @@ describe("AthenaWorkbench data group sorting", () => {
       .toEqual(["First folder data group", "Second folder data group"])
   })
 
-  it("restores a saved view sort without needing project mutation permission", async () => {
-    localStorage.setItem("athena.group-sort.v1", "name")
+  it.each([
+    ["newest", ["a", "z"]],
+    ["added", ["z", "a"]],
+    ["name", ["a", "z"]],
+    ["tag", ["z", "a"]],
+  ])("restores saved %s sorting without needing project mutation permission", async (savedSort, expectedIds) => {
+    localStorage.setItem("athena.group-sort.v1", savedSort)
     api.mockImplementation(async path => path === "/projects/integrated-project"
       ? projectFixture({ id: "integrated-project", groups: [group("z", "Zulu"), group("a", "Alpha")] })
       : Promise.reject(new Error(`unexpected ${path}`)))
     render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project"] }} />)
 
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Sort spectra" })).toHaveValue("name"))
-    expect(listedGroupIds()).toEqual(["a", "z"])
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Sort spectra" })).toHaveValue(savedSort))
+    expect(listedGroupIds()).toEqual(expectedIds)
     expect(screen.getByRole("button", { name: "Reorder Zulu" })).toBeDisabled()
     expect(api).toHaveBeenCalledTimes(1)
   })
