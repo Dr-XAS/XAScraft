@@ -10,8 +10,9 @@ test("CrystalNN shell, FEFF candidates, and periodic viewer use the selected abs
   await page.goto("/")
   await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
   const viewer = page.getByRole("region", { name: "CIF structure viewer", exact: true })
-  await expect(viewer.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeVisible()
+  await expect(viewer.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeHidden()
   await viewer.getByRole("combobox", { name: "CIF view mode" }).selectOption("shell")
+  await expect(viewer.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeVisible()
   await expect(viewer.getByText("3 atoms shown", { exact: true })).toBeVisible()
   await expect(viewer.getByRole("button", { name: "Reset view", exact: true })).toBeEnabled()
   // Inspect actual 3Dmol atom styles and pixel output, not just a loaded canvas.
@@ -24,6 +25,8 @@ test("CrystalNN shell, FEFF candidates, and periodic viewer use the selected abs
   await page.getByRole("button", { name: "Generate FEFF paths", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "FEFF paths" })
   await dialog.getByRole("radio", { name: "Absorber site 1", exact: true }).click()
+  await expect(dialog.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeHidden()
+  await dialog.getByRole("combobox", { name: "CIF view mode" }).selectOption("shell")
   await expect(dialog.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeVisible()
   // Display-only site changes must not change FEFF site or discard work.
   await dialog.getByRole("combobox", { name: "CIF center site" }).selectOption("2")

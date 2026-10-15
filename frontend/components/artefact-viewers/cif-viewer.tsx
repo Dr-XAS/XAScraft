@@ -18,6 +18,7 @@ import { AtomLegend } from "../atom-legend"
 import { LocalStructureControls } from "../local-structure-controls"
 import { StructureDisplayLegend } from "../structure-display-legend"
 import { ViewerPanel } from "./viewer-panel"
+import { ViewerDisplayControls } from "./viewer-display-controls"
 import { ResizablePlotCard } from "./athena-plot-card"
 import { ClusterCoordination } from "./cluster-coordination"
 import styles from "./cif-viewer.module.css"
@@ -271,8 +272,6 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
   const resetButton = <button type="button" disabled={!ready || !!error} onClick={() => { clearHover(); viewer.current?.zoomTo(); if (mode === "shell") viewer.current?.zoom(1.8); viewer.current?.render() }}>Reset view</button>
   const actions = <div className={styles.headerActions}>
     <button type="button" aria-pressed={measuring} disabled={!ready || !!error} onClick={() => { setMeasuring(value => !value); clearMeasurement(); clearHover() }}>Measure</button>
-    <button type="button" aria-expanded={coordinationPanel === "open"} aria-controls={coordinationId}
-      onClick={() => setCoordinationPanel(previous => previous === "open" ? "closed" : "open")}>Coordination numbers</button>
     {resetButton}
   </div>
   const viewerHelp = <>Drag to rotate; scroll or pinch to zoom; hover over atoms for details or bonds for their length in Å. Enable Measure and click two atoms for a distance, or three for distances and the angle at atom 2. Measurements use the displayed periodic images and do not imply a chemical bond. Escape clears the selection. Bonds are inferred from distances. Display settings do not change FEFF parameters. The largest sphere marks the center; larger neighboring spheres mark CrystalNN first-shell atoms, keeping their element colors. In radial view, shell colors and neighbor counts appear in the shell table. Element visibility does not change shell membership. Use CrystalNN first shell view to show all periodic neighbors.</>
@@ -313,7 +312,7 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
     </div>}
     {geometry.lattice && structure.sites.length > 0 && <>
       <div className={styles.controls}>
-        <label><span>View<SectionHelp label="CIF view mode">Local cluster shows atoms within the display radius. Unit cell shows repeated crystallographic cells. CrystalNN first shell uses its periodic neighbor analysis; Radial shells groups neighbors by distance.</SectionHelp></span><select aria-label="CIF view mode" value={mode} onChange={event => setMode(event.target.value as typeof mode)}><option value="cluster">Local cluster</option><option value="cell">Unit cell</option><option value="shell" disabled={!shell}>CrystalNN first shell</option><option value="radial" disabled={!radial}>Radial shells</option></select></label>
+        <label><span>View<SectionHelp label="CIF view mode">Local cluster shows atoms within the display radius. Unit cell shows repeated crystallographic cells. CrystalNN first shell uses its periodic neighbor analysis; Radial shells groups neighbors by distance.</SectionHelp></span><select aria-label="CIF view mode" value={mode} onChange={event => setMode(event.target.value as typeof mode)}><option value="cluster">Local cluster</option><option value="cell">Unit cell</option><option value="shell" disabled={!structure.supported && !shell}>CrystalNN first shell</option><option value="radial" disabled={!structure.supported && !radial}>Radial shells</option></select></label>
         <label><span>Center site<SectionHelp label="CIF center site">Choose the crystallographic site at the center of the structure and neighbor analysis. Sites of the same element can have different local environments.</SectionHelp></span><select aria-label="CIF center site" value={center} onChange={event => { const site = Number(event.target.value); setCenter({ key: centerKey, site }); onSiteChange?.(site) }}>{centerSites.map(site => <option key={site.index} value={site.index}>{site.species} · site {site.index}</option>)}</select></label>
         {shell && mode !== "radial" && <label><input type="checkbox" aria-label="Highlight CrystalNN first shell" checked={highlightShell || mode === "shell"} disabled={mode === "shell"} onChange={event => setHighlightShell(event.target.checked)} />First shell<SectionHelp label="Highlight first shell">Enlarge neighbors assigned by CrystalNN while keeping their element colors. The first-shell view always shows them; hiding or highlighting atoms does not change shell membership.</SectionHelp></label>}
       </div>
@@ -328,8 +327,8 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
     </>}
   </ResizablePlotCard>
     {geometry.lattice && structure.sites.length > 0 && <>
-      <div className={styles.help}><FirstShellSummary state={{ ...shellState, shell }} /></div>
-      <details className={styles.help} open={mode === "radial" ? true : undefined}><summary>Radial shell ranges & display</summary>
+      <div className={styles.help} hidden={mode !== "shell"}><FirstShellSummary state={{ ...shellState, shell }} /></div>
+      <details className={styles.help} hidden={mode !== "radial"} open={mode === "radial" ? true : undefined}><summary>Radial shell ranges & display</summary>
         <RadialShellPanel state={{ ...radialState, data: radial }} selected={visibleShells} onToggle={index => {
           setShellVisibility({ key: radialKey, indices: visibleShells.includes(index) ? visibleShells.filter(value => value !== index) : [...visibleShells, index] })
           setMode("radial")
@@ -337,6 +336,10 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
       </details>
     </>}
     {geometry.warnings.map(warning => <p className={styles.warning} key={warning}>{warning}</p>)}
+    <ViewerDisplayControls label="CIF actions">
+      <button type="button" aria-expanded={coordinationPanel === "open"} aria-controls={coordinationId}
+        onClick={() => setCoordinationPanel(previous => previous === "open" ? "closed" : "open")}>Coordination numbers</button>
+    </ViewerDisplayControls>
     {coordinationPanel !== "unopened" && <div id={coordinationId} hidden={coordinationPanel !== "open"}>
       <ClusterCoordination geometry={geometry} unavailableReason={coordinationUnavailable} />
     </div>}

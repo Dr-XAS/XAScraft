@@ -15,8 +15,10 @@ it("renders selected complete shells independently of cluster radius with stable
   const cutoffWarning = "The outer shell is close to the search cutoff and may be incomplete. Increase the radius to check it."
   render(<CifViewer structure={radialStructure} selectedSite={1} radialAnalysis={{ ...state, data: { ...radialFixture, warnings: [cutoffWarning] } }} />)
   await waitFor(() => expect(screen.getByRole("button", { name: "Reset view" })).toBeEnabled())
+  expect(screen.getByText("Radial shell ranges & display")).not.toBeVisible()
   fireEvent.change(screen.getByRole("slider", { name: "CIF display radius" }), { target: { value: "1" } })
   fireEvent.change(screen.getByRole("combobox", { name: "CIF view mode" }), { target: { value: "radial" } })
+  expect(screen.getByText("Radial shell ranges & display")).toBeVisible()
   expect(screen.getByText("5 atoms shown")).toBeVisible()
   expect(screen.getByText(/Distances are measured from the selected absorber/)).not.toBeVisible()
   fireEvent.mouseEnter(screen.getByRole("button", { name: "About Radial shells" }))
@@ -41,6 +43,7 @@ it("renders selected complete shells independently of cluster radius with stable
   fireEvent.click(screen.getByRole("checkbox", { name: "Show shell 2" }))
   expect(screen.getByText("1 atom shown")).toBeVisible()
   fireEvent.change(screen.getByRole("combobox", { name: "CIF view mode" }), { target: { value: "cluster" } })
+  expect(screen.getByText("Radial shell ranges & display")).not.toBeVisible()
   expect(screen.getByRole("slider", { name: "CIF display radius" })).toHaveValue("1")
 })
 
