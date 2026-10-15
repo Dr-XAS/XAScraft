@@ -42,9 +42,8 @@ function CellRepeatInput({ axis, value, onChange }: { axis: string; value: numbe
     }} /></label>
 }
 
-export function CifViewer({ structure, collapsible = false, structureControls, selectedSite, onSiteChange, analysis, radialAnalysis, displayRadius, onDisplayRadiusChange, radiusDisabled = false }: {
+export function CifViewer({ structure, structureControls, selectedSite, onSiteChange, analysis, radialAnalysis, displayRadius, onDisplayRadiusChange, radiusDisabled = false }: {
   structure: ArtemisStructure
-  collapsible?: boolean
   structureControls?: ReactNode
   selectedSite?: number
   onSiteChange?: (site: number) => void
@@ -351,10 +350,5 @@ export function CifViewer({ structure, collapsible = false, structureControls, s
       <ClusterCoordination geometry={geometry} unavailableReason={coordinationUnavailable} />
     </div>}
   </>
-  return collapsible
-    ? <ViewerPanel title="CIF structure viewer" viewerId="cif" help={viewerHelp} actions={actions} className={styles.docked}>{content}</ViewerPanel>
-    : <section className={styles.viewer} aria-label="CIF structure viewer">
-      <div className={styles.heading}><h4>CIF structure viewer<SectionHelp label="CIF structure viewer">{viewerHelp}</SectionHelp></h4>{actions}</div>
-      {content}
-    </section>
+  return <ViewerPanel title="CIF structure viewer" viewerId="cif" help={viewerHelp} actions={actions} className={styles.viewer}>{content}</ViewerPanel>
 }

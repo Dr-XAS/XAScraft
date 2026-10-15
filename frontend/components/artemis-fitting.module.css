@@ -1,6 +1,6 @@
 .editor { flex: 1 1 0px; display: flex; flex-direction: column; height: 0; box-sizing: border-box; min-width: 0; padding: 12px; min-height: 400px; overflow-y: auto; scrollbar-gutter: stable; font-size: var(--text-body); color: var(--ath-ink, #24362c); }
 .editor > * { flex-shrink: 0; }
-.editor h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--text-section); font-weight: 500; line-height: var(--leading-heading); }
+.editor h3:not(:where([data-viewer-panel] *)) { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--text-section); font-weight: 500; line-height: var(--leading-heading); }
 .help { margin: 7px 0; color: var(--ath-muted, #647669); font-size: var(--text-caption); line-height: var(--leading-body); }
 .spectrum { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; margin: 0 0 12px; background: var(--ath-canvas, #f5f8f5); border-radius: 5px; overflow-wrap: anywhere; }
 .spectrum span { color: var(--ath-muted, #647669); font-size: var(--text-caption); }
@@ -15,14 +15,15 @@
 .sectionBody > section { margin-bottom: 0; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; }
 .viewer .toolbar button { padding: 6px 8px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; background: var(--ath-surface, #fff); color: var(--ath-ink, #24362c); cursor: pointer; font: inherit; font-size: var(--text-body); line-height: var(--leading-control); }
-.editor button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; background: var(--ath-surface, #fff); color: var(--ath-ink, #24362c); cursor: pointer; font: inherit; font-size: var(--text-body); line-height: var(--leading-control); }
-.editor button:disabled { opacity: .5; cursor: default; }
+/* Embedded viewers own their controls in both dialogs and the results column. */
+.editor button:not(:where([data-viewer-panel] *)) { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; background: var(--ath-surface, #fff); color: var(--ath-ink, #24362c); cursor: pointer; font: inherit; font-size: var(--text-body); line-height: var(--leading-control); }
+.editor button:disabled:not(:where([data-viewer-panel] *)) { opacity: .5; cursor: default; }
 .editor button.contextTrigger { padding: 0 4px; min-width: 24px; border-color: transparent; background: transparent; color: var(--ath-muted, #647669); }
 .editor button.syncButton { background: var(--ath-sync-primary, #7c3aed); border-color: var(--ath-sync-primary, #7c3aed); color: var(--ath-primary-foreground); font-weight: 500; }
 .editor button.syncButton:not(:disabled):hover { background: var(--ath-sync-primary-hover, #6d28d9); border-color: var(--ath-sync-primary-hover, #6d28d9); color: var(--ath-primary-foreground); }
 .editor button.syncButton:focus-visible { outline-color: var(--ath-sync-primary, #7c3aed); }
-.editor input:not([type=checkbox]):not([type=radio]):not([type=file]), .editor select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 29px; padding: 5px 6px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; color: var(--ath-ink, #24362c); background: var(--ath-surface, #fff); font: inherit; font-size: var(--text-input); line-height: var(--leading-control); }
-.editor input:focus-visible, .editor select:focus-visible, .editor button:focus-visible, .viewer button:focus-visible { outline: 2px solid var(--ath-primary, #268553); outline-offset: 2px; }
+.editor input:not([type=checkbox]):not([type=radio]):not([type=file]):not(:where([data-viewer-panel] *)), .editor select:not(:where([data-viewer-panel] *)) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 29px; padding: 5px 6px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; color: var(--ath-ink, #24362c); background: var(--ath-surface, #fff); font: inherit; font-size: var(--text-input); line-height: var(--leading-control); }
+.editor input:focus-visible:not(:where([data-viewer-panel] *)), .editor select:focus-visible:not(:where([data-viewer-panel] *)), .editor button:focus-visible:not(:where([data-viewer-panel] *)), .viewer button:focus-visible { outline: 2px solid var(--ath-primary, #268553); outline-offset: 2px; }
 .fileInput { display: none; }
 .path { margin-top: 8px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 5px; padding: 8px; }
 .pathHeader { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
@@ -40,7 +41,7 @@
 .pathDetails[hidden] { display: none; }
 .check { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editor input[type=checkbox] { accent-color: var(--ath-primary, #268553); margin: 0; width: 13px; height: 13px; flex-shrink: 0; }
+.editor input[type=checkbox]:not(:where([data-viewer-panel] *)) { accent-color: var(--ath-primary, #268553); margin: 0; width: 13px; height: 13px; flex-shrink: 0; }
 .pathHeader button, .parameterHeader button { flex-shrink: 0; padding: 5px; }
 .metadata { margin: 5px 0 8px; color: var(--ath-muted, #647669); font-size: var(--text-caption); }
 .modelField { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin: 8px 0; }

@@ -23,7 +23,7 @@ export function ProjectCifViewer({ attachments = [], selectedId, selectedSite, o
   </ViewerPanel>
 
   return <div className="ath-project-cif-viewer">
-    <CifViewer key={`${selected.id}:${selected.sha256}`} structure={structure} displayRadius={radius} onDisplayRadiusChange={setRadius} selectedSite={selected.id === selectedId && structure.sites.some(site => site.index === selectedSite) ? selectedSite : undefined} onSiteChange={site => onSelect(selected.id, site)} collapsible structureControls={
+    <CifViewer key={`${selected.id}:${selected.sha256}`} structure={structure} displayRadius={radius} onDisplayRadiusChange={setRadius} selectedSite={selected.id === selectedId && structure.sites.some(site => site.index === selectedSite) ? selectedSite : undefined} onSiteChange={site => onSelect(selected.id, site)} structureControls={
       <label className="ath-cif-selection"><span>Project CIF<SectionHelp label="Viewed CIF structure">Choose an attached structure for the 3D viewer. The listed names identify the saved CIF snapshots; changing the viewed structure does not replace any attachment.</SectionHelp></span>
         <select aria-label="Viewed CIF structure" value={selected.id} onChange={event => onSelect(event.target.value)}>
           {attachments.map(attachment => <option key={attachment.id} value={attachment.id}>

@@ -26,7 +26,7 @@ export function ViewerPanel({ title, label = title, viewerId, actions, help, chi
     if (collapsed) window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")))
   }
 
-  return <section className={`${styles.panel} ${className}`.trim()} aria-label={label} data-collapsed={collapsed}>
+  return <section className={`${styles.panel} ${className}`.trim()} aria-label={label} data-viewer-panel data-collapsed={collapsed}>
     <header className={styles.heading}>
       <h3><button type="button" className={styles.toggle} aria-expanded={!collapsed} aria-controls={id}
         aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`} onClick={toggle}>

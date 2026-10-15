@@ -228,7 +228,7 @@ describe("CifViewer", () => {
   it("calculates finite-cluster CNs and preserves results across display-only controls", async () => {
     const attached = structure()
     const original = structuredClone(attached)
-    render(<CifViewer structure={attached} collapsible />)
+    render(<CifViewer structure={attached} />)
     await ready()
     expect(screen.queryByRole("table", { name: "Cluster coordination numbers" })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Coordination numbers" }))
@@ -332,8 +332,8 @@ describe("CifViewer", () => {
     expect(screen.getByRole("button", { name: "Calculate" })).toBeDisabled()
   })
 
-  it("preserves the display radius and renderer when the docked viewer is collapsed", async () => {
-    render(<CifViewer structure={structure()} collapsible structureControls={<p>Saved crystal structure</p>} />)
+  it("preserves the display radius and renderer when the shared viewer is collapsed", async () => {
+    render(<CifViewer structure={structure()} structureControls={<p>Saved crystal structure</p>} />)
     await ready()
     expect(screen.getByRole("button", { name: "Collapse CIF structure viewer" })).toBeVisible()
     expect(screen.getByText("Saved crystal structure")).toBeVisible()
@@ -433,7 +433,7 @@ describe("CifViewer", () => {
   it("expands unit cells along each lattice direction and keeps both view settings", async () => {
     const attached = structure()
     const original = structuredClone(attached)
-    render(<CifViewer structure={attached} collapsible />)
+    render(<CifViewer structure={attached} />)
     const instance = await ready()
     fireEvent.change(screen.getByRole("slider", { name: "CIF display radius" }), { target: { value: "5" } })
     fireEvent.change(screen.getByRole("combobox", { name: "CIF view mode" }), { target: { value: "cell" } })
