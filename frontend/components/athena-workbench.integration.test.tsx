@@ -82,10 +82,12 @@ afterEach(() => {
 
 describe("AthenaWorkbench integrated request gating", () => {
   it("issues only the initial project GET for a read-project-only EXAFS session", async () => {
+    const project = eligibleProject()
+    project.groups.push({ ...project.groups[0], id: "second-sample", label: "Second EXAFS sample" })
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith("/api/athena/projects/integrated-project")) {
-        return new Response(JSON.stringify(eligibleProject()), {
+        return new Response(JSON.stringify(project), {
           headers: { "content-type": "application/json" },
         })
       }

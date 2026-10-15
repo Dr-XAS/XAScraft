@@ -8,9 +8,10 @@ import { viewerIcons } from "./athena-viewer-icons"
 
 type Drag = { id: ViewerId; pointerId: number; x: number; y: number; moved: boolean; target: ViewerId | null }
 
-export function AthenaViewerChooser({ order, shown, onToggle, onToggleAll, onMove }: {
+export function AthenaViewerChooser({ order, shown, disabled = {}, onToggle, onToggleAll, onMove }: {
   order: readonly ViewerId[]
   shown: ReadonlySet<ViewerId>
+  disabled?: Partial<Record<ViewerId, string>>
   onToggle: (id: ViewerId) => void
   onToggleAll: () => void
   onMove: (source: ViewerId, target: ViewerId) => void
@@ -88,7 +89,7 @@ export function AthenaViewerChooser({ order, shown, onToggle, onToggleAll, onMov
 
   return <>
     <div ref={container} className="ath-viewer-chips" role="group" aria-label="Choose viewers">
-      <button type="button" className="ath-viewer-chip ath-viewer-all" aria-pressed={order.every(id => shown.has(id))} onClick={onToggleAll}>All viewers</button>
+      <button type="button" className="ath-viewer-chip ath-viewer-all" aria-pressed={order.filter(id => !disabled[id]).every(id => shown.has(id))} onClick={onToggleAll}>All viewers</button>
       <SectionHelp label="Choose viewers">Show or hide each results panel, or toggle all panels together. Single spectrum follows the highlighted data; Multiple spectra follows the marked data. Drag a handle or use its arrow keys to reorder panels. These choices do not change project data.</SectionHelp>
       {order.map((id, index) => {
         const Icon = viewerIcons[id]
@@ -112,7 +113,7 @@ export function AthenaViewerChooser({ order, shown, onToggle, onToggleAll, onMov
               event.preventDefault()
               if (order[target]) move(id, order[target])
             }}><GripVertical size={14} aria-hidden="true" /></button>
-          <button type="button" className="ath-viewer-toggle" aria-pressed={shown.has(id)} onClick={() => onToggle(id)}>
+          <button type="button" className="ath-viewer-toggle" aria-pressed={shown.has(id)} disabled={!!disabled[id]} title={disabled[id]} onClick={() => onToggle(id)}>
             <span className="ath-viewer-chip-icon" aria-hidden="true"><Icon size={20} strokeWidth={2} /></span>{viewerLabels[id]}
           </button>
         </div>

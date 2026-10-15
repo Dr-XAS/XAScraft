@@ -5016,6 +5016,7 @@ describe("AthenaWorkbench group selection and drafts", () => {
     expect(plotProps("current").groups.map(g => g.id)).toEqual(["foil"])
     expect(plotProps().active?.id).toBe("foil")
     expect(plotProps().groups.map(g => g.id)).toEqual(["oxide"])
+    expect(document.querySelector('[data-viewer-id="multiple"]')).not.toBeVisible()
   })
 
   it("removes the Apply button and discards a pending edit before its debounce expires", async () => {
@@ -6434,7 +6435,7 @@ describe('AthenaWorkbench plot scope and processing lines', () => {
       k: [0, 4, 8, 14], weighted_chi: [0, 1, -1, 2],
       q: [2, 4, 8], chiq_re: [0, 1, -1], chiq_im: [1, 0, -1],
     })
-    await openSaved(projectFixture({ groups: [spectrum] }))
+    await openSaved(projectFixture({ groups: [spectrum, { ...spectrum, id: 'second-foil', label: 'Second foil scan' }] }))
     fireEvent.click(multipleViewer().getByRole('tab', { name: /Back transform/ }))
     const minimum = () => multipleViewer().getByRole('spinbutton', { name: 'Plot minimum' })
     const maximum = () => multipleViewer().getByRole('spinbutton', { name: 'Plot maximum' })
@@ -6533,20 +6534,25 @@ describe('AthenaWorkbench plot scope and processing lines', () => {
 
   it.each([0, 1, 2])('keeps separate default views with %s imported spectra', async count => {
     const project = processedProject()
-    project.groups = project.groups.slice(0, count)
+    project.groups = project.groups.slice(0, count).map(g => ({ ...g, marked: true }))
     await openSaved(project)
 
     expect(singleViewer().getByRole('radio', { name: 'μ(E) · raw' })).toBeChecked()
-    expect(multipleViewer().getByRole('radio', { name: 'μ(E) · flattened' })).toBeChecked()
     expect(singleViewer().getByRole('checkbox', { name: 'Show legend' })).toBeChecked()
-    expect(multipleViewer().getByRole('checkbox', { name: 'Show legend' })).toBeChecked()
+    if (count > 1) {
+      expect(multipleViewer().getByRole('radio', { name: 'μ(E) · flattened' })).toBeChecked()
+      expect(multipleViewer().getByRole('checkbox', { name: 'Show legend' })).toBeChecked()
+    } else {
+      expect(document.querySelector('[data-viewer-id="multiple"]')).not.toBeVisible()
+      expect(screen.getByRole('button', { name: 'Multiple spectra viewer' })).toBeDisabled()
+    }
     expect(plotProps('current')).toMatchObject({ plotScope: 'current', showLegend: true, energyMode: 'mu',
       background: count > 0, preEdge: count > 0, postEdge: count > 0 })
     expect(plotProps()).toMatchObject({ plotScope: 'selected', showLegend: true, energyMode: 'flat',
       background: false, preEdge: false, postEdge: false })
     for (const line of ['Background', 'Pre-edge line', 'Post-edge line']) {
       expect(singleViewer().getByRole('checkbox', { name: line })).toHaveProperty('checked', count > 0)
-      expect(multipleViewer().queryByRole('checkbox', { name: line })).not.toBeInTheDocument()
+      if (count > 1) expect(multipleViewer().queryByRole('checkbox', { name: line })).not.toBeInTheDocument()
     }
     expect(screen.queryByRole('radio', { name: 'Current spectrum' })).not.toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: 'All selected' })).not.toBeInTheDocument()
@@ -6604,15 +6610,15 @@ describe('AthenaWorkbench plot scope and processing lines', () => {
     expect(plotProps()).toMatchObject({ energyMode: 'flat', showLegend: true })
   })
 
-  it('leaves the multiple viewer empty with no marks while the single viewer follows the current spectrum', async () => {
+  it('hides the multiple viewer with no marks while the single viewer follows the current spectrum', async () => {
     const project = processedProject()
     for (const g of project.groups) g.marked = false
     await openSaved(project)
 
     expect(plotProps().groups).toEqual([])
     expect(plotProps('current').groups.map(g => g.id)).toEqual(['foil'])
-    expect(multipleViewer().getByRole('spinbutton', { name: 'Plot minimum' })).toBeDisabled()
-    expect(multipleViewer().getByRole('spinbutton', { name: 'Plot maximum' })).toBeDisabled()
+    expect(document.querySelector('[data-viewer-id="multiple"]')).not.toBeVisible()
+    expect(screen.getByRole('button', { name: 'Multiple spectra viewer' })).toBeDisabled()
     expect(singleViewer().getByRole('spinbutton', { name: 'Plot minimum' })).toHaveValue(-19)
     selectGroup('Unused reference')
     expect(plotProps('current').groups.map(g => g.id)).toEqual(['unused'])

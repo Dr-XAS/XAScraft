@@ -470,6 +470,9 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   const [feffPathState, setFeffPathState] = useState<{ projectId: string; groupId: string; paths: FeffPathSummary[]; model: ArtemisPreviewRequest | null } | null>(null)
   const [cifSelection, setCifSelection] = useState<{ projectId?: string; attachmentId: string; siteIndex?: number } | null>(null)
   const [shownViewers, setShownViewers] = useState<Set<ViewerId>>(() => new Set(viewerIds))
+  const marked = useMemo(() => project?.groups.filter(g => g.marked) ?? [], [project?.groups])
+  const hasMultipleMarked = marked.length > 1
+  const visibleViewers = useMemo(() => new Set([...shownViewers].filter(id => id !== "multiple" || hasMultipleMarked)), [shownViewers, hasMultipleMarked])
   const [viewerSort, setViewerSort] = useState<ViewerSort>("default")
   const [customViewerOrder, setCustomViewerOrder] = useState<ViewerId[]>(() => [...viewerIds])
   const viewerPreference = useRef<ReturnType<typeof readViewerOrderPreference> | null>(null)
@@ -580,7 +583,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")))
     return () => window.cancelAnimationFrame(frame)
-  }, [shownViewers, viewerSort, customViewerOrder])
+  }, [visibleViewers, viewerSort, customViewerOrder])
   function recordViewerActivity(id: ViewerId, projectId: string, groupId: string, firstOnly = false) {
     const key = JSON.stringify([projectId, groupId])
     const eventKey = `${key}:${id}`
@@ -639,7 +642,6 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   }
   const currentFeff = feffPathState && feffPathState.projectId === project?.id && feffPathState.groupId === active?.id ? feffPathState : null
   const currentFeffPaths = currentFeff?.paths ?? []
-  const marked = useMemo(() => project?.groups.filter(g => g.marked) ?? [], [project?.groups])
   const linkedReferenceIds = useMemo(() => new Set(project?.groups.map(group => group.reference_id).filter((id): id is string => !!id) ?? []), [project?.groups])
   const groupById = useMemo(() => new Map(project?.groups.map(group => [group.id, group]) ?? []), [project?.groups])
   const referenceUsers = useMemo(() => {
@@ -2537,14 +2539,15 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
           <div className="ath-viewer-picker-heading"><h3>Results</h3><div className="ath-viewer-tools">
             {active && <button className="ath-subtle" disabled={!canOpen("metadata")} onClick={() => openTool("metadata")} aria-label="Edit data information"><Settings2 size={16} /></button>}
           </div><label>Order <SectionHelp label="Viewer order">Drag the viewer handles to save a custom order in this browser. Default order restores the original arrangement. Process order: Single and multiple spectra stay first; saved CIF attachment and this spectrum’s recorded wavelet, path-list, and fit events follow oldest first. Missing events keep default order.</SectionHelp><select aria-label="Sort viewers" value={viewerSort} onChange={event => changeViewerSort(event.target.value as ViewerSort)}><option value="default">Default order</option><option value="custom">Custom order</option><option value="process">Process order (this session)</option></select></label></div>
-          <AthenaViewerChooser order={orderedViewerIds} shown={shownViewers}
-            onToggleAll={() => setShownViewers(previous => availableViewers.every(id => previous.has(id)) ? new Set() : new Set(availableViewers))}
+          <AthenaViewerChooser order={orderedViewerIds} shown={visibleViewers}
+            disabled={{ multiple: hasMultipleMarked ? undefined : "Mark at least two spectra to compare." }}
+            onToggleAll={() => setShownViewers(previous => availableViewers.filter(id => id !== "multiple" || hasMultipleMarked).every(id => previous.has(id)) ? new Set() : new Set(availableViewers))}
             onToggle={id => setShownViewers(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next })}
             onMove={moveResultViewer} />
 
         </section>
-        {!availableViewers.some(id => shownViewers.has(id)) && <p className="ath-viewer-empty" role="status">No viewers selected. Choose one above to show its results.</p>}
-        <div className="ath-viewer-stack">{orderedViewerIds.map(viewer => <div key={viewer} id={viewer === "single" || viewer === "multiple" ? `athena-${viewer}-spectrum-viewer` : undefined} data-viewer-id={viewer} hidden={!shownViewers.has(viewer)}>
+        {!availableViewers.some(id => visibleViewers.has(id)) && <p className="ath-viewer-empty" role="status">No viewers selected. Choose one above to show its results.</p>}
+        <div className="ath-viewer-stack">{orderedViewerIds.map(viewer => <div key={viewer} id={viewer === "single" || viewer === "multiple" ? `athena-${viewer}-spectrum-viewer` : undefined} data-viewer-id={viewer} hidden={!visibleViewers.has(viewer)}>
         {viewer === "single" ? <>
         {active && <section className="ath-group-identity" aria-label="Current absorber and edge"><span onContextMenu={event => showContext(event, { kind: "section", section: "group" })}>Absorber / edge: <strong>{edgeIdentityDescription(active)}</strong></span></section>}
         {renderSpectrumViewer("single")}
