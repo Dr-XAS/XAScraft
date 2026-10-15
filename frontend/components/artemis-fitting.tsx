@@ -503,6 +503,9 @@ function FittingEditor({ projectId, projectName, version, group, groups, pending
       setNotice(`σ² model inserted: ${insertion.expression}. Review its parameters before fitting.`)
     } catch (error) { setError(errorText(error)) }
   }
+  function setAllParameterKinds(kind: "guess" | "set") {
+    edit(previous => ({ ...previous, parameters: previous.parameters.map(parameter => ({ ...parameter, kind })) }))
+  }
   function syncParameters() {
     try {
       const { added, removed } = planArtemisParameterSync(draft.parameters, draft.paths)
@@ -785,7 +788,10 @@ function FittingEditor({ projectId, projectName, version, group, groups, pending
     <FittingSection title="Parameters" icon={SlidersHorizontal} summary={`${freeCount} free`} disabled={disabled}
       help="Guess refines a value, Set fixes it, Def evaluates an expression.">
       <div className={styles.toolbar}><button type="button" className={styles.syncButton} disabled={!draft.paths.some(path => path.enabled)} onClick={syncParameters}><RefreshCw size={13} />Sync parameters</button>
-        <SectionHelp label="Sync parameters">Sync adds missing parameters and removes those unused by included paths, including Def dependencies. Existing values and constraints are kept.</SectionHelp></div>
+        <SectionHelp label="Sync parameters">Sync adds missing parameters and removes those unused by included paths, including Def dependencies. Existing values and constraints are kept.</SectionHelp>
+        <button type="button" disabled={draft.parameters.every(parameter => parameter.kind === "guess")} onClick={() => setAllParameterKinds("guess")}>Guess all</button>
+        <button type="button" disabled={draft.parameters.every(parameter => parameter.kind === "set")} onClick={() => setAllParameterKinds("set")}>Set all</button>
+      </div>
       {draft.parameters.map((parameter, i) => <div key={parameter.id} className={styles.parameter}>
         <div className={styles.parameterHeader}>
           <span className={styles.parameterControl}><input aria-label={`Parameter ${i + 1} name`} value={parameter.name} maxLength={32} placeholder="Parameter name" onChange={event => editParameter(parameter.id, "name", event.target.value)} spellCheck={false} /><SectionHelp label={`Parameter ${i + 1} name`}>The name used by path and Def expressions. Give each parameter a unique name; reusing that name in several paths couples them.</SectionHelp></span>
