@@ -238,7 +238,7 @@ longer scans calculate the background and Fourier transforms when supported.
 **Input already normalized** still preserves supplied normalized values.
 Use **Data → Processing settings…** after import to turn EXAFS on or off manually.
 
-The current group's element and absorption edge are shown automatically, using
+The current group's element and absorption edge are identified automatically, using
 saved file metadata when available or inference from E₀. No manual identity
 selection is required.
 

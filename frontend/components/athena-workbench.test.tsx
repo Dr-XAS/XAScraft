@@ -613,8 +613,6 @@ function expectUnprocessedImport(payload: unknown) {
   expect(payload).not.toHaveProperty('rebin_grid')
 }
 
-function identityBar() { return screen.getByRole("region", { name: "Current absorber and edge" }) }
-
 describe("AthenaWorkbench EXAFS fitting", () => {
   it("accepts saved CIF revisions only for the current project without changing the active spectrum", async () => {
     const project = await openSaved()
@@ -3017,24 +3015,22 @@ describe("AthenaWorkbench native context actions", () => {
 })
 
 describe("AthenaWorkbench absorber and edge identity", () => {
-  it("displays saved identity or effective fallback without manual selection, lookups or project mutations", async () => {
+  it("keeps edge identity metadata without a separate identity bar, manual selection, lookups or project mutations", async () => {
     const initial = projectFixture()
     initial.groups[0].source.edge_identity = { element: "Cu", edge: "K", origin: "native" }
     initial.groups[0].result!.effective = { ...initial.groups[0].result!.effective, element: "Fe", edge: "K" }
     initial.groups[1].result!.effective = { ...initial.groups[1].result!.effective, element: "Zn", edge: "L3" }
     initial.groups[1].frozen = true
     await openSaved(initial)
-    expect(identityBar()).toHaveTextContent("Cu K · native")
-    expect(within(identityBar()).queryByRole("button")).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "Current absorber and edge" })).not.toBeInTheDocument()
     openGroupMenu()
     expect(within(screen.getByRole("navigation", { name: /main menu/i })).queryByRole("button", { name: "Edit absorber and edge…" })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Data" }))
     expect(sessionStorage.getItem(edgePolicyStorageKey)).toBeNull()
     selectGroup("Sample scan")
-    expect(identityBar()).toHaveTextContent("Zn L3")
-    expect(within(identityBar()).queryByRole("button")).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "Current absorber and edge" })).not.toBeInTheDocument()
     selectGroup("Oxide standard")
-    expect(identityBar()).toHaveTextContent("Unknown")
+    expect(screen.queryByRole("region", { name: "Current absorber and edge" })).not.toBeInTheDocument()
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     expect(api.mock.calls).toEqual([[`/projects/${initial.id}`]])
     expect(plotProps().active).toBe(initial.groups[2])

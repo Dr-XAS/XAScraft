@@ -212,7 +212,6 @@ html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="wavelet"] { --viewer
 html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="cif"] { --viewer-accent: #e784c1; --viewer-ink: #f8cce7; --viewer-soft: #372331; --viewer-border: #814d70; }
 html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="feff"] { --viewer-accent: #f19b83; --viewer-ink: var(--ath-coral-ink); --viewer-soft: var(--ath-coral-soft); --viewer-border: var(--ath-coral-line); }
 html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="fit"] { --viewer-accent: #efc978; --viewer-ink: var(--ath-gold-ink); --viewer-soft: var(--ath-gold-soft); --viewer-border: var(--ath-gold-line); }
-.ath-viewer-order-hint { margin: 10px 0 0; color: var(--ath-muted); font-size: var(--text-caption); }
 .ath-viewer-empty { padding: 26px 16px; border: 1px dashed var(--ath-line); border-radius: 7px; color: var(--ath-muted); background: var(--ath-surface); text-align: center; }
 .ath-viewer-stack { display: flex; flex-direction: column; gap: var(--ath-panel-gap); }
 .ath-viewer-stack > [hidden] { display: none; }

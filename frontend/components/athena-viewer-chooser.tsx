@@ -119,7 +119,7 @@ export function AthenaViewerChooser({ order, shown, disabled = {}, onToggle, onT
         </div>
       })}
     </div>
-    <p id={helpId} className="ath-viewer-order-hint">Drag a handle to reorder viewers, or focus it and use arrow keys.</p>
+    <span id={helpId} className="ath-sr-only">Drag a handle to reorder viewers, or focus it and use arrow keys.</span>
     <span className="ath-sr-only" aria-live="polite" aria-atomic="true">{announcement}</span>
   </>
 }
