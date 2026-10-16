@@ -97,10 +97,10 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
   const curves = series.flatMap(({ component, data, paths: pathCurves }) => data ? [
     ...(data.data ? [{ name: "Data", y: data.data, color: "#166d8d", dash: "solid", width: 2.4, tier: 0 }] : []),
     { name: isTheory ? "Total theory" : "Model", y: data.model, color: "#db7835", dash: "solid", width: 2.4, tier: 0 },
-    ...(data.residual ? [{ name: "Residual", y: data.residual, color: "#8d5bab", dash: "dot", width: 1.4, tier: 1 }] : []),
+    ...(data.residual ? [{ name: "Residual", y: data.residual, color: "#8d5bab", dash: "dot", width: 1.4, tier: 1, visible: "legendonly" as const }] : []),
     ...(pathsShown ? paths.map((path, i) => ({ name: `Path ${i + 1} · ${path.label || path.filename}`, y: pathCurves[i]!,
       color: `hsl(${((i * 137.508 + 145) % 360).toFixed(1)}, 58%, 40%)`, dash: "solid", width: 1, tier: i + (isTheory ? 1 : 2) })) : []),
-  ].map(curve => ({ ...curve, component, name: multipleComponents ? `${componentLabels[component]} · ${curve.name}` : curve.name,
+  ].map(curve => ({ visible: true, ...curve, component, name: multipleComponents ? `${componentLabels[component]} · ${curve.name}` : curve.name,
     dash: multipleComponents ? componentDashes[component] : curve.dash })) : [])
   // Include zero when measuring signed/magnitude curves, then use a compact
   // baseline step: a 0.14-high peak gets about 0.01 spacing at any plot weight.
@@ -126,11 +126,10 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
     if (plotWidth) {
       for (let index = 0; index < characters.length; index += legendLineLength) lines.push(characters.slice(index, index + legendLineLength).join(""))
     }
-    // The residual is drawn by default: a misfit is the first thing a reader of
-    // an EXAFS fit should be able to see, not something to find in the legend.
+    // Keep hidden residuals available through Plotly's legend toggle.
     return { type: "scatter", mode: "lines", name: lines.length ? lines.join("<br>") : curve.name, meta: { legendLabel: curve.name }, x: x.slice(), y: curve.y.map(value => value + offset),
       yaxis: separatePhase && curve.component === "pha" ? "y2" : "y",
-      visible: true,
+      visible: curve.visible,
       customdata: curve.y.map(value => [value, offset]),
       hovertemplate: `${space === "k" ? "k" : "R"} = %{x:.3f} ${space === "k" ? "Å⁻¹" : "Å"}<br>Unshifted value = %{customdata[0]:.5g}<br>Display offset = %{customdata[1]:+.5g}<extra>%{meta.legendLabel}</extra>`,
       line: { color: curve.color, width: curve.width, dash: curve.dash } }

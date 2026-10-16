@@ -938,12 +938,11 @@ describe("ArtemisFitResultViewer", () => {
     expect(screen.queryByTestId("fit-plot")).not.toBeInTheDocument()
   })
 
-  it("shows complex residual magnitude, switches real/k views, and does not mutate cached data", () => {
+  it("keeps residuals hidden in the legend, switches real/k views, and does not mutate cached data", () => {
     const result = fitResult()
     render(<ArtemisFitResultViewer result={result} group={group()} />)
     fireEvent.click(screen.getByRole("checkbox", { name: "Offset plot" }))
-    // Hidden in the legend, a poor fit's residual went unseen on the demo screenshot.
-    expect(plot.mock.calls.at(-1)?.[0].data[2]).toMatchObject({ name: "Residual", visible: true })
+    expect(plot.mock.calls.at(-1)?.[0].data[2]).toMatchObject({ name: "Residual", visible: "legendonly" })
     expect(plot.mock.calls.at(-1)?.[0].data[2].y).toEqual(result.r.residual_mag)
     expect(screen.getByText(/Residual is \|FT\(data − model\)\|/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("checkbox", { name: "Magnitude" }))
