@@ -2,7 +2,7 @@
 
 import { SectionHelp } from "../section-help"
 import { ThemedPlot as Plot } from "../themed-plot"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent, type MouseEvent } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent, type MouseEvent } from "react"
 import { isDifferenceGroup, type AthenaGroup, type Analysis } from "@/lib/athena"
 import { defaultPlotColors, spectrumColors, type PlotColorSettings } from "@/lib/athena-plot-colors"
 import { AthenaContextMenu } from "../athena-context-menu"
@@ -344,6 +344,24 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       hovermode: "closest", uirevision: `${space}-${energyMode}-${componentKey}-${analysisVisible}-${[rangeStart, rangeEnd].join()}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`,
     }
   }, [xTitle, yTitle, y2Title, e0, showGrid, analysisVisible, showLegend, space, energyMode, componentKey, rangeStart, rangeEnd, plotScope, activeId, kWeight])
+  const descriptionId = useId()
+  const description = useMemo(() => {
+    const traces = data.map(trace => {
+      const x = trace.x as number[]
+      const y = trace.y as number[]
+      let points = 0, xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity
+      for (let index = 0; index < x.length; index++) {
+        if (!Number.isFinite(x[index]) || !Number.isFinite(y[index])) continue
+        points++
+        xmin = Math.min(xmin, x[index]); xmax = Math.max(xmax, x[index])
+        ymin = Math.min(ymin, y[index]); ymax = Math.max(ymax, y[index])
+      }
+      const label = String(trace.name ?? "Unnamed series")
+      const format = (value: number) => String(Number(value.toPrecision(6)))
+      return points ? `${label}: ${points} points; x data ${format(xmin)} to ${format(xmax)}; y data ${format(ymin)} to ${format(ymax)}.` : `${label}: no finite points.`
+    })
+    return `Horizontal axis: ${xTitle}. Vertical axis: ${yTitle}.${y2Title ? ` Right vertical axis: ${y2Title}.` : ""} ${traces.join(" ")}${xTitle === "R (Å)" ? " R peaks are not phase-corrected bond lengths." : ""}`
+  }, [data, xTitle, yTitle, y2Title])
   const config = useMemo(() => ({ displaylogo: false, responsive: true, toImageButtonOptions: { format: "svg", filename: "craft-spectrum" }, modeBarButtonsToRemove: ["lasso2d", "select2d"] }), [])
   const canPick = picking && !analysisVisible && space !== "q"
   // react-plotly.js only refreshes listeners when the figure changes. Arming a
@@ -358,5 +376,5 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
     if (current.canPick && typeof x === "number" && Number.isFinite(x)) current.onPickX?.(x, space)
   }, [plotData, space])
   if (!hasData) return <><div ref={plotRef} className="ath-no-plot" data-testid="athena-plot" aria-label={`${space}-space spectrum plot`} {...plotInteraction}><span>{space}</span><h3>{noSelection ? "No spectra selected" : noComponents ? "No components selected" : groups.length ? "No data in this plot space" : "Your spectra, in perspective."}<SectionHelp label="Spectrum plot">{noSelection ? "Check data to compare spectra. The Single spectrum viewer shows the highlighted data." : noComponents ? "Select Magnitude, Real, Imaginary, or Phase above to display the spectrum." : groups.length ? "Check the data type and processing parameters, or select another plot space." : "Import a spectrum or load the copper examples to begin."}</SectionHelp></h3></div>{options}</>
-  return <><div ref={plotRef} className={`ath-plot${canPick ? " ath-picking" : ""}`} data-testid="athena-plot" aria-label={`${space}-space spectrum plot`} {...plotInteraction}><Plot data={plotData} onClick={onPlotClick} layout={layout} config={config} useResizeHandler style={{ width: "100%", height: "100%" }} /></div>{options}</>
+  return <><div ref={plotRef} className={`ath-plot${canPick ? " ath-picking" : ""}`} data-testid="athena-plot" aria-describedby={descriptionId} aria-label={`${space}-space spectrum plot`} {...plotInteraction}><Plot data={plotData} onClick={onPlotClick} layout={layout} config={config} useResizeHandler style={{ width: "100%", height: "100%" }} /><span id={descriptionId} className="ath-sr-only">{description}</span></div>{options}</>
 }
