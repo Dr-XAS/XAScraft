@@ -1,12 +1,12 @@
 "use client"
 
-import { SectionHelp } from "../section-help"
 import { useId, useState, type ReactNode } from "react"
 import type { SimulationResult } from "@/lib/artemis-simulation"
 import { simulationCsv } from "@/lib/artemis-simulation"
 import { downloadArtemisText } from "@/lib/artemis-structures"
 import { ThemedPlot as Plot } from "../themed-plot"
 import { ViewerPanel } from "./viewer-panel"
+import { ViewerPlotSpace } from "./viewer-plot-space"
 import { ViewerDisplayControls } from "./viewer-display-controls"
 import { ResizablePlotCard } from "./athena-plot-card"
 import styles from "./artemis-simulation-viewer.module.css"
@@ -22,6 +22,9 @@ export function ArtemisSimulationViewer({ result, actions }: { result: Simulatio
   ]} help={<>FEFF paths are summed before Fourier transformation. |χ(R)| is not phase corrected; its peaks are not bond distances. Export simulation JSON to retain the exact CIF, FEFF input, path files, parameters and curves.</>}>
     <ResizablePlotCard storageKey="artemis.simulation.height.v1" defaultHeight={390}
       plotSelector="[data-simulation-plot]" resizeLabel="Resize simulated EXAFS plot height" controlsId={plotId}>
+    <ViewerPlotSpace label="Simulation plot space" value={space} onChange={setSpace}
+      options={[{ value: "k", label: "χ(k)" }, { value: "r", label: "|χ(R)|" }]}
+      help="χ(k) shows the summed FEFF paths with the simulated k-weight. |χ(R)| shows the magnitude of their Fourier transform; its peaks are not phase-corrected distances." />
     <div id={plotId} data-simulation-plot className={styles.plot} aria-label={`Simulated EXAFS ${space} plot`}>
       <Plot data={[{ type: "scatter", mode: "lines", name: "Simulation", x: space === "k" ? result.k.x : result.r.x,
         y: space === "k" ? result.k.total : result.r.total_mag, line: { color: "#3285AD", width: 2 } }]}
@@ -32,12 +35,9 @@ export function ArtemisSimulationViewer({ result, actions }: { result: Simulatio
         config={{ responsive: true, displaylogo: false, toImageButtonOptions: { filename: `${stem}-${space}`, scale: 2 } }}
         style={{ width: "100%", height: "100%" }} useResizeHandler />
     </div>
-    <ViewerDisplayControls label="Simulation display options" className={styles.controls}>
-      <button type="button" aria-pressed={space === "k"} onClick={() => setSpace("k")}>χ(k)</button>
-      <button type="button" aria-pressed={space === "r"} onClick={() => setSpace("r")}>|χ(R)|</button>
-      <SectionHelp label="Simulation plot space">χ(k) shows the summed FEFF paths with the simulated k-weight. |χ(R)| shows the magnitude of their Fourier transform; its peaks are not phase-corrected distances.</SectionHelp>
+    {actions && <ViewerDisplayControls label="Simulation display options" className={styles.controls}>
       {actions}
-    </ViewerDisplayControls>
+    </ViewerDisplayControls>}
     </ResizablePlotCard>
   </ViewerPanel>
 }

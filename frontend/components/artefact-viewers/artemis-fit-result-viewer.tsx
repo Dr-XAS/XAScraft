@@ -9,6 +9,7 @@ import { downloadArtemisText } from "@/lib/artemis-structures"
 import { ThemedPlot as Plot } from "../themed-plot"
 import { ResizablePlotCard } from "./athena-plot-card"
 import { ViewerPanel } from "./viewer-panel"
+import { ViewerPlotSpace } from "./viewer-plot-space"
 import type { ViewerExportItem } from "./viewer-export-menu"
 import { ViewerControlField, ViewerControlGroup, ViewerDisplayControls, ViewerToggle } from "./viewer-display-controls"
 import { ViewerKWeightControl } from "./viewer-kweight-control"
@@ -176,10 +177,15 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
       <button type="button" aria-pressed={!isTheory} onClick={() => setTheoryChoice(null)}>Fit result</button>
       <button type="button" aria-pressed={isTheory} onClick={() => setTheoryChoice(matchingFit)}>Theory</button>
     </div>}
-    <div className={styles.choice} role="group" aria-label={isTheory ? "Theory plot space" : "Fit plot space"}>{(["k", "r"] as const).map(value => <button type="button" key={value} aria-pressed={space === value} onClick={() => setSpace(value)}>{value === "r" ? "R space" : "k space"}</button>)}<SectionHelp label={isTheory ? "Theory plot space" : "Fit plot space"}>{isTheory ? "View the theoretical total and its paths in k space or after the Fourier transform in R space." : "Compare the saved data and model in k space or after the Fourier transform in R space. Changing the plot space does not repeat the fit."}</SectionHelp></div>
-    {visible && space === "r" && <ViewerComplexComponents value={components} onChange={setComponents} />}
   </div>}>
     <ResizablePlotCard storageKey="artemis.fit.height.v1" defaultHeight={380} plotSelector="#artemis-fit-plot" resizeLabel={isTheory ? "Resize EXAFS theory plot height" : "Resize EXAFS fit plot height"} controlsId="artemis-fit-plot">
+      <ViewerPlotSpace label={isTheory ? "Theory plot space" : "Fit plot space"} value={space} onChange={setSpace}
+        options={[{ value: "k", label: "k", description: "space" }, { value: "r", label: "R", description: "space" }]}
+        help={isTheory ? "View the theoretical total and its paths in k space or after the Fourier transform in R space." : "Compare the saved data and model in k space or after the Fourier transform in R space. Changing the plot space does not repeat the fit."}>
+        {visible && <ViewerKWeightControl label={isTheory ? "EXAFS theory k-weight" : "EXAFS fit k-weight"} value={kWeight} savedWeight={theory?.simulation.request.transform.kweight[0] ?? visible.k.weight}
+          onChange={setKWeight} disabled={!projectId || version === undefined} />}
+        {visible && space === "r" && <ViewerComplexComponents value={components} onChange={setComponents} />}
+      </ViewerPlotSpace>
       {fit?.archive && <div className={styles.message} role="status">
         <p>{fit.archive.imported ? "Imported fit archive" : "Saved fit"} · {new Date(fit.archive.created).toLocaleString()} · Larch {fit.archive.origin.larch_version}</p>
         {fit.archive.stale && <p>Outdated input<SectionHelp label="Outdated fit input">This spectrum has changed since the fit. These curves show the saved data and model. Run a new fit for the current spectrum.</SectionHelp></p>}
@@ -214,8 +220,6 @@ export function ArtemisFitResultViewer({ result, group, projectId, version, pend
           </>}
         </ViewerControlGroup>
         <ViewerControlGroup>
-          <ViewerKWeightControl label={isTheory ? "EXAFS theory k-weight" : "EXAFS fit k-weight"} value={kWeight} savedWeight={theory?.simulation.request.transform.kweight[0] ?? visible.k.weight}
-            onChange={setKWeight} disabled={!projectId || version === undefined} />
           <ViewerToggle label="Show paths" checked={pathsShown} disabled={!pathsAvailable} onChange={setShowPaths} title={isTheory ? "Display the individual FEFF paths evaluated at the saved simulation parameters." : pathsAvailable ? "Display the individual FEFF paths evaluated at the fitted parameters." : "Run the fit again to include individual path curves in its results."} />
           {!pathsAvailable && <SectionHelp label="Unavailable path curves">{isTheory ? "The saved simulation needs its original FEFF path files to show contributions." : "Run the fit again to include path curves."}</SectionHelp>}
         </ViewerControlGroup>

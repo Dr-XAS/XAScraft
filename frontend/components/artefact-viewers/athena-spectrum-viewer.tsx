@@ -10,6 +10,7 @@ import { AthenaColorLegend } from "./athena-color-legend"
 import { automaticPlotRange } from "./athena-plot-range"
 import { ResizablePlotCard } from "./athena-plot-card"
 import { ViewerPanel } from "./viewer-panel"
+import { ViewerPlotSpace } from "./viewer-plot-space"
 import { spectrumDataCsv } from "./athena-spectrum-export"
 import type { ViewerExportItem } from "./viewer-export-menu"
 import { ViewerKWeightControl } from "./viewer-kweight-control"
@@ -24,6 +25,12 @@ const energyPlotOptions = [
   { value: "flat", label: "μ(E) · flattened" },
   { value: "dmude", label: "Derivative dμ/dE" },
   { value: "d2mude", label: "Second derivative d²μ/dE²" },
+] as const
+const plotSpaces = [
+  { value: "E", label: "E", description: "Energy" },
+  { value: "k", label: "k", description: "EXAFS" },
+  { value: "R", label: "R", description: "Fourier" },
+  { value: "q", label: "q", description: "Back transform" },
 ] as const
 function PlotRangeInput({ label, value, automatic, disabled, onChange }: {
   label: string; value: number | null; automatic: number | null; disabled: boolean
@@ -102,10 +109,14 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
   return <ViewerPanel title={viewerLabels[viewer]} viewerId={viewer}
     exportItems={exportItems} exportFilename={filename}
     exportDisabled={!canExport || exportPending || weightedPlot.loading || !!weightedPlot.error || (!selectedGroups.length && !showingAnalysis)}
-    help={viewer === "single" ? "Plots the highlighted data, independently of its mark. Plot display choices stay local to this viewer." : "Plots the marked data in project order. Its display choices are independent of the single spectrum viewer."}><ResizablePlotCard storageKey={`athena.plot.${viewer}.height.v1`} resizeLabel={`Resize ${viewer === "single" ? "single spectrum" : "multiple spectra"} plot height`} controlsId={`athena-${viewer}-spectrum-viewer`}><div className="ath-plot-top"><div className="ath-space-tabs" role="tablist" aria-label="Plot space">{(["E", "k", "R", "q"] as Space[]).map(s => <button key={s} role="tab" aria-selected={space === s && !showingAnalysis} onContextMenu={event => { event.preventDefault(); onSpecialPlot?.(s) }} title="Right-click for Craft’s special plot" onClick={() => onChangeSpace(s)}><b>{s}</b><span>{{ E: "Energy", k: "EXAFS", R: "Fourier", q: "Back transform" }[s]}</span></button>)}</div><SectionHelp label="Plot space">E shows absorption versus energy; k shows EXAFS oscillations; R shows the Fourier transform; q shows the R-filtered back transform. R peaks are not phase-corrected bond lengths. Right-click a space for its Craft comparison plot.</SectionHelp></div>
-        {plotScope === "selected" && <div className="ath-plot-scope"><span className="ath-plot-scope-note">{selectedGroups.length} checked {selectedGroups.length === 1 ? "group" : "groups"}</span></div>}
+    help={viewer === "single" ? "Plots the highlighted data, independently of its mark. Plot display choices stay local to this viewer." : "Plots the marked data in project order. Its display choices are independent of the single spectrum viewer."}><ResizablePlotCard storageKey={`athena.plot.${viewer}.height.v1`} resizeLabel={`Resize ${viewer === "single" ? "single spectrum" : "multiple spectra"} plot height`} controlsId={`athena-${viewer}-spectrum-viewer`}>
+        <ViewerPlotSpace label="Plot space" tabs options={plotSpaces} value={showingAnalysis ? null : space}
+          onChange={onChangeSpace} onSpecialPlot={onSpecialPlot}
+          help="E shows absorption versus energy; k shows EXAFS oscillations; R shows the Fourier transform; q shows the R-filtered back transform. R peaks are not phase-corrected bond lengths. Right-click a space for its Craft comparison plot.">
+          {space !== "E" && <ViewerKWeightControl label={`${viewer === "single" ? "Single spectrum" : "Multiple spectra"} k-weight`} value={viewerKWeight} savedWeight={savedKWeight} onChange={setKWeight} disabled={!canChangeKWeight || !selectedGroups.length || showingAnalysis} />}
+        </ViewerPlotSpace>
+        {plotScope === "selected" && <div className="ath-plot-scope"><span className="ath-plot-scope-note">{selectedGroups.length} marked data {selectedGroups.length === 1 ? "item" : "items"}</span></div>}
         <div className="ath-plot-controls">
-        {space !== "E" && <ViewerKWeightControl label={`${viewer === "single" ? "Single spectrum" : "Multiple spectra"} k-weight`} value={viewerKWeight} savedWeight={savedKWeight} onChange={setKWeight} disabled={!canChangeKWeight || !selectedGroups.length || showingAnalysis} />}
         {space === "E" ? plotScope === "current" && <>
           <label className="ath-check" title="Show the current spectrum’s fitted background in μ(E)"><input type="checkbox" aria-label="Background" checked={background && canShowBackground} disabled={!canShowBackground} onChange={e => setBackground(e.target.checked)} />Background<SectionHelp label="Background">Overlay the fitted μ₀(E) background on the current raw μ(E) curve. It is available after background processing; showing it does not refit the spectrum.</SectionHelp></label>
           <label className="ath-check" title="Show the fitted pre-edge line and its start/end points for Current spectrum in μ(E)"><input type="checkbox" aria-label="Pre-edge line" checked={preEdge && canShowPreEdge} disabled={!canShowPreEdge} onChange={e => setPreEdge(e.target.checked)} />Pre-edge line<SectionHelp label="Pre-edge line">Overlay the fitted pre-edge normalization line and markers at its interval endpoints. Hover the markers for energies and offsets from E₀.</SectionHelp></label>
@@ -126,9 +137,9 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
         <ViewerDisplayControls label="Spectrum plot display options">
           <ViewerControlGroup label="Spectrum display" className="ath-plot-display-controls">
             <ViewerToggle label="Offset plot" checked={offset !== 0} disabled={plotScope === "current"}
-              title="Separate selected spectra vertically without changing their data"
+              title="Separate marked data vertically without changing their data"
               onChange={enabled => setOffset(enabled ? previousStackOffset.current : 0)} />
-            <ViewerControlField label="Spacing" title="Vertical separation between selected spectra">
+            <ViewerControlField label="Spacing" title="Vertical separation between marked data">
               <input aria-label="Stack offset" type="number" step="0.1" value={offset} disabled={plotScope === "current"} onChange={event => {
                 const next = Number(event.target.value)
                 if (Number.isFinite(next)) {

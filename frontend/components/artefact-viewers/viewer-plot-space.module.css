@@ -1,0 +1,42 @@
+.toolbar:global(.ath-plot-top) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--ath-line);
+}
+
+.spaces { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+
+.toolbar .space {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-bottom-width: 2px;
+  border-radius: 4px 4px 0 0;
+  color: var(--ath-muted);
+  background: transparent;
+  font: inherit;
+  line-height: var(--leading-control, 1.4);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.space b { font-size: var(--text-section, 14px); font-weight: 500; }
+.space span { font-size: var(--text-caption, 12px); }
+.toolbar .space:hover { color: var(--ath-primary); background: var(--ath-primary-soft); }
+.toolbar .space[data-selected="true"], .toolbar .space[data-selected="true"]:hover { color: var(--ath-primary); background: var(--ath-primary-soft); border-bottom-color: var(--ath-primary); }
+.toolbar .space:focus-visible { outline: 2px solid var(--ath-primary); outline-offset: 2px; }
+
+@media (max-width: 620px) {
+  .toolbar:global(.ath-plot-top) { gap: 6px 10px; padding: 6px 10px; }
+  .toolbar .space { padding-inline: 7px; }
+}
