@@ -73,13 +73,20 @@ test('official LaCoO3 PRJ, native reflection, E/k/R plots, curve picking, save a
   expect(errors).toEqual([])
 })
 
-test('mobile arctangent clamps and a cross-window conflict cannot save an obsolete preview',async({page},info)=>{
+test('mobile arctangent rejects negative amplitude and a cross-window conflict cannot save an obsolete preview',async({page},info)=>{
   await page.setViewportSize({width:390,height:844});const project=await load(page),dialog=await open(page)
   await configure(page,dialog,'arctangent')
-  const response=page.waitForResponse(r=>r.url().endsWith('/mee/preview')&&r.request().postDataJSON().options.amplitude===-1)
+  const invalidPreviewRequests:string[]=[]
+  page.on('request',request=>{if(request.url().endsWith('/mee/preview')&&request.postDataJSON().options.amplitude<0)invalidPreviewRequests.push(request.url())})
   await dialog.getByLabel('Scale by (edge-step fraction)',{exact:true}).fill('-1')
+  await expect(dialog.getByRole('status')).toHaveText('Use a nonnegative amplitude and broadening of at least 0.01 eV.')
+  await expect(dialog.getByRole('button',{name:'Refresh preview',exact:true})).toBeDisabled()
+  await expect(dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true})).toBeDisabled()
+  const response=page.waitForResponse(r=>r.url().endsWith('/mee/preview')&&r.request().postDataJSON().options.amplitude===0.014)
+  await dialog.getByLabel('Scale by (edge-step fraction)',{exact:true}).fill('0.014')
   expect((await response).ok()).toBe(true)
-  await expect(dialog.getByText('Negative amplitude was reset to zero, as in Athena.',{exact:true})).toBeVisible()
+  await expect(dialog.getByRole('button',{name:'Save MEE-corrected data',exact:true})).toBeEnabled()
+  expect(invalidPreviewRequests).toEqual([])
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true)
   const bounds=await dialog.boundingBox()
   for(const name of ['Close MEE tool','Refresh preview','Save MEE-corrected data']) {
