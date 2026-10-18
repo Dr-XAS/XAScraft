@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -55,11 +56,13 @@ async function expectSignal(plot: Locator, index: number, flipped = false) {
 async function review(page: Page, panel: Locator, shareParameters = true) {
   await panel.getByRole('button', { name: 'Review selected scans' }).click()
   const dialog = page.getByRole('dialog', { name: 'Import spectra' })
+  await selectImportSignals(dialog, ['transmission'])
   await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
   await dialog.getByRole('radio', { name: shareParameters ? 'Yes, use the same parameters' : 'No, review each file', exact: true }).check()
   if (await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).count()) {
     await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
   }
+  await selectImportSignals(dialog, ['transmission'])
   await expect(dialog.getByLabel('Energy column')).toHaveValue('column_0016')
   await expect(dialog.getByLabel('Energy units')).toHaveValue('keV')
   await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
@@ -163,6 +166,7 @@ test('SPEC second-scan inspection retry preserves the first scan and continues i
   await expect(dialog.getByRole('alert')).toContainText('Temporary scan inspection failure')
   expect(imports).toEqual([collection.scans[0].upload_id])
   await dialog.getByRole('button', { name: 'Retry file inspection', exact: true }).click()
+  await selectImportSignals(dialog, ['transmission'])
   await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
   await expect(dialog.getByLabel('Numerator ion2', { exact: true })).toBeChecked()
   await expect(dialog.getByLabel('Denominator ion1', { exact: true })).toBeChecked()

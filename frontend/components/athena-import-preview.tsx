@@ -13,7 +13,6 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
   projectId: string; version: number; uploadId: string; mapping: ColumnMapping; disabled?: boolean; automaticExafs?: boolean
 }) {
   const athenaApi = useAthenaApi()
-  const [showReference, setShowReference] = useState(true)
   const [retry, setRetry] = useState(0)
   const [state, setState] = useState<{ key: string; value?: ColumnPreview; error?: string } | null>(null)
   const problem = columnProblem(mapping)
@@ -38,12 +37,12 @@ export function AthenaImportPreview({ projectId, version, uploadId, mapping, dis
   const isCurrent = state?.key === key
   const value = !problem && isCurrent ? state?.value : undefined
   const error = problem ?? (isCurrent ? state?.error : undefined)
-  const traces = value?.traces.filter(t => (showReference || t.role !== "reference") && (showOriginal || t.stage !== 'original')) ?? []
-  const hasReference = !!(mapping.reference_numerator || mapping.reference_denominator)
+  const referenceOnly = !!mapping.import_signals?.reference && !mapping.import_signals.transmission && !mapping.import_signals.fluorescence
+  const traces = value?.traces.filter(t => showOriginal || t.stage !== 'original')
+    .map(t => referenceOnly ? { ...t, label: 'Reference' } : t) ?? []
   const plottedReference = traces.some(t => t.role === "reference")
   return <section className={styles.previewPanel} aria-label="Column selection preview">
-    <div className={styles.previewTools}><strong>Preview selected columns <SectionHelp label="Selected columns preview">All selected detector signals before normalization or background removal. Switching a column tab changes the editing panel; transmission, fluorescence, and reference remain plotted together.</SectionHelp></strong>
-      {hasReference && <label className="ath-check"><input type="checkbox" checked={showReference} onChange={e => setShowReference(e.target.checked)} />Plot reference <SectionHelp label="Plot reference">Overlay the reference signal calculated from the reference columns, so its edge and polarity can be checked before import.</SectionHelp></label>}
+    <div className={styles.previewTools}><strong>Preview selected columns <SectionHelp label="Selected columns preview">The checked signals before normalization or background removal. Use the checkboxes beside the signal tabs to choose what to import and preview. Clicking a tab changes only the column editing panel.</SectionHelp></strong>
       {mapping.rebin?.enabled && <label className="ath-check"><input type="checkbox" checked={showOriginal} onChange={e => setShowOriginal(e.target.checked)} />Plot original data <SectionHelp label="Plot original data">Compare the unreduced signal with the rebinned preview to see whether the new grid preserves spectral features.</SectionHelp></label>}
     </div>
     <div className={styles.plot} aria-label="Imported signal preview plot" aria-busy={!isCurrent && !problem}>

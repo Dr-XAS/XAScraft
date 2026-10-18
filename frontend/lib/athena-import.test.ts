@@ -1,7 +1,7 @@
 import type { AthenaGroup } from "./athena"
 import { expect, it } from "vitest"
 import type { InspectionResponse } from "./contracts"
-import { columnPayload, columnProblem, defaultRebin, flipSignalColumns, initialColumnMapping, reuseColumnMapping, reuseProblem, batchCapacityWarning, batchExclusions, setDualMode, setThreeMode, changeInputType, changeImportProcessing, lastImportedSample, withoutImportProcessing, type ColumnMapping } from "./athena-import"
+import { columnPayload, columnProblem, defaultRebin, flipSignalColumns, initialColumnMapping, reuseColumnMapping, reuseProblem, batchCapacityWarning, batchExclusions, setDualMode, setThreeMode, prepareImportSignals, selectedColumnMapping, importSpectrumCount, changeInputType, changeImportProcessing, lastImportedSample, withoutImportProcessing, type ColumnMapping } from "./athena-import"
 const previous: ColumnMapping = { energy_column: "old", numerator: ["old"], denominator: ["d1", "d2"], mode: "fluorescence",
   units: "eV", data_type: "xanes", reference_numerator: "r1", reference_denominator: "r2", signal_multiplier: 9, invert: true, sort: false }
 const inspection: InspectionResponse = { upload_id: "u", display_name: "file.dat", row_count: 5, warnings: [], issues: [],
@@ -291,6 +291,190 @@ it('resets dual mode for chi and new layouts, restores remembered dual settings,
 const threeInspection: InspectionResponse = { ...inspection, columns: ['energy', 'I0', 'It', 'If', 'Iref'].map((name, index) => ({
   ...inspection.columns[0], name, index, column_id: `c${index}`,
 })) }
+
+it('defaults the three detector checkboxes to checked while retaining reviewed signal choices', () => {
+  const reviewed: ColumnMapping = { ...transmission, mode: 'fluorescence', numerator: ['c3'], denominator: ['c1'],
+    signal_multiplier: 2, reference_numerator: 'c4', reference_denominator: 'c2', reference_log: false }
+  const prepared = prepareImportSignals(reviewed, threeInspection)
+  expect(prepared).toMatchObject({ import_signals: { transmission: true, fluorescence: true, reference: true },
+    additional_fluorescence: { numerator: ['c3'], denominator: ['c1'], signal_multiplier: 2 },
+    reference_numerator: 'c4', reference_denominator: 'c2', reference_log: false })
+  const choices = { ...prepared, import_signals: { transmission: false, fluorescence: true, reference: false } }
+  expect(prepareImportSignals(choices, threeInspection)).toBe(choices)
+  const incomplete = prepareImportSignals(transmission, inspection)
+  expect(incomplete.import_signals).toEqual({ transmission: true, fluorescence: true, reference: true })
+  expect(columnProblem(incomplete)).toMatch(/fluorescence signal/)
+})
+
+it.each([true, false])('restores a remembered reference-only ratio to Reference before defaulting all three signals (log=%s)', reference_log => {
+  const onlyReference = { ...prepareImportSignals(transmission, threeInspection), reference_log,
+    import_signals: { transmission: false, fluorescence: false, reference: true } }
+  // The server remembers the submitted primary recipe, then removes the
+  // per-import reference designation before returning remembered columns.
+  const { is_reference: _reference, ...saved } = selectedColumnMapping(onlyReference)
+  const next: InspectionResponse = { ...threeInspection, remembered_columns: {
+    version: 1, matching_columns: true, mapping: saved, warnings: [], primary_is_reference: true,
+  } }
+  const restored = prepareImportSignals(initialColumnMapping(next, onlyReference), next)
+  expect(restored).toMatchObject({ import_signals: { transmission: true, fluorescence: true, reference: true },
+    mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' },
+    reference_numerator: 'c2', reference_denominator: 'c4', reference_log })
+  expect(columnProblem(restored)).toBeNull()
+  expect(columnPayload(restored)).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    reference_numerator: 'c2', reference_denominator: 'c4', reference_log })
+})
+
+it('uses remembered reference provenance for custom ratios without restoring the sample reference flag', () => {
+  const onlyReference: ColumnMapping = { ...prepareImportSignals(transmission, threeInspection),
+    reference_numerator: 'c3', reference_denominator: '1', reference_log: false,
+    import_signals: { transmission: false, fluorescence: false, reference: true } }
+  const { is_reference: _reference, ...saved } = selectedColumnMapping(onlyReference)
+  const next: InspectionResponse = { ...threeInspection, remembered_columns: {
+    version: 1, matching_columns: true, mapping: saved, warnings: [], primary_is_reference: true,
+  } }
+  const restored = prepareImportSignals(initialColumnMapping(next, onlyReference), next)
+  expect(restored).toMatchObject({ mode: 'transmission', numerator: ['c1'], denominator: 'c2',
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' },
+    reference_numerator: 'c3', reference_denominator: '1', reference_log: false, is_reference: false })
+  expect(columnPayload(restored)).not.toHaveProperty('is_reference')
+  expect(columnPayload(restored)).not.toHaveProperty('primary_is_reference')
+})
+
+it('recognizes a reversed reference-only recipe from older server column memory', () => {
+  const saved: ColumnMapping = { ...transmission, numerator: ['c4'], denominator: 'c2' }
+  const next: InspectionResponse = { ...threeInspection, remembered_columns: {
+    version: 1, matching_columns: true, mapping: saved, warnings: [],
+  } }
+  const restored = prepareImportSignals(initialColumnMapping(next, transmission), next)
+  expect(restored).toMatchObject({ numerator: ['c1'], denominator: 'c2',
+    reference_numerator: 'c4', reference_denominator: 'c2', reference_log: true,
+    additional_fluorescence: { numerator: ['c3'], denominator: 'c1' } })
+})
+
+it.each([undefined, true])('preserves explicit combined recipes even when their primary was marked as reference (%s)', primary_is_reference => {
+  for (const extra of [
+    { additional_fluorescence: { numerator: ['c3'], denominator: ['c1'], signal_multiplier: .5, individual_channels: true } },
+    { reference_numerator: 'c2', reference_denominator: 'c4' },
+  ]) {
+    const saved: ColumnMapping = { ...transmission, numerator: ['c4'], denominator: 'c2', ...extra }
+    const next: InspectionResponse = { ...threeInspection, remembered_columns: {
+      version: 1, matching_columns: true, mapping: saved, warnings: [], primary_is_reference,
+    } }
+    const restored = prepareImportSignals(initialColumnMapping(next, transmission), next)
+    expect(restored).toMatchObject({ numerator: ['c4'], denominator: 'c2', ...extra })
+  }
+})
+
+it.each([
+  [true, true, true, 3, 'transmission', ['c1'], 'c2'],
+  [true, true, false, 2, 'transmission', ['c1'], 'c2'],
+  [true, false, true, 2, 'transmission', ['c1'], 'c2'],
+  [true, false, false, 1, 'transmission', ['c1'], 'c2'],
+  [false, true, true, 2, 'fluorescence', ['c3'], 'c1'],
+  [false, true, false, 1, 'fluorescence', ['c3'], 'c1'],
+  [false, false, true, 1, 'transmission', ['c2'], 'c4'],
+] as const)('submits only checked signals (transmission=%s, fluorescence=%s, reference=%s)', (t, f, r, count, mode, numerator, denominator) => {
+  const mapping = { ...prepareImportSignals(transmission, threeInspection), is_reference: r,
+    import_signals: { transmission: t, fluorescence: f, reference: r } }
+  const body = columnPayload(mapping)
+  expect(body).toMatchObject({ mode, numerator, denominator,
+    reference_numerator: r && (t || f) ? 'c2' : null,
+    reference_denominator: r && (t || f) ? 'c4' : null })
+  expect(!!body.additional_fluorescence).toBe(t && f)
+  expect(!!body.is_reference).toBe(!t && !f && r)
+  expect(body).not.toHaveProperty('import_signals')
+  expect(selectedColumnMapping(mapping)).not.toHaveProperty('import_signals')
+  expect(columnProblem(mapping)).toBeNull()
+  expect(importSpectrumCount(mapping)).toBe(count)
+  // Lowering leaves unchecked recipes available to turn on again.
+  expect(mapping.additional_fluorescence?.numerator).toEqual(['c3'])
+  expect(mapping.reference_denominator).toBe('c4')
+})
+
+it('blocks empty selection and validates only the selected recipes', () => {
+  const mapping = prepareImportSignals(transmission, threeInspection)
+  const none = { ...mapping, import_signals: { transmission: false, fluorescence: false, reference: false } }
+  expect(columnProblem(none)).toBe('Choose at least one signal to import.')
+  expect(importSpectrumCount(none)).toBe(0)
+  expect(batchCapacityWarning(none, threeInspection, [], 200)).toBeNull()
+  const onlyFluorescence: ColumnMapping = { ...mapping, numerator: [], denominator: '', signal_multiplier: '',
+    reference_numerator: '', reference_denominator: '', import_signals: { transmission: false, fluorescence: true, reference: false } }
+  expect(columnProblem(onlyFluorescence)).toBeNull()
+  expect(columnPayload(onlyFluorescence)).toMatchObject({ mode: 'fluorescence', signal_multiplier: 1 })
+  expect(columnProblem({ ...onlyFluorescence, import_signals: { ...onlyFluorescence.import_signals!, transmission: true } })).toMatch(/transmission numerator/)
+  expect(columnProblem({ ...onlyFluorescence, import_signals: { ...onlyFluorescence.import_signals!, reference: true } })).toMatch(/reference numerator/)
+  expect(columnProblem({ ...onlyFluorescence, additional_fluorescence: null })).toMatch(/fluorescence signal/)
+  expect(columnProblem({ ...onlyFluorescence, additional_fluorescence: { numerator: ['c3'], denominator: 'c1', signal_multiplier: '' } })).toMatch(/fluorescence multiplicative/)
+  expect(columnProblem({ ...mapping, additional_fluorescence: { numerator: [], denominator: '', signal_multiplier: '' },
+    import_signals: { transmission: true, fluorescence: false, reference: false } })).toBeNull()
+})
+
+it('imports the reference alone using its ratio, logarithm and reference identity', () => {
+  const mapping: ColumnMapping = { ...prepareImportSignals(transmission, threeInspection), signal_multiplier: '',
+    invert: true, individual_channels: true, reference_numerator: '1', reference_log: false,
+    import_signals: { transmission: false, fluorescence: false, reference: true } }
+  expect(columnProblem(mapping)).toBeNull()
+  expect(columnPayload(mapping)).toMatchObject({ mode: 'fluorescence', numerator: ['1'], denominator: 'c4',
+    signal_multiplier: 1, invert: false, individual_channels: false, is_reference: true,
+    additional_fluorescence: null, reference_numerator: null, reference_denominator: null })
+  const implicitConstant = { ...mapping, reference_numerator: '', reference_denominator: 'c4' }
+  expect(columnProblem(implicitConstant)).toBeNull()
+  expect(columnPayload(implicitConstant)).toMatchObject({ numerator: [], denominator: 'c4' })
+  expect(columnProblem({ ...implicitConstant, reference_denominator: '' })).toMatch(/reference numerator/)
+  expect(columnPayload({ ...mapping, reference_numerator: 'c4', reference_denominator: '1' })).toMatchObject({ numerator: ['c4'], denominator: '1' })
+})
+
+it('retains direct signal and constant arithmetic when just one detector recipe is checked', () => {
+  const mapping = prepareImportSignals(transmission, threeInspection)
+  const primary: ColumnMapping = { ...mapping, mode: 'fluorescence', numerator: [], denominator: '',
+    import_signals: { transmission: true, fluorescence: false, reference: false } }
+  expect(columnProblem(primary)).toBeNull()
+  expect(columnPayload(primary)).toMatchObject({ mode: 'fluorescence', numerator: [], denominator: null })
+  const fluorescence = { ...mapping, additional_fluorescence: { numerator: ['c3'], denominator: '' },
+    import_signals: { transmission: false, fluorescence: true, reference: false } }
+  expect(columnProblem(fluorescence)).toBeNull()
+  expect(columnPayload(fluorescence)).toMatchObject({ mode: 'fluorescence', numerator: ['c3'], denominator: null })
+  expect(columnProblem({ ...fluorescence, import_signals: { ...fluorescence.import_signals, transmission: true } })).toMatch(/fluorescence signal/)
+})
+
+it('keeps direct absorption, extracted chi, calculations and foil choices outside the three-detector defaults', () => {
+  for (const mapping of [{ ...transmission, mode: 'mu' as const }, { ...transmission, data_type: 'chi' as const },
+    { ...transmission, data_type: 'xmudat' as const }, { ...transmission, is_reference: true }]) {
+    expect(prepareImportSignals(mapping, threeInspection)).toBe(mapping)
+  }
+  for (const evidence of [{ ambiguous: true }, { foil_spectrum: true }]) {
+    const input: InspectionResponse = { ...threeInspection, beamline_reader: {
+      id: 'test', name: 'Synthetic reader', facility: 'Test', beamline: 'Test', format: 'text', evidence: 'header', confidence: 'beamline',
+      measurement: { mode: 'transmission', edge_energy: 9000, contrast: {}, notes: [], ...evidence },
+    } }
+    expect(prepareImportSignals(transmission, input)).toBe(transmission)
+  }
+  const prepared = prepareImportSignals(transmission, threeInspection)
+  expect(changeInputType(prepared, 'chi')).not.toHaveProperty('import_signals')
+  expect(changeInputType(prepared, 'xmudat')).not.toHaveProperty('import_signals')
+  expect(columnPayload(changeInputType(prepared, 'xmudat'))).toMatchObject({ mode: 'mu', numerator: ['c1'], denominator: null,
+    additional_fluorescence: null, reference_numerator: null, reference_denominator: null })
+  expect(initialColumnMapping(inspection, prepared)).not.toHaveProperty('import_signals')
+})
+
+it('remaps checked and unchecked recipes in a batch and ignores unused nonnumeric detectors', () => {
+  const mapping = { ...prepareImportSignals(transmission, threeInspection),
+    import_signals: { transmission: false, fluorescence: true, reference: false } }
+  const next = { ...threeInspection, columns: threeInspection.columns.map(c => ({ ...c, column_id: `next-${c.index}` })) }
+  expect(reuseColumnMapping(threeInspection, next, mapping)).toMatchObject({ import_signals: mapping.import_signals,
+    numerator: ['next-1'], denominator: 'next-2', additional_fluorescence: { numerator: ['next-3'], denominator: 'next-1' },
+    reference_numerator: 'next-2', reference_denominator: 'next-4' })
+  const unusedBroken = { ...next, columns: next.columns.map(c => [2, 4].includes(c.index) ? { ...c, numeric: false } : c) }
+  const reused = reuseColumnMapping(threeInspection, unusedBroken, mapping)
+  expect(reused).not.toBeNull()
+  expect(columnPayload(reused!)).toMatchObject({ mode: 'fluorescence', numerator: ['next-3'], denominator: 'next-1' })
+  expect(reuseColumnMapping(threeInspection, { ...next, columns: next.columns.map(c => c.index === 3 ? { ...c, numeric: false } : c) }, mapping)).toBeNull()
+  const onlyReference = { ...mapping, import_signals: { transmission: false, fluorescence: false, reference: true } }
+  expect(reuseColumnMapping(threeInspection, next, onlyReference)?.import_signals).toEqual(onlyReference.import_signals)
+  expect(batchCapacityWarning(onlyReference, threeInspection, [], 100)).toBeNull()
+  expect(batchCapacityWarning(onlyReference, threeInspection, [], 101)).toMatch(/101 data \(1 per file/)
+})
 
 it('defaults complete detector files to transmission, fluorescence and one It/Iref reference', () => {
   const selected = initialColumnMapping(threeInspection, previous)

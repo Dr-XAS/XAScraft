@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -25,7 +26,7 @@ async function load(page:Page,name:string) {
   await page.getByLabel('Choose data files',{exact:true}).setInputFiles(fixture(name))
   const dialog=page.getByRole('dialog',{name:'Import spectra',exact:true})
   await expect(dialog.getByLabel('File conversion')).toContainText('HXMA')
-  await dialog.getByRole('combobox',{name:'Measurement',exact:true}).selectOption('transmission')
+  await selectImportSignals(dialog, ['transmission'])
   await dialog.getByRole('tab',{name:'Reference',exact:true}).click()
   await dialog.getByRole('combobox',{name:'reference numerator',exact:true}).selectOption('')
   await dialog.getByRole('combobox',{name:'reference denominator',exact:true}).selectOption('')

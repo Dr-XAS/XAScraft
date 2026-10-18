@@ -21,6 +21,34 @@ beforeEach(() => { vi.useFakeTimers(); api.mockReset().mockResolvedValue(respons
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe("live column preview", () => {
+  it('previews only checked signals and stops when all are unchecked', async () => {
+    const selection: Partial<ColumnMapping> = {
+      additional_fluorescence: { numerator: ['c3'], denominator: 'c1' },
+      reference_numerator: 'c2', reference_denominator: 'c4',
+      import_signals: { transmission: false, fluorescence: true, reference: false },
+    }
+    const view = render(<AthenaImportPreview {...props(selection)} />)
+    await tick()
+    expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ mode: 'fluorescence', numerator: ['c3'], denominator: 'c1',
+      additional_fluorescence: null, reference_numerator: null, reference_denominator: null })
+    expect(api.mock.calls.at(-1)?.[1]).not.toHaveProperty('import_signals')
+    expect(screen.queryByLabelText('Plot reference')).not.toBeInTheDocument()
+
+    view.rerender(<AthenaImportPreview {...props({ ...selection,
+      import_signals: { transmission: false, fluorescence: false, reference: true } })} />)
+    expect(screen.queryByTestId('plotly')).not.toBeInTheDocument()
+    await tick()
+    expect(api.mock.calls.at(-1)?.[1]).toMatchObject({ mode: 'transmission', numerator: ['c2'], denominator: 'c4',
+      reference_numerator: null, reference_denominator: null })
+    expect(handoff().data[0].name).toBe('Reference')
+
+    view.rerender(<AthenaImportPreview {...props({ ...selection,
+      import_signals: { transmission: false, fluorescence: false, reference: false } })} />)
+    await tick()
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('plotly')).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one signal to import.')
+  })
   it("debounces input and plots server values with matching axes without mutating them", async () => {
     const view = render(<AthenaImportPreview {...props()} />)
     await tick(100)
@@ -110,17 +138,13 @@ describe("live column preview", () => {
     await tick()
     expect(api.mock.calls[1][1]).toMatchObject({ upload_id: "next", version: 3 })
   })
-  it("plots the reference separately and toggles it without another backend request", async () => {
+  it("always plots the configured reference without a separate visibility control", async () => {
     api.mockResolvedValue({ ...response, traces: [...response.traces, { ...response.traces[0], role: "reference", label: "Reference", id: "ref" }] })
     render(<AthenaImportPreview {...props({ reference_numerator: "c2", reference_denominator: "c3", reference_log: false, reference_same_element: false, individual_channels: true })} />)
     await tick()
     expect(api.mock.calls[0][1]).toMatchObject({ reference_log: false, reference_same_element: false, individual_channels: true })
     expect(handoff().data.map((t: { yaxis: string }) => t.yaxis)).toEqual(["y", "y2"])
-    fireEvent.click(screen.getByLabelText("Plot reference"))
-    expect(handoff().data).toHaveLength(1)
-    await tick()
-    expect(api).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByLabelText("Plot reference"))
+    expect(screen.queryByLabelText("Plot reference")).not.toBeInTheDocument()
     expect(handoff().data).toHaveLength(2)
   })
   it("plots transmission, fluorescence, and one reference together after edits to either additional signal", async () => {
@@ -134,7 +158,7 @@ describe("live column preview", () => {
       reference_numerator: "c2", reference_denominator: "c4", reference_log: true }
     const view = render(<AthenaImportPreview {...props(both)} />)
     await tick()
-    expect(screen.getByLabelText("Plot reference")).toBeChecked()
+    expect(screen.queryByLabelText("Plot reference")).not.toBeInTheDocument()
     expect(handoff().data.map((trace: { name: string; yaxis: string }) => [trace.name, trace.yaxis]))
       .toEqual([["Transmission", "y"], ["Fluorescence", "y"], ["Reference", "y2"]])
     expect(handoff().data.map((trace: { y: number[] }) => trace.y)).toEqual(combined.traces.map(trace => trace.y))

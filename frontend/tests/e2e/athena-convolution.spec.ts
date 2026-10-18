@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +13,7 @@ async function load(page: Page) {
   await page.goto('/'); await page.getByRole('button', {name: 'Import data', exact: true}).click()
   await page.getByLabel('Choose data files', {exact: true}).setInputFiles(fixture)
   const dialog = page.getByRole('dialog', {name: 'Import spectra', exact: true})
+  await selectImportSignals(dialog, ['transmission'])
   await expect(dialog.locator('.js-line').first()).toBeVisible()
   await dialog.getByRole('checkbox', {name: 'Numerator i0', exact: true}).uncheck()
   await dialog.getByRole('checkbox', {name: 'Numerator mutrans', exact: true}).check()

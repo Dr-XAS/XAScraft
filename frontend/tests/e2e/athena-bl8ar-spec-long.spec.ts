@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -48,7 +49,7 @@ async function restore(page: Page, path: string) {
   return response.json()
 }
 async function singleMeasurement(dialog: Locator, mode: 'transmission' | 'fluorescence') {
-  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+  await selectImportSignals(dialog, [mode])
   await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
   await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
   await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
@@ -76,7 +77,7 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   const i0Plot = dialog.getByLabel('I0 correction plot', { exact: true })
   await expect.poll(async () => (await curve(i0Plot)).length).toBe(4)
   expect((await curve(i0Plot)).map(t => t.y)).toEqual(inspected.reader_preview.traces.map((t: { y: number[] }) => t.y))
-  await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: /^Import (?:spectrum|2 spectra)$/, exact: true })).toBeDisabled()
   await i0Plot.scrollIntoViewIfNeeded(); await dialog.screenshot({ path: info.outputPath('bl8ar-i0-review.png') })
   const approve = dialog.getByRole('checkbox', { name: 'I reviewed the I0 correction for this file', exact: true })
   await expect(approve).toBeEnabled(); await approve.check()
@@ -84,9 +85,10 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
   const rows = oracle('ge'), x = rows.map(r => r[0])
   await signal(plot, x, rows.map(r => r.slice(6, 10).reduce((a, b) => a+b, 0)/r[3]))
-  for (const column of inspected.columns.slice(10, 19)) await dialog.getByRole('checkbox', { name: `Numerator ${column.name}`, exact: true }).check()
+  for (const column of inspected.columns.slice(10, 19)) await dialog.getByRole('checkbox', { name: `Fluorescence numerator ${column.name}`, exact: true }).check()
   const y = rows.map(r => r.slice(6, 19).reduce((a, b) => a+b, 0)/r[3])
   await signal(plot, x, y)
+  await dialog.getByRole('checkbox', { name: 'Import Reference', exact: true }).check()
   await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
   await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption(inspected.columns[5].column_id)
   await dialog.getByRole('checkbox', { name: 'Reference natural log', exact: true }).uncheck()
@@ -109,11 +111,11 @@ test('BL8Ar fits, per-file review, live Ge13 and reference columns, batch import
   expect(project.groups[0].source.mapping.reader_reviewed).toBe(true)
   expect((await nextInspection).ok()).toBe(true)
   await expect(approve).not.toBeChecked()
-  await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: /^Import (?:spectrum|2 spectra)$/, exact: true })).toBeDisabled()
   await expect(page.getByRole('heading', { name: /^Data 2\b/ })).toBeVisible()
   await expect(approve).toBeEnabled(); await approve.check()
   const again = page.waitForResponse(r => r.url().endsWith('/import'))
-  await dialog.getByRole('button', { name: 'Import spectrum', exact: true }).click()
+  await dialog.getByRole('button', { name: /^Import (?:spectrum|2 spectra)$/, exact: true }).click()
   const second = await again; expect(second.ok()).toBe(true)
   const finished = await second.json(); expect(finished.groups).toHaveLength(4)
   const saving = page.waitForEvent('download'); await page.getByRole("button", { name: "File", exact: true }).click(); await page.getByRole("button", { name: "Save Craft project (.prj)", exact: true }).click(); await confirmProjectSave(page)

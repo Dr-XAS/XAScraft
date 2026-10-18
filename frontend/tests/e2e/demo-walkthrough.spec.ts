@@ -103,8 +103,8 @@ async function importBeamlineFile(page: Page, file: string, { sort = false } = {
   const referenceTab = dialog.getByRole('tab', { name: 'Reference', exact: true })
   if (await referenceTab.count()) await referenceTab.click()
   const referenced = await dialog.getByText(/^Reference = /).first().isVisible()
-  const mode = await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).inputValue()
-  const samples = mode === 'both' || mode === 'all' ? 2 : 1
+  const outputs = dialog.getByRole('checkbox', { name: /^Import (Transmission|Fluorescence)$/ })
+  const samples = await outputs.count() ? (await Promise.all((await outputs.all()).map(checkbox => checkbox.isChecked()))).filter(Boolean).length : 1
   const imported = page.waitForResponse(r => r.url().endsWith('/import'))
   await dialog.getByRole('button', { name: /^Import (?:spectrum|both modes|\d+ spectra)$/ }).click()
   const response = await imported

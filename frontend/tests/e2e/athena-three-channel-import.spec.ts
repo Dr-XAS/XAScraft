@@ -71,7 +71,11 @@ test('three measurement tabs keep every preview visible and import one shared re
   for (const name of ['File plugins…', 'Reinspect selected file', 'Save grid as defaults', 'Load saved grid', 'Use Craft default grid']) {
     await expect(panel.getByRole('button', { name, exact: true })).toHaveCount(0)
   }
-  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toHaveValue('all')
+  await expect(panel.getByRole('checkbox', { name: 'Plot reference', exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toHaveCount(0)
+  for (const signal of ['Transmission', 'Fluorescence', 'Reference']) {
+    await expect(panel.getByRole('checkbox', { name: `Import ${signal}`, exact: true })).toBeChecked()
+  }
   await expect(panel.getByRole('tab', { name: 'Transmission', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(panel.getByRole('button', { name: 'Import 3 spectra', exact: true })).toBeEnabled()
 

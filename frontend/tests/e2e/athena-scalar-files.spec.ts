@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -26,7 +27,7 @@ async function signal(plot: Locator, x: number[], y: number[]) {
 
 async function selectNativeColumns(dialog: Locator, columns: ColumnInfo[], choice: { ln: number; energy: string; numerator: string; denominator: string }) {
   const mode = choice.ln ? 'transmission' : 'fluorescence'
-  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+  await selectImportSignals(dialog, [mode])
   // This arithmetic oracle deliberately imports one measurement. A file with
   // all detector roles may initially offer the combined three-signal import.
   await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
@@ -35,10 +36,10 @@ async function selectNativeColumns(dialog: Locator, columns: ColumnInfo[], choic
   await dialog.getByRole('tab', { name: choice.ln ? 'Transmission' : 'Fluorescence', exact: true }).click()
   const column = (token: string) => columns[Number(token.slice(1)) - 1]
   await dialog.getByRole('combobox', { name: 'Energy column', exact: true }).selectOption(column(choice.energy).column_id)
-  await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Clear denominator', exact: true }).click()
-  for (const token of choice.numerator.split('+')) await dialog.getByLabel(`Numerator ${column(token).name}`, { exact: true }).check()
-  for (const token of choice.denominator.split('+')) await dialog.getByLabel(`Denominator ${column(token).name}`, { exact: true }).check()
+  await dialog.getByRole('button', { name: mode === 'fluorescence' ? 'Clear fluorescence numerator' : 'Clear numerator', exact: true }).click()
+  await dialog.getByRole('button', { name: mode === 'fluorescence' ? 'Clear fluorescence denominator' : 'Clear denominator', exact: true }).click()
+  for (const token of choice.numerator.split('+')) await dialog.getByLabel(`${mode === 'fluorescence' ? 'Fluorescence numerator' : 'Numerator'} ${column(token).name}`, { exact: true }).check()
+  for (const token of choice.denominator.split('+')) await dialog.getByLabel(`${mode === 'fluorescence' ? 'Fluorescence denominator' : 'Denominator'} ${column(token).name}`, { exact: true }).check()
 }
 
 for (const name of ['cmc', 'hxma', 'lnls']) {
@@ -97,8 +98,8 @@ for (const name of ['cmc', 'hxma', 'lnls']) {
     await expect(dialog.getByRole('combobox', { name: 'Energy units', exact: true })).toHaveValue('eV')
     if (name === 'cmc') {
       // Native omits MCA1 and MCA7; show that adding them changes the live sum.
-      await dialog.getByLabel('Numerator mca1', { exact: true }).check()
-      await dialog.getByLabel('Numerator mca7', { exact: true }).check()
+      await dialog.getByLabel('Fluorescence numerator mca1', { exact: true }).check()
+      await dialog.getByLabel('Fluorescence numerator mca7', { exact: true }).check()
       await signal(preview, x, rows.map(row => row.slice(5).reduce((sum, v) => sum + v, 0) / row[1]))
       await selectNativeColumns(dialog, inspected.columns, ref.native.fluorescence)
     } else if (name === 'hxma') {
@@ -108,16 +109,16 @@ for (const name of ['cmc', 'hxma', 'lnls']) {
     } else {
       // The final source column is an already-written ratio; its precision
       // differs from dividing Ge15/Curta again in the preview.
-      await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
-      await dialog.getByRole('button', { name: 'Clear denominator', exact: true }).click()
-      await dialog.getByLabel('Numerator fluorescencia', { exact: true }).check()
+      await dialog.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Clear fluorescence denominator', exact: true }).click()
+      await dialog.getByLabel('Fluorescence numerator fluorescencia', { exact: true }).check()
       await signal(preview, x, rows.map(row => row[7]))
       await selectNativeColumns(dialog, inspected.columns, ref.native.fluorescence)
     }
     await signal(preview, x, y)
-    await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
+    await dialog.getByRole('button', { name: choice.ln ? 'Flip numerator and denominator' : 'Flip fluorescence numerator and denominator', exact: true }).click()
     await signal(preview, x, flipped)
-    await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
+    await dialog.getByRole('button', { name: choice.ln ? 'Flip numerator and denominator' : 'Flip fluorescence numerator and denominator', exact: true }).click()
     await signal(preview, x, y)
     const originalSummary = dialog.getByText(/^Source file contents( \(first section\))?$/)
     await originalSummary.click()

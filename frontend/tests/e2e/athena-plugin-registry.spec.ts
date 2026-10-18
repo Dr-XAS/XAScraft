@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
@@ -24,6 +25,7 @@ test('formats open automatically, explicit opt-outs persist, and native YAML is 
   const detected = await automatic; expect(detected.ok()).toBe(true)
   expect((await detected.json()).file_plugin.id).toBe('X10C')
   const importing = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await selectImportSignals(importing, ['transmission'])
   await expect(importing.getByLabel('Imported signal preview plot').locator('.js-line').first()).toBeAttached()
   await expect(importing.getByRole('button', { name: 'File plugins…', exact: true })).toHaveCount(0)
   await expect(importing.getByRole('button', { name: 'Reinspect selected file', exact: true })).toHaveCount(0)
@@ -56,6 +58,7 @@ test('formats open automatically, explicit opt-outs persist, and native YAML is 
   const retry = page.waitForResponse(r => r.url().endsWith('/inspect'))
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(path)
   expect((await retry).ok()).toBe(true)
+  await selectImportSignals(importing, ['transmission'])
   await expect(importing.getByLabel('Imported signal preview plot').locator('.js-line').first()).toBeAttached()
   const accepted = page.waitForResponse(r => r.url().endsWith('/import'), { timeout: 30000 })
   await importing.getByRole('button', { name: 'Import spectrum', exact: true }).click()

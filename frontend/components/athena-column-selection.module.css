@@ -26,11 +26,17 @@
 .range label { flex: 1 1 160px; margin-bottom: 0 !important; }
 .range button { min-height: 32px; border: 1px solid var(--ath-line); padding: 6px 8px; }
 .modeTitle { margin: 12px 0 8px; font-size: var(--text-section); }
-.signalTabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--ath-line); }
-.signalTabs button { flex: 1 1 auto; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; background: var(--ath-surface); }
-.signalTabs button[aria-selected="true"] { border-color: var(--ath-primary); background: var(--ath-primary); color: var(--ath-primary-foreground); }
-.signalTabs button[aria-selected="true"]:hover:not(:disabled) { background: var(--ath-primary-hover); }
-.signalTabs button:focus-visible { outline: 2px solid var(--ath-primary); outline-offset: 2px; }
+.signalTabs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 12px 0 0; padding: 3px; border: 1px solid var(--ath-line); border-radius: 8px; background: var(--ath-canvas); }
+.signalTab { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 7px; min-width: 0; padding: 0 9px; border: 1px solid transparent; border-radius: 5px; color: var(--ath-muted); transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+.signalTab:hover:not(:has(:disabled)) { background: var(--ath-surface-muted); color: var(--ath-ink); }
+.signalTab[data-active="true"] { border-color: var(--ath-primary-line); background: var(--ath-surface); color: var(--ath-primary); box-shadow: 0 1px 3px rgb(24 24 27 / 5%); }
+.signalTab[data-active="true"]:hover:not(:has(:disabled)) { background: var(--ath-primary-soft); color: var(--ath-primary); }
+.signalTabs .signalTab > input[type="checkbox"] { flex: 0 0 14px; width: 14px; height: 14px; min-height: 0; margin: 0; accent-color: var(--ath-primary); cursor: pointer; }
+.signalTab > input:disabled { cursor: not-allowed; }
+.signalTab:has(:focus-visible) { outline: 2px solid var(--ath-primary); outline-offset: 1px; }
+.signalTabs .signalTab > button { flex: 0 1 auto; min-height: 30px; padding: 4px 0; border: 0; border-radius: 0; background: inherit; color: inherit; font-size: var(--text-label); font-weight: 400; line-height: var(--leading-control); }
+.signalTabs .signalTab > button:hover:not(:disabled) { background: inherit; color: inherit; }
+.signalTabs .signalTab > :focus-visible { outline: none; }
 .signalPanel { min-width: 0; padding: 8px 0; }
 .signalPanel[hidden] { display: none; }
 .fluorescence { min-width: 0; margin: 4px 0; padding: 0; border: 0; }
@@ -41,5 +47,6 @@
 .fluorescenceFields > * { min-width: 0; }
 .fluorescenceFields button { white-space: normal; }
 .raw { margin: 12px 0; }
+@media (prefers-reduced-motion: reduce) { .signalTab { transition: none; } }
 @media (max-width: 850px) { .importHeader { align-items: stretch; flex-direction: column; gap: 8px; padding-block: 8px; }.importActions { align-self: stretch; justify-content: flex-end; flex-wrap: wrap; }.headerError { flex: none; }.importActions button { flex: 1 1 145px; }.layout { display: flex; flex-direction: column; gap: 16px; }.controls, .preview { width: 100%; }.preview { position: static; order: -1; }.plot { height: 300px; } }
 @media (max-width: 850px) { .readerPreviews { max-height: none; overflow: visible; padding-right: 0; } }

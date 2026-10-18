@@ -22,9 +22,25 @@ async function openColumns(page: Page) {
     await panel.getByRole('button', { name: 'Use suggested columns' }).click()
   }
   await expect(panel.getByRole("combobox", { name: "Energy units", exact: true })).toHaveValue("keV")
-  await expect(panel.getByRole("combobox", { name: "Measurement", exact: true })).toHaveValue("transmission")
+  await expect(panel.getByRole("combobox", { name: "Measurement", exact: true })).toHaveCount(0)
+  await selectSignals(panel, 'Transmission')
   await panel.getByLabel("Denominator it", { exact: true }).check()
   return panel
+}
+async function selectSignals(panel: Locator, ...names: string[]) {
+  for (const name of ['Transmission', 'Fluorescence', 'Reference']) {
+    const checkbox = panel.getByRole('checkbox', { name: `Import ${name}`, exact: true })
+    if (await checkbox.count()) await checkbox.setChecked(names.includes(name))
+  }
+  if (names[0]) {
+    const tab = panel.getByRole('tab', { name: names[0], exact: true })
+    if (await tab.count()) await tab.click()
+  }
+  // Direct columns retain one editable formula without detector tabs.
+  if (names.length === 1 && names[0] === 'Transmission') {
+    const log = panel.getByLabel('Natural log', { exact: true })
+    if (await log.count() && await log.isEnabled()) await log.check()
+  }
 }
 async function curves(panel: Locator) {
   await expect(panel.getByLabel("Imported signal preview plot")).toHaveAttribute("aria-busy", "false")
@@ -36,6 +52,49 @@ async function curves(panel: Locator) {
   return plot.evaluate(node => (node as HTMLElement & { data: { x: number[]; y: number[]; name: string }[] }).data.map(t => ({ x: [...t.x], y: [...t.y], name: t.name })))
 }
 
+test('signal checkboxes default to all three and import only the checked reference', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Import data', exact: true }).click()
+  await page.getByLabel('Choose data files', { exact: true }).setInputFiles({
+    name: 'selected-reference.dat', mimeType: 'text/plain', buffer: content,
+  })
+  const panel = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await expect(panel.getByRole('combobox', { name: 'Input format', exact: true })).toBeVisible()
+  if (await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).count()) {
+    await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
+  }
+  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toHaveCount(0)
+  for (const name of ['Transmission', 'Fluorescence', 'Reference']) {
+    await expect(panel.getByRole('checkbox', { name: `Import ${name}`, exact: true })).toBeChecked()
+  }
+  await panel.getByRole('tab', { name: 'Reference', exact: true }).click()
+  await panel.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption({ label: 'i0 · column 2' })
+  await panel.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption({ label: 'ref · column 6' })
+  await selectSignals(panel)
+  await expect(panel.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
+  await expect(panel.getByRole('tab', { name: 'Reference', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await panel.getByRole('checkbox', { name: 'Import Reference', exact: true }).check()
+  const preview = await curves(panel)
+  expect(preview).toHaveLength(1)
+  for (const index of [0, 200, 400, measured.length - 1]) {
+    expect(preview[0].y[index]).toBeCloseTo(measured[index][1], 12)
+  }
+  const request = page.waitForRequest(r => r.url().endsWith('/import'))
+  const response = page.waitForResponse(r => r.url().endsWith('/import'))
+  await panel.getByRole('button', { name: 'Import spectrum', exact: true }).click()
+  expect((await request).postDataJSON()).toMatchObject({ mode: 'transmission', numerator: ['column_0002'],
+    denominator: 'column_0006', is_reference: true, reference_numerator: null, reference_denominator: null,
+    additional_fluorescence: null })
+  const imported = await response
+  expect(imported.ok()).toBe(true)
+  const project = await imported.json()
+  expect(project.groups).toHaveLength(1)
+  expect(project.groups[0].mu).toEqual(preview[0].y)
+  expect(project.groups[0].reference_id).toBeFalsy()
+  expect(project.groups[0].processing_error).toBeNull()
+  await expect(panel).not.toBeVisible()
+})
+
 test('shared batch shows one progress bar until every file is imported', async ({ page }, info) => {
   test.setTimeout(90000)
   const errors: string[] = []
@@ -45,12 +104,12 @@ test('shared batch shows one progress bar until every file is imported', async (
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(
     [1, 2, 3].map(index => ({ name: `progress-${index}.dat`, mimeType: 'text/plain', buffer: content })))
   const panel = page.getByRole('dialog', { name: 'Import spectra', exact: true })
-  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toBeVisible()
+  await expect(panel.getByRole('combobox', { name: 'Input format', exact: true })).toBeVisible()
   if (await panel.getByRole('button', { name: 'Use suggested columns' }).count()) {
     await panel.getByRole('button', { name: 'Use suggested columns' }).click()
   }
   await panel.getByRole('combobox', { name: 'Energy units', exact: true }).selectOption('keV')
-  await panel.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+  await selectSignals(panel, 'Transmission')
   await panel.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await panel.getByLabel('Numerator i0', { exact: true }).check()
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
@@ -124,11 +183,11 @@ test('official MRCAT quick scan keeps its native energy grid before explicit pos
     { name: 'uhup-copy.101', mimeType: 'text/plain', buffer: data },
   ])
   const panel = page.getByRole('dialog')
-  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toBeVisible()
+  await expect(panel.getByRole('combobox', { name: 'Input format', exact: true })).toBeVisible()
   if (await panel.getByRole('button', { name: 'Use suggested columns' }).count()) {
     await panel.getByRole('button', { name: 'Use suggested columns' }).click()
   }
-  await panel.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+  await selectSignals(panel, 'Transmission')
   await panel.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await panel.getByLabel('Numerator mcs3', { exact: true }).check()
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
@@ -171,11 +230,13 @@ test('batch choice pauses on renamed columns and names the change, resets, and p
     { name: 'shared-renamed.dat', mimeType: 'text/plain', buffer: renamed },
   ])
   const panel = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await selectSignals(panel, 'Transmission')
   const same = panel.getByRole('radio', { name: 'Yes, use the same parameters', exact: true })
   const separate = panel.getByRole('radio', { name: 'No, review each file', exact: true })
   await expect(panel.getByText('Use the same import parameters for all files?', { exact: true })).toBeVisible()
   await expect(same).not.toBeChecked()
   await expect(separate).not.toBeChecked()
+  await selectSignals(panel, 'Transmission')
   await expect(panel.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
   await panel.screenshot({ path: info.outputPath('batch-choice-desktop.png') })
   await page.setViewportSize({ width: 390, height: 844 })
@@ -188,7 +249,7 @@ test('batch choice pauses on renamed columns and names the change, resets, and p
     await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
   }
   await panel.getByRole('combobox', { name: 'Energy units', exact: true }).selectOption('keV')
-  await panel.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+  await selectSignals(panel, 'Transmission')
   await panel.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await panel.getByLabel('Numerator i0', { exact: true }).check()
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
@@ -206,7 +267,7 @@ test('batch choice pauses on renamed columns and names the change, resets, and p
     await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
   }
   await panel.getByRole('combobox', { name: 'Energy units', exact: true }).selectOption('keV')
-  await panel.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+  await selectSignals(panel, 'Transmission')
   await panel.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await panel.getByLabel('Numerator monitor', { exact: true }).check()
   await panel.getByRole('button', { name: 'Clear denominator', exact: true }).click()
@@ -233,11 +294,13 @@ test('batch choice pauses on renamed columns and names the change, resets, and p
   ])
   await expect(same).not.toBeChecked()
   await expect(separate).not.toBeChecked()
+  await selectSignals(panel, 'Transmission')
   await expect(panel.getByRole('button', { name: 'Import spectrum', exact: true })).toBeDisabled()
   await separate.check()
   await panel.getByRole('spinbutton', { name: 'Multiplicative constant', exact: true }).fill('1')
   await panel.getByRole('button', { name: 'Import spectrum', exact: true }).click()
   await expect(panel.getByText('individual-second.dat', { exact: true })).toBeVisible()
+  await selectSignals(panel, 'Transmission')
   expect(imports).toHaveLength(3)
   expect((await imports[2]).groups).toHaveLength(3)
   await panel.getByRole('spinbutton', { name: 'Multiplicative constant', exact: true }).fill('2')
@@ -265,11 +328,11 @@ test('imports transmission and fluorescence together across a shared real-Cu bat
     { name: 'dual-second.dat', mimeType: 'text/plain', buffer: content },
   ])
   const panel = page.getByRole('dialog', { name: 'Import spectra', exact: true })
-  await expect(panel.getByRole('combobox', { name: 'Measurement', exact: true })).toBeVisible()
+  await expect(panel.getByRole('combobox', { name: 'Input format', exact: true })).toBeVisible()
   if (await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).count()) {
     await panel.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
   }
-  await panel.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('both')
+  await selectSignals(panel, 'Transmission', 'Fluorescence')
   await panel.getByRole('combobox', { name: 'Energy units', exact: true }).selectOption('keV')
   await panel.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await panel.getByLabel('Numerator i0', { exact: true }).check()
@@ -368,6 +431,7 @@ test("column preview, reference, invalid mapping recovery and imported values", 
   await expect(panel.getByLabel("Imported signal preview plot").locator(".js-line")).toHaveCount(0)
   await panel.getByRole("button", { name: "Clear denominator", exact: true }).click()
   await panel.getByLabel("Denominator it", { exact: true }).check()
+  await selectSignals(panel, "Transmission", "Reference")
   await panel.getByRole("tab", { name: "Reference", exact: true }).click()
   await panel.getByRole("combobox", { name: "reference numerator", exact: true }).selectOption({ label: "i0 · column 2" })
   await panel.getByRole("combobox", { name: "reference denominator", exact: true }).selectOption({ label: "ref · column 6" })
@@ -377,7 +441,7 @@ test("column preview, reference, invalid mapping recovery and imported values", 
   expect(referenceRatio[1].y[200]).toBeCloseTo(Math.exp(measured[200][1]), 10)
   await panel.getByLabel("Reference natural log", { exact: true }).check()
   const beforeImport = await curves(panel)
-  const importButton = panel.getByRole("button", { name: "Import spectrum", exact: true })
+  const importButton = panel.getByRole("button", { name: "Import 2 spectra", exact: true })
   await panel.locator(".ath-modal-body").evaluate(element => { element.scrollTop = element.scrollHeight })
   await expect(importButton).toBeInViewport()
   const title = await panel.getByRole("heading", { name: "Import spectra", exact: true }).boundingBox()
@@ -411,19 +475,19 @@ test("MED range selection, automatic separate-channel preview and import on mobi
   await expect(panel.getByLabel("Pause plotting", { exact: true })).toHaveCount(0)
   await expect(panel.getByRole("button", { name: "Replot", exact: true })).toHaveCount(0)
   await expect(panel.getByRole("button", { name: "Retry preview", exact: true })).toHaveCount(0)
-  await panel.getByRole("combobox", { name: "Measurement", exact: true }).selectOption("fluorescence")
-  await panel.getByRole("button", { name: "Clear denominator", exact: true }).click()
-  await panel.getByLabel("Denominator i0", { exact: true }).check()
-  await panel.getByRole("button", { name: "Clear numerator", exact: true }).click()
-  await panel.getByLabel("Numerator column numbers", { exact: true }).fill("4-5")
-  await panel.getByRole("button", { name: "Select range", exact: true }).click()
-  await panel.getByLabel("Save each channel as a separate data item", { exact: true }).check()
+  await selectSignals(panel, 'Fluorescence')
+  await panel.getByRole("button", { name: "Clear fluorescence denominator", exact: true }).click()
+  await panel.getByLabel("Fluorescence denominator i0", { exact: true }).check()
+  await panel.getByRole("button", { name: "Clear fluorescence numerator", exact: true }).click()
+  await panel.getByLabel("Fluorescence numerator column numbers", { exact: true }).fill("4-5")
+  await panel.getByRole("button", { name: "Select fluorescence range", exact: true }).click()
+  await panel.getByLabel("Save each fluorescence channel as a separate data item", { exact: true }).check()
   await expect.poll(async () => (await curves(panel)).length).toBe(2)
   const initial = await curves(panel)
   expect(initial[0].y[200]).toBeCloseTo(measured[200][1], 12)
   expect(initial[1].y[200]).toBeCloseTo(measured[200][1] / 2, 12)
 
-  const scale = panel.getByRole('spinbutton', { name: 'Multiplicative constant', exact: true })
+  const scale = panel.getByRole('spinbutton', { name: 'Fluorescence multiplicative constant', exact: true })
   await scale.fill('2')
   const scaled = await curves(panel)
   expect(scaled[0].y[200]).toBeCloseTo(2 * measured[200][1], 12)
@@ -438,7 +502,7 @@ test("MED range selection, automatic separate-channel preview and import on mobi
   expect(box!.x + box!.width).toBeLessThanOrEqual(390)
   await panel.screenshot({ path: info.outputPath("column-preview-mobile.png") })
   const accepted = page.waitForResponse(r => r.url().endsWith("/import"))
-  await panel.getByRole("button", { name: "Import spectrum", exact: true }).click()
+  await panel.getByRole("button", { name: "Import 2 spectra", exact: true }).click()
   const result = await accepted
   expect(result.ok()).toBe(true)
   const project = await result.json()
@@ -491,6 +555,7 @@ test("a refused import says why beside the Import button, not below the dialog's
   await page.getByLabel("Choose data files", { exact: true }).setInputFiles({ name: "short.dat", mimeType: "text/plain",
     buffer: Buffer.from("# energy i0 it\n8900 10000 5000\n8950 10000 4000\n9000 10000 3000\n") })
   const panel = page.getByRole("dialog", { name: "Import spectra", exact: true })
+  await selectSignals(panel, "Transmission")
   const importButton = panel.getByRole("button", { name: "Import spectrum", exact: true })
   await importButton.click()
   // The preview may repeat the reason further down; one copy must sit just
@@ -508,8 +573,8 @@ test("switching to chi clears absorption transforms and keeps raw k values", asy
   const panel = await openColumns(page)
   await panel.getByRole("spinbutton", { name: "Multiplicative constant", exact: true }).fill("3")
   await panel.getByRole("combobox", { name: "Input format", exact: true }).selectOption("chi")
-  await expect(panel.getByRole("combobox", { name: "Measurement", exact: true })).toHaveValue("mu")
-  await expect(panel.getByRole("combobox", { name: "Measurement", exact: true })).toBeDisabled()
+  await expect(panel.getByRole("combobox", { name: "Measurement", exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('checkbox', { name: 'Import Fluorescence', exact: true })).toHaveCount(0)
   await expect(panel.getByRole("button", { name: "Flip numerator and denominator", exact: true })).toBeDisabled()
   await expect(panel.getByRole("spinbutton", { name: "Multiplicative constant", exact: true })).toHaveValue("1")
   await expect(panel.getByRole("spinbutton", { name: "Multiplicative constant", exact: true })).toBeDisabled()
@@ -521,11 +586,12 @@ test("switching to chi clears absorption transforms and keeps raw k values", asy
 test('imported sample and reference retain their measured scales and energy shifts until explicit postprocessing', async ({ page }) => {
   test.setTimeout(90000)
   const panel = await openColumns(page)
+  await selectSignals(panel, 'Transmission', 'Reference')
   await panel.getByRole('tab', { name: 'Reference', exact: true }).click()
   await panel.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption({ label: 'i0 · column 2' })
   await panel.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption({ label: 'ref · column 6' })
   const accepted = page.waitForResponse(r => r.url().endsWith('/import'))
-  await panel.getByRole('button', { name: 'Import spectrum', exact: true }).click()
+  await panel.getByRole('button', { name: 'Import 2 spectra', exact: true }).click()
   const initial = await (await accepted).json()
   await expect(panel).not.toBeVisible()
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
@@ -597,7 +663,7 @@ test("XAS-QA-007: retrying an import whose response was lost does not import the
 test("XAS-QA-001: the fluorescence multiplier stays readable in a narrow dual-mode import", async ({ page }, info) => {
   test.setTimeout(60000)
   const panel = await openColumns(page)
-  await panel.getByRole("combobox", { name: "Measurement", exact: true }).selectOption("both")
+  await selectSignals(panel, 'Transmission', 'Fluorescence')
   await panel.getByRole("tab", { name: "Fluorescence", exact: true }).click()
   const fluorescence = panel.getByRole("group", { name: "Fluorescence columns", exact: true })
   const constant = fluorescence.getByLabel("Fluorescence multiplicative constant", { exact: true })

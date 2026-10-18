@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -41,6 +42,7 @@ for (const name of ['x10c', 'lytle']) {
     if (await dialog.getByRole('button', { name: 'Use suggested columns' }).count()) {
       await dialog.getByRole('button', { name: 'Use suggested columns' }).click()
     }
+    await selectImportSignals(dialog, ['transmission'])
     await expect(dialog.getByLabel('Natural log', { exact: true })).toBeChecked()
     const preview = dialog.getByLabel('Imported signal preview plot', { exact: true })
     await expect.poll(async () => (await curve(preview)).x).toEqual(x)

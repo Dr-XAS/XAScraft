@@ -26,7 +26,7 @@ test('a mixed batch selects EXAFS per spectrum and leaves manual processing avai
   await expect(dialog.getByRole('combobox', { name: 'Energy column', exact: true })).toBeVisible({ timeout: 30000 })
   const suggested = dialog.getByRole('button', { name: 'Use suggested columns', exact: true })
   if (await suggested.count()) await suggested.click()
-  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('mu')
+  await expect(dialog.getByRole('checkbox', { name: 'Natural log', exact: true })).not.toBeChecked()
   await expect(dialog.getByRole('checkbox', { name: 'Enable EXAFS processing', exact: true })).toHaveCount(0)
   await dialog.getByRole('checkbox', { name: 'Input already normalized', exact: true }).uncheck()
   await dialog.getByRole('radio', { name: 'Yes, use the same parameters', exact: true }).check()

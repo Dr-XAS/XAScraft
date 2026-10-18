@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -43,12 +44,12 @@ async function selectFluorescence(dialog: Locator, inspection: {
   plugin_suggestions: { fluorescence: { numerator: string[]; denominator: string } };
 }) {
   const choice = inspection.plugin_suggestions.fluorescence
-  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
-  await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Clear denominator', exact: true }).click()
+  await selectImportSignals(dialog, ['fluorescence'])
+  await dialog.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Clear fluorescence denominator', exact: true }).click()
   for (const column of inspection.columns) {
-    if (choice.numerator.includes(column.column_id)) await dialog.getByRole('checkbox', { name: `Numerator ${column.name}`, exact: true }).check()
-    if (choice.denominator === column.column_id) await dialog.getByRole('checkbox', { name: `Denominator ${column.name}`, exact: true }).check()
+    if (choice.numerator.includes(column.column_id)) await dialog.getByRole('checkbox', { name: `Fluorescence numerator ${column.name}`, exact: true }).check()
+    if (choice.denominator === column.column_id) await dialog.getByRole('checkbox', { name: `Fluorescence denominator ${column.name}`, exact: true }).check()
   }
 }
 

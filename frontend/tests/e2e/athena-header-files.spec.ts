@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -33,7 +34,7 @@ async function enable(page: Page, reader: string) {
   await registry.getByRole('button', { name: 'Close registry', exact: true }).click()
 }
 async function singleMeasurement(dialog: Locator, mode: 'transmission' | 'fluorescence') {
-  await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+  await selectImportSignals(dialog, [mode])
   await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
   await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
   await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
@@ -57,18 +58,28 @@ for (const reader of ['B18','BM23']) {
     const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
     await signal(plot,x,y)
     await expect(dialog.getByRole('combobox', { name: 'Energy units', exact: true })).toHaveValue('eV')
+    const originalNumerators = [], originalDenominators = []
+    for (const checkbox of await dialog.getByRole('checkbox', { name: /^(?:Fluorescence numerator|Numerator) / }).all()) {
+      if (await checkbox.isChecked()) originalNumerators.push(checkbox)
+    }
+    for (const checkbox of await dialog.getByRole('checkbox', { name: /^(?:Fluorescence denominator|Denominator) / }).all()) {
+      if (await checkbox.isChecked()) originalDenominators.push(checkbox)
+    }
     if (reader === 'B18') {
-      await expect(dialog.getByRole('checkbox', { name: 'Natural log', exact: true })).not.toBeChecked()
-      expect(await dialog.getByRole('checkbox', { name: /^Numerator ff\d+$/ }).count()).toBe(36)
-      await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
-      await dialog.getByLabel('Numerator ff1', { exact: true }).check()
+      expect(await dialog.getByRole('checkbox', { name: /^Fluorescence numerator ff\d+$/ }).count()).toBe(36)
+      await dialog.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
+      await dialog.getByLabel('Fluorescence numerator ff1', { exact: true }).check()
       await signal(plot,x,rows.map(row => row[7]/row[2]))
     } else {
       await dialog.getByRole('button', { name: 'Clear denominator', exact: true }).click()
       await dialog.getByLabel('Denominator iref', { exact: true }).check()
       await signal(plot,x,rows.map(row => Math.log(Math.abs(row[2]/row[4]))))
     }
-    await singleMeasurement(dialog, mode); await signal(plot,x,y)
+    await dialog.getByRole('button', { name: mode === 'fluorescence' ? 'Clear fluorescence numerator' : 'Clear numerator', exact: true }).click()
+    await dialog.getByRole('button', { name: mode === 'fluorescence' ? 'Clear fluorescence denominator' : 'Clear denominator', exact: true }).click()
+    for (const checkbox of originalNumerators) await checkbox.check()
+    for (const checkbox of originalDenominators) await checkbox.check()
+    await signal(plot,x,y)
     for (const variant of ['original','converted']) {
       const summary = dialog.getByText(variant === 'original' ? /^Source file contents( \(first section\))?$/ : /^Converted columns( \(first section\))?$/)
       await summary.click(); const downloading = page.waitForEvent('download')

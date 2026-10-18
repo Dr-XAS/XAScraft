@@ -17,6 +17,10 @@ export interface FluorescenceMapping {
   individual_channels?: boolean; signal_multiplier?: number | ""; invert?: boolean
 }
 
+export interface ImportSignals {
+  transmission: boolean; fluorescence: boolean; reference: boolean
+}
+
 export interface ColumnMapping {
   energy_column: string; numerator: string[]; denominator: string | string[]
   mode: "mu" | "transmission" | "fluorescence"
@@ -30,6 +34,8 @@ export interface ColumnMapping {
   preprocessing?: ImportPreprocessing
   rebin?: ImportRebinOptions
   additional_fluorescence?: FluorescenceMapping | null
+  /** Editable detector choices; lowered to the existing API mapping on submit. */
+  import_signals?: ImportSignals
 }
 
 export interface ColumnPreview {
@@ -47,7 +53,7 @@ export function withoutImportProcessing(mapping: ColumnMapping): ColumnMapping {
 }
 
 export function columnPayload(mapping: ColumnMapping, { automaticExafs = true } = {}) {
-  mapping = normalizeImportInversion(mapping)
+  mapping = normalizeImportInversion(selectedColumnMapping(mapping))
   if (automaticExafs) mapping = automaticImportProcessing(mapping)
   const denominator = denominatorColumns(mapping)
   const fluorescenceDenominator = mapping.additional_fluorescence && denominatorColumns(mapping.additional_fluorescence)
@@ -93,6 +99,16 @@ export function flipSignalColumns<T extends SignalMapping>(mapping: T): T {
 }
 
 export function columnProblem(mapping: ColumnMapping): string | null {
+  const selected = mapping.import_signals
+  if (selected) {
+    if (!selected.transmission && !selected.fluorescence && !selected.reference) return "Choose at least one signal to import."
+    if (selected.transmission && selected.fluorescence && (!mapping.numerator.length || !denominatorColumns(mapping).length)) return "Choose the transmission numerator (I₀) and denominator (It) columns."
+    if (selected.fluorescence && (!mapping.additional_fluorescence || (selected.transmission && (!mapping.additional_fluorescence.numerator.length || !denominatorColumns(mapping.additional_fluorescence).length)))) return "Choose the fluorescence signal and I₀ columns."
+    const referenceOnly = selected.reference && !selected.transmission && !selected.fluorescence
+    if (selected.reference && (referenceOnly ? !mapping.reference_numerator && !mapping.reference_denominator : !mapping.reference_numerator || !mapping.reference_denominator)) return "Choose the reference numerator (It) and denominator (Iref) in the Reference tab."
+    if (selected.fluorescence && (mapping.additional_fluorescence?.signal_multiplier === '' || !Number.isFinite(mapping.additional_fluorescence?.signal_multiplier ?? 1))) return "Enter a finite fluorescence multiplicative constant."
+    mapping = selectedColumnMapping(mapping)
+  }
   if (mapping.signal_multiplier === "" || !Number.isFinite(mapping.signal_multiplier ?? 1)) return "Enter a finite multiplicative constant."
   const fluorescence = mapping.additional_fluorescence
   if (fluorescence) {
@@ -120,12 +136,14 @@ export function rebinProblem(r?: ImportRebinOptions): string | null {
 }
 
 export function changeInputType(mapping: ColumnMapping, data_type: ColumnMapping["data_type"], { automaticExafs = true } = {}): ColumnMapping {
-  const { exafs: _exafs, ...input } = mapping
-  return { ...input, data_type, ...importExafsSetting(data_type, automaticExafs), is_normalized: data_type === 'norm' || data_type === 'xmudat', ...(data_type === "chi" ? { mode: "mu" as const, units: "eV" as const,
+  const { exafs: _exafs, import_signals, ...input } = mapping
+  return { ...input, ...(data_type !== 'chi' && data_type !== 'xmudat' && import_signals ? { import_signals } : {}), data_type, ...importExafsSetting(data_type, automaticExafs), is_normalized: data_type === 'norm' || data_type === 'xmudat', ...(data_type === "chi" ? { mode: "mu" as const, units: "eV" as const,
     denominator: "", invert: false, signal_multiplier: 1, reference_numerator: "", reference_denominator: "",
     ...(mapping.additional_fluorescence ? { additional_fluorescence: null } : {}),
     ...(mapping.rebin ? { rebin: { ...mapping.rebin, enabled: false } } : {}),
-    ...(mapping.preprocessing ? { preprocessing: { ...mapping.preprocessing, standard_id: null, copy_parameters: false, align: false } } : {}) } : {}) }
+    ...(mapping.preprocessing ? { preprocessing: { ...mapping.preprocessing, standard_id: null, copy_parameters: false, align: false } } : {}) } : {}),
+    ...(data_type === 'xmudat' ? { mode: 'mu' as const, denominator: '', signal_multiplier: 1, invert: false,
+      reference_numerator: '', reference_denominator: '', ...(mapping.additional_fluorescence ? { additional_fluorescence: null } : {}) } : {}) }
 }
 
 function importExafsSetting(data_type: ColumnMapping['data_type'], automaticExafs: boolean): { exafs?: boolean | null } {
@@ -203,6 +221,54 @@ export function setThreeMode(mapping: ColumnMapping, inspection: InspectionRespo
   return { ...dual, reference_numerator: it ?? '', reference_denominator: iref ?? '', reference_log: true }
 }
 
+/** Keep all detector recipes available while the checkboxes choose the outputs. */
+export function prepareImportSignals(mapping: ColumnMapping, inspection: InspectionResponse): ColumnMapping {
+  if (mapping.import_signals) return mapping
+  const measurement = inspection.beamline_reader?.measurement
+  if (mapping.data_type === 'chi' || mapping.data_type === 'xmudat' || mapping.mode === 'mu'
+    || mapping.is_reference || measurement?.foil_spectrum || measurement?.ambiguous) return mapping
+  // A reference-only request uses the API's primary slot. Its remembered role
+  // restores that recipe to Reference without marking new sample data as foil.
+  // Older servers have no role hint; recognize only their known foil columns.
+  const reference = suggestedReference(inspection) ?? {
+    reference_numerator: uniqueDetector(inspection, 'it', /^(?:it|i1|itrans|transmission)$/i) ?? '',
+    reference_denominator: uniqueDetector(inspection, 'iref', /^(?:iref|i2|ireference|reference|ref)$/i) ?? '',
+  }
+  const denominator = denominatorColumns(mapping)
+  const numeratorId = mapping.numerator[0] || '1', denominatorId = denominator[0] || '1'
+  const { reference_numerator: refNumerator, reference_denominator: refDenominator } = reference
+  const memory = inspection.remembered_columns
+  const rememberedReference = memory?.matching_columns && !mapping.additional_fluorescence
+    && !mapping.reference_numerator && !mapping.reference_denominator
+    && mapping.numerator.length <= 1 && denominator.length <= 1
+    && (memory.primary_is_reference === true || (memory.primary_is_reference === undefined && refNumerator && refDenominator
+      && ((numeratorId === refNumerator && denominatorId === refDenominator)
+        || (numeratorId === refDenominator && denominatorId === refNumerator))))
+  if (rememberedReference) {
+    mapping = setThreeMode({ ...mapping, mode: 'mu', additional_fluorescence: null,
+      reference_numerator: numeratorId, reference_denominator: denominatorId, reference_log: mapping.mode === 'transmission' }, inspection)
+  }
+  return { ...setThreeMode(mapping, inspection), import_signals: { transmission: true, fluorescence: true, reference: true } }
+}
+
+/** The API accepts one primary signal, an optional fluorescence signal and reference. */
+export function selectedColumnMapping(mapping: ColumnMapping): ColumnMapping {
+  const { import_signals: selected, ...columns } = mapping
+  if (!selected) return columns
+  const sampleIsReference = selected.reference ? false : columns.is_reference
+  const reference = selected.reference ? {} : { reference_numerator: '', reference_denominator: '' }
+  if (selected.transmission) return { ...columns, ...reference, is_reference: sampleIsReference,
+    additional_fluorescence: selected.fluorescence ? columns.additional_fluorescence : null }
+  if (selected.fluorescence) return { ...columns, is_reference: sampleIsReference,
+    numerator: [], denominator: '', individual_channels: false, signal_multiplier: 1, invert: false,
+    ...columns.additional_fluorescence, mode: 'fluorescence', ...reference, additional_fluorescence: null }
+  return { ...columns, mode: columns.reference_log === false ? 'fluorescence' : 'transmission',
+    numerator: selected.reference && columns.reference_numerator ? [columns.reference_numerator] : [],
+    denominator: selected.reference ? columns.reference_denominator : '',
+    signal_multiplier: 1, invert: false, individual_channels: false, is_reference: selected.reference,
+    reference_numerator: '', reference_denominator: '', additional_fluorescence: null }
+}
+
 function automaticThreeMode(mapping: ColumnMapping, inspection: InspectionResponse): ColumnMapping {
   // Keep direct absorption/chi inputs and sample-or-foil decisions intact. A
   // detector-like column name alone cannot override the reader's edge evidence.
@@ -236,7 +302,7 @@ function automaticThreeMode(mapping: ColumnMapping, inspection: InspectionRespon
 
 export function initialColumnMapping(inspection: InspectionResponse, previous: ColumnMapping, remembered = true, resetReference = true): ColumnMapping {
   const cols = inspection.columns, suggested = inspection.athena_suggestion
-  const { additional_fluorescence: _fluorescence, is_normalized: _normalized, exafs: _exafs, ...singlePrevious } = previous
+  const { additional_fluorescence: _fluorescence, import_signals: _signals, is_normalized: _normalized, exafs: _exafs, ...singlePrevious } = previous
   // A reference channel the reader recognized (a foil behind It) is imported
   // by default; it used to be cleared, so every file needed it picked by hand.
   // Only a reference whose edge the reader saw in the data is imported by
@@ -273,6 +339,7 @@ function mappingColumnIds(mapping: ColumnMapping): string[] {
  * different column count, or energy units the file states differently, can
  * each turn a plausible-looking spectrum into the wrong ratio. */
 export function reuseProblem(source: InspectionResponse, target: InspectionResponse, mapping: ColumnMapping): string | null {
+  mapping = selectedColumnMapping(mapping)
   for (const id of mappingColumnIds(mapping)) {
     const original = source.columns.find(c => c.column_id === id)
     if (!original) return 'a selected column is not in the first file.'
@@ -326,6 +393,7 @@ function foilColumns(inspection: InspectionResponse): string[] | null {
 export function reuseColumnMapping(source: InspectionResponse, target: InspectionResponse, mapping: ColumnMapping): ColumnMapping | null {
   if (reuseProblem(source, target, mapping)) return null
   const column = (id: string): string | undefined => {
+    if (id === '1') return id
     const original = source.columns.find(c => c.column_id === id)
     return original && target.columns.find(c => c.index === original.index && c.numeric)?.column_id
   }
@@ -339,16 +407,16 @@ export function reuseColumnMapping(source: InspectionResponse, target: Inspectio
   if (additional_fluorescence) {
     const numerator = additional_fluorescence.numerator.map(column)
     const denominator = denominatorColumns(additional_fluorescence).map(column)
-    if (numerator.some(id => id === undefined) || denominator.some(id => id === undefined)) return null
-    additional_fluorescence = { ...additional_fluorescence, numerator: numerator as string[],
-      denominator: Array.isArray(additional_fluorescence.denominator) ? denominator as string[] : denominator[0] ?? '' }
+    if ((!mapping.import_signals || mapping.import_signals.fluorescence) && (numerator.some(id => id === undefined) || denominator.some(id => id === undefined))) return null
+    additional_fluorescence = { ...additional_fluorescence, numerator: numerator.filter((id): id is string => id !== undefined),
+      denominator: Array.isArray(additional_fluorescence.denominator) ? denominator.filter((id): id is string => id !== undefined) : denominator[0] ?? '' }
   }
-  if (!energy_column || numerator.some(id => id === undefined) || denominator.some(id => id === undefined)
-    || reference_numerator === undefined || reference_denominator === undefined) return null
-  return { ...mapping, energy_column, numerator: numerator as string[],
+  if (!energy_column || ((!mapping.import_signals || mapping.import_signals.transmission) && (numerator.some(id => id === undefined) || denominator.some(id => id === undefined)))
+    || ((!mapping.import_signals || mapping.import_signals.reference) && (reference_numerator === undefined || reference_denominator === undefined))) return null
+  return { ...mapping, energy_column, numerator: numerator.filter((id): id is string => id !== undefined),
     ...(additional_fluorescence ? { additional_fluorescence } : {}),
-    denominator: Array.isArray(mapping.denominator) ? denominator as string[] : denominator[0] ?? '',
-    reference_numerator, reference_denominator }
+    denominator: Array.isArray(mapping.denominator) ? denominator.filter((id): id is string => id !== undefined) : denominator[0] ?? '',
+    reference_numerator: reference_numerator ?? '', reference_denominator: reference_denominator ?? '' }
 }
 
 /** Files a multi-file selection leaves out of a scan batch, with the reason.
@@ -384,6 +452,22 @@ function retainedValues(group: AthenaGroup): number {
   return group.energy.length * 2 + arrays('column_arrays') + arrays('raw_arrays')
 }
 
+function importCounts(mapping: ColumnMapping): { samples: number; references: number } {
+  const selected = mapping.import_signals
+  if (selected && !selected.transmission && !selected.fluorescence && !selected.reference) return { samples: 0, references: 0 }
+  mapping = selectedColumnMapping(mapping)
+  const fluorescence = mapping.additional_fluorescence
+  const samples = (mapping.individual_channels && mapping.numerator.length > 1 ? mapping.numerator.length : 1)
+    + (fluorescence ? fluorescence.individual_channels && fluorescence.numerator.length > 1 ? fluorescence.numerator.length : 1 : 0)
+  const referenced = !!(mapping.reference_numerator || mapping.reference_denominator)
+  return { samples, references: referenced ? fluorescence ? 1 : samples : 0 }
+}
+
+export function importSpectrumCount(mapping: ColumnMapping): number {
+  const { samples, references } = importCounts(mapping)
+  return samples + references
+}
+
 /** Say before a batch starts whether it will outgrow the project.
  *
  * The server refuses the import that crosses either limit, so a 58-group
@@ -391,12 +475,10 @@ function retainedValues(group: AthenaGroup): number {
  * lets the user split the series or open a new project instead. */
 export function batchCapacityWarning(mapping: ColumnMapping, inspection: InspectionResponse, groups: AthenaGroup[], files: number): string | null {
   if (files < 2) return null
-  const fluorescence = mapping.additional_fluorescence
-  const samples = (mapping.individual_channels && mapping.numerator.length > 1 ? mapping.numerator.length : 1)
-    + (fluorescence ? fluorescence.individual_channels && fluorescence.numerator.length > 1 ? fluorescence.numerator.length : 1 : 0)
-  const referenced = !!(mapping.reference_numerator || mapping.reference_denominator)
-  const references = referenced ? fluorescence ? 1 : samples : 0
+  const { samples, references } = importCounts(mapping)
+  const referenced = references > 0
   const perFile = samples + references
+  if (!perFile) return null
   const rows = inspection.row_count, finite = inspection.columns.filter(c => c.preview.every(v => v !== null)).length
   const valuesPerFile = samples * rows * (finite + 4) + references * rows * 7
   const groupsAfter = groups.length + files * perFile

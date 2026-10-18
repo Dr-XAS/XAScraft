@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -62,7 +63,7 @@ for (const { name, reader } of samples) {
       await dialog.getByRole('button', { name: 'Use suggested columns', exact: true }).click()
     }
     const mode = name === 'srsc' || choice?.ln ? 'transmission' : 'fluorescence'
-    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption(mode)
+    await selectImportSignals(dialog, [mode])
     await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
     await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
     await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
@@ -86,16 +87,21 @@ for (const { name, reader } of samples) {
       await signal(preview, rows.map(row => row[0]), y)
       await dialog.getByLabel('Energy column').selectOption('column_0002')
     } else if (name !== 'srsc') {
-      await dialog.getByRole('button', { name: 'Clear numerator', exact: true }).click()
-      await dialog.getByLabel('Numerator column numbers').fill(`7-${rows[0].length}`)
-      await dialog.getByRole('button', { name: 'Select range', exact: true }).click()
+      const originalNumerators = []
+      for (const checkbox of await dialog.getByRole('checkbox', { name: /^Fluorescence numerator / }).all()) {
+        if (await checkbox.isChecked()) originalNumerators.push(checkbox)
+      }
+      await dialog.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
+      await dialog.getByLabel('Fluorescence numerator column numbers').fill(`7-${rows[0].length}`)
+      await dialog.getByRole('button', { name: 'Select fluorescence range', exact: true }).click()
       await signal(preview, x, rows.map(row => row.slice(6).reduce((sum, v) => sum + v, 0) / row[2]))
-      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
+      await dialog.getByRole('button', { name: 'Clear fluorescence numerator', exact: true }).click()
+      for (const checkbox of originalNumerators) await checkbox.check()
     }
     await signal(preview, x, y)
-    await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
+    await dialog.getByRole('button', { name: name === 'srsc' ? 'Flip numerator and denominator' : 'Flip fluorescence numerator and denominator', exact: true }).click()
     await signal(preview, x, flipped)
-    await dialog.getByRole('button', { name: 'Flip numerator and denominator', exact: true }).click()
+    await dialog.getByRole('button', { name: name === 'srsc' ? 'Flip numerator and denominator' : 'Flip fluorescence numerator and denominator', exact: true }).click()
     await signal(preview, x, y)
     await dialog.getByText('Source file contents (first section)', { exact: true }).click()
     const originalDownload = page.waitForEvent('download')
@@ -146,6 +152,7 @@ for (const { name, reader } of samples) {
         buffer: Buffer.from(source.toString().replace('D=  3.13551 A', 'monochromator spacing absent')) })
       const spacingWarning = dialog.getByText('Monochromator D spacing is absent: the native fallback 2d = 1 Å was used. Check the converted energy axis before importing.', { exact: true }).first()
       await expect(spacingWarning).toBeVisible()
+      await selectImportSignals(dialog, ['fluorescence'])
       await expect(dialog.getByRole('button', { name: 'Import spectrum', exact: true })).toBeEnabled()
       const fallback: number[][] = JSON.parse(gunzipSync(readFileSync(fixture(manifest.pf_missing_spacing.file))).toString())
       await signal(preview, fallback.map(row => row[1]), y)

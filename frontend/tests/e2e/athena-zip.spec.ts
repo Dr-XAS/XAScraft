@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -62,6 +63,7 @@ test('official ZIP subset has native bytes, live column edits, E/k/R/q and saved
   await dialog.screenshot({path:info.outputPath('zip-mobile.png')})
   await chooser.getByRole('button',{name:'Review selected files',exact:true}).click()
   await page.setViewportSize({width:1280,height:900})
+  await selectImportSignals(dialog, ['transmission'])
   const plot=dialog.getByLabel('Imported signal preview plot',{exact:true})
   await signal(plot,0)
   await dialog.getByRole('radio',{name:'No, review each file',exact:true}).check()
@@ -70,6 +72,7 @@ test('official ZIP subset has native bytes, live column edits, E/k/R/q and saved
   await plot.scrollIntoViewIfNeeded();await dialog.screenshot({path:info.outputPath('zip-columns.png')})
   const importing=page.waitForResponse(r=>r.url().endsWith('/import'))
   await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click();expect((await importing).ok()).toBe(true)
+  await selectImportSignals(dialog, ['transmission'])
   await signal(plot,2)
   const last=page.waitForResponse(r=>r.url().endsWith('/import'))
   await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click()
@@ -114,6 +117,7 @@ test('ZIP from Open project preserves mixed project, scan and nested-archive ord
   await expect(dialog.getByRole('region',{name:'Scan selection',exact:true})).toBeVisible()
   await dialog.getByRole('checkbox',{name:'Include Scan 7 · entry 1',exact:true}).uncheck()
   await dialog.getByRole('button',{name:'Review selected scans',exact:true}).click()
+  await selectImportSignals(dialog, ['transmission'])
   await expect(dialog.getByLabel('Imported signal preview plot').locator('.js-line').first()).toBeAttached()
   await dialog.getByRole('radio',{name:'No, review each file',exact:true}).check()
   await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click()
@@ -121,6 +125,7 @@ test('ZIP from Open project preserves mixed project, scan and nested-archive ord
   await dialog.getByRole('button',{name:'Select no files',exact:true}).click()
   await dialog.getByRole('checkbox',{name:'Include fe.061 · entry 2',exact:true}).check()
   await dialog.getByRole('button',{name:'Review selected files',exact:true}).click()
+  await selectImportSignals(dialog, ['transmission'])
   await signal(dialog.getByLabel('Imported signal preview plot',{exact:true}),1)
   const imported=page.waitForResponse(r=>r.url().endsWith('/import'))
   await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click()

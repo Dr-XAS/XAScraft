@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -43,6 +44,7 @@ test('measured X11A live columns, metadata, processing, PRJ restore and persiste
   const i = await inspect(page)
   expect(i.row_count).toBe(612); expect(i.columns.map((c: { name: string }) => c.name)).toEqual(['energy', 'I0', 'I', 'If'])
   const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await selectImportSignals(dialog, ['transmission'])
   const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
   const mu = rows.map(r => Math.log(r[1]/r[2]))
   await signal(plot, mu)
@@ -103,6 +105,7 @@ test('X11A acquisition fields and all measured points remain usable on mobile', 
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/')
   await inspect(page)
   const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await selectImportSignals(dialog, ['transmission'])
   await signal(dialog.getByLabel('Imported signal preview plot', { exact: true }), rows.map(r => Math.log(r[1]/r[2])))
   const metadata = dialog.getByRole('region', { name: 'Beamline metadata' })
   await metadata.getByText('View beamline metadata', { exact: true }).click()

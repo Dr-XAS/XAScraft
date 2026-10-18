@@ -86,6 +86,40 @@ def test_same_labels_restore_by_position_even_for_duplicate_names_and_different_
     assert restored['mapping']['denominator'] == ['new_1', 'new_2']
 
 
+def test_reference_primary_provenance_survives_restart_only_for_matching_columns(store, xas_arrays):
+    p = store.create()
+    inspected = store.inspect(p['id'], data(xas_arrays), 'reference.dat')
+    ids = [column['column_id'] for column in inspected['columns']]
+    req = request(p, inspected, numerator=[ids[3]], denominator='1', mode='fluorescence', is_reference=True)
+    imported = store.import_data(p['id'], req)
+    assert len(imported['groups']) == 1
+    preferences = AthenaPreferences(store.settings)
+    assert preferences.read_columns().mapping['is_reference'] is True
+    assert 'primary_is_reference' not in preferences.read_columns().model_dump()
+
+    restarted = AthenaStore(store.settings)
+    next_inspection = restarted.inspect(p['id'], data(xas_arrays), 'next.dat')
+    memory = next_inspection['remembered_columns']
+    assert memory['primary_is_reference'] is True
+    assert memory['mapping']['numerator'] == [ids[3]]
+    assert memory['mapping']['denominator'] == '1'
+    assert 'is_reference' not in memory['mapping']
+    different = restarted.inspect(p['id'], data(xas_arrays, 'energy i0 it yield det ref'), 'different.dat')
+    assert not different['remembered_columns']['matching_columns']
+    assert 'primary_is_reference' not in different['remembered_columns']
+
+
+def test_old_column_preferences_default_to_sample_primary(store, xas_arrays):
+    p, _, _ = import_one(store, xas_arrays)
+    preferences = AthenaPreferences(store.settings)
+    stored = preferences.read_columns().model_dump()
+    stored['mapping'].pop('is_reference')
+    preferences.storage.write_json(preferences.ident, 'columns.json', stored)
+    assert preferences.read_columns().mapping.get('is_reference', False) is False
+    inspected = store.inspect(p['id'], data(xas_arrays), 'next.dat')
+    assert inspected['remembered_columns']['primary_is_reference'] is False
+
+
 @pytest.mark.parametrize('labels', ['energy i0 it det ref det', 'energy i0 it det det reference'])
 def test_different_layout_uses_guesses_and_disables_references_med_and_rebin(store, xas_arrays, labels):
     p, _, _ = import_one(store, xas_arrays, reference_numerator='col_1', reference_denominator='col_5',
@@ -184,7 +218,8 @@ def test_memory_contains_choices_only_and_concurrent_imports_serialize(store, xa
     assert all(len(p['groups']) == 1 for p in out)
     memory = AthenaPreferences(store.settings).read_columns().model_dump()
     assert memory['version'] == 2
-    assert not {'version', 'upload_id', 'edge_policy', 'is_reference'} & memory['mapping'].keys()
+    assert not {'version', 'upload_id', 'edge_policy'} & memory['mapping'].keys()
+    assert memory['mapping']['is_reference'] is False
     assert all(set(c) == {'column_id', 'name'} for c in memory['columns'])
 
 

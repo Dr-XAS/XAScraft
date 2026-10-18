@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -21,7 +22,7 @@ for (const width of [1500, 390]) {
     const source = readFileSync(fixture, 'utf8').replace('# ///', '# Scan.end_time: 2001-06-26T22:31:31\n# Scan.process: Earlier processing\n# ///')
     await page.goto('/'); await page.getByRole('button', { name: 'Import data', exact: true }).click()
     await page.getByLabel('Choose data files', { exact: true }).setInputFiles({ name: 'Cu-history.xdi', mimeType: 'text/plain', buffer: Buffer.from(source) })
-    await expect(page.getByRole('dialog').locator('.js-line').first()).toBeVisible()
+    await selectImportSignals(page.getByRole('dialog', { name: 'Import spectra', exact: true }), ['transmission'])
     const importing = page.waitForResponse(r => r.url().endsWith('/import'))
     await page.getByRole('button', { name: 'Import spectrum', exact: true }).click()
     const imported = await importing; expect(imported.ok()).toBe(true)

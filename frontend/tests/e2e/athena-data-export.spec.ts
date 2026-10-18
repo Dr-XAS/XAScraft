@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
@@ -45,6 +46,7 @@ test('measured XDI exports full native columns, comments and header and reimport
   await page.setViewportSize({width:1500,height:1040});const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   await page.goto('/');await page.getByRole('button',{name:'Import data',exact:true}).click()
   await page.getByLabel('Choose data files',{exact:true}).setInputFiles(fixtures+'xdi-official-cu_metal_rt.xdi')
+  await selectImportSignals(page.getByRole('dialog', { name: 'Import spectra', exact: true }), ['transmission'])
   const waiting=page.waitForResponse(r=>r.url().endsWith('/import'));await page.getByRole('button',{name:'Import spectrum',exact:true}).click()
   const imported=await waiting;expect(imported.ok()).toBe(true);const project=await imported.json(), group=project.groups[0]
   await expect(page.getByRole('dialog')).toHaveCount(0)

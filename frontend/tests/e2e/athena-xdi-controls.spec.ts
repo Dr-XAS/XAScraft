@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +29,7 @@ for (const file of ['xdi-official-cu_metal_rt.xdi', 'demeter-x11a-cu.012']) {
     await page.setViewportSize({ width: mobile ? 390 : 1500, height: mobile ? 844 : 1040 })
     await page.goto('/'); await page.getByRole('button', { name: 'Import data', exact: true }).click()
     await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fixtures+file)
+    await selectImportSignals(page.getByRole('dialog', { name: 'Import spectra', exact: true }), ['transmission'])
     const importing = page.waitForResponse(r => r.url().endsWith('/import'))
     await page.getByRole('button', { name: 'Import spectrum', exact: true }).click()
     const imported = await importing; expect(imported.ok()).toBe(true)

@@ -64,7 +64,7 @@ def test_dual_import_keeps_actual_modes_independent_arithmetic_and_one_undo(tmp_
 def test_combined_import_saves_three_measurements_and_one_shared_reference(tmp_path, xas_arrays, rebin):
     store, p, info, req, ids = staged(tmp_path, xas_arrays, reverse=True)
     req = ImportRequest.model_validate(req.model_dump() | {
-        'reference_numerator': ids['it'], 'reference_denominator': ids['ref'], 'rebin': rebin})
+        'reference_numerator': ids['it'], 'reference_denominator': ids['ref'], 'rebin': rebin, 'is_reference': True})
     before = copy.deepcopy(p)
     preview = store.preview_columns(p['id'], req)
     assert store.load(p['id']) == before
@@ -82,6 +82,8 @@ def test_combined_import_saves_three_measurements_and_one_shared_reference(tmp_p
         'detectors.dat · Transmission', 'detectors.dat · Fluorescence', 'detectors.dat · Reference']
     assert transmission['reference_id'] == fluorescence['reference_id'] == reference['id']
     assert reference['reference_id'] is None and not reference['marked']
+    assert transmission['source']['mapping']['is_reference'] is False
+    assert fluorescence['source']['mapping']['is_reference'] is False
     for group, trace in zip(imported['groups'], traces, strict=True):
         np.testing.assert_allclose(group['mu'], trace['y'], atol=1e-14)
         np.testing.assert_allclose(group['energy'], trace['x'], atol=1e-10)

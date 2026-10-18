@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -47,7 +48,7 @@ for (const name of ['SSRLA', 'SSRLB', 'SSRLmicro']) {
     }
     // Keep this reader's original single-measurement oracle independent of
     // the new combined-import default for complete detector files.
-    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+    await selectImportSignals(dialog, ['transmission'])
     await dialog.getByRole('tab', { name: 'Reference', exact: true }).click()
     await dialog.getByRole('combobox', { name: 'reference numerator', exact: true }).selectOption('')
     await dialog.getByRole('combobox', { name: 'reference denominator', exact: true }).selectOption('')
@@ -55,21 +56,21 @@ for (const name of ['SSRLA', 'SSRLB', 'SSRLmicro']) {
     const preview = dialog.getByLabel('Imported signal preview plot', { exact: true })
     if (name === 'SSRLmicro') {
       await expect(dialog.getByRole('alert')).toContainText(/zero/i)
-      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
+      await selectImportSignals(dialog, ['fluorescence'])
     }
     let y = rows.map(row => name === 'SSRLmicro' ? row[5] / row[2] : Math.log(Math.abs(row[3] / row[4])))
     await expect.poll(async () => (await curve(preview)).x).toEqual(x)
     await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - y[i])))).toBeLessThan(1e-12)
     // Change the chosen detector expression and check the real Plotly trace.
-    await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('fluorescence')
+    await selectImportSignals(dialog, ['fluorescence'])
     if (name === 'SSRLmicro') {
-      await dialog.getByLabel('Numerator column numbers').fill('6-37')
-      await dialog.getByRole('button', { name: 'Select range', exact: true }).click()
+      await dialog.getByLabel('Fluorescence numerator column numbers').fill('6-37')
+      await dialog.getByRole('button', { name: 'Select fluorescence range', exact: true }).click()
       y = rows.map(row => row.slice(5).reduce((sum, value) => sum + value, 0) / row[2])
     } else {
       const fluorescence = rows.map(row => row[5] / row[3])
       await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - fluorescence[i])))).toBeLessThan(1e-12)
-      await dialog.getByRole('combobox', { name: 'Measurement', exact: true }).selectOption('transmission')
+      await selectImportSignals(dialog, ['transmission'])
     }
     await expect.poll(async () => Math.max(...(await curve(preview)).y.map((v, i) => Math.abs(v - y[i])))).toBeLessThan(1e-12)
     const source = name === 'SSRLB' ? 'Binary source bytes (hex) (first section)' : 'Source file contents (first section)'

@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
@@ -45,6 +46,7 @@ for (const mobile of [false, true]) test((mobile ? 'mobile' : 'desktop') + ' ori
   await page.getByRole('button', { name: 'Import data', exact: true }).click()
   await page.getByLabel('Choose data files', { exact: true }).setInputFiles(fileURLToPath(new URL('../../../backend/tests/fixtures/demeter-merge-fe.060', import.meta.url)))
   const columns = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+  await selectImportSignals(columns, ['transmission'])
   await columns.getByRole('button', { name: 'Clear numerator', exact: true }).click()
   await columns.getByRole('checkbox', { name: 'Numerator i0', exact: true }).check()
   await columns.getByRole('button', { name: 'Clear denominator', exact: true }).click()

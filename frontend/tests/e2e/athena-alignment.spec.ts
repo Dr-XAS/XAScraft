@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +21,7 @@ async function load(page:Page){
     const content=original.split('\n').map(l=>{if(!shifted||!l.trim()||l.startsWith('#'))return l;const a=l.trim().split(/\s+/).map(Number);a[0]+=3.1254;a[3]*=2;return a.join(' ')}).join('\n')
     await page.getByLabel('Choose data files',{exact:true}).setInputFiles({name:shifted?'Cu-shifted.xdi':'Cu-standard.xdi',mimeType:'text/plain',buffer:Buffer.from(content)})
     const dialog=page.getByRole('dialog',{name:'Import spectra',exact:true})
+    await selectImportSignals(dialog, ['transmission'])
     await dialog.getByRole('checkbox',{name:'Numerator i0',exact:true}).uncheck()
     await dialog.getByRole('checkbox',{name:'Numerator mutrans',exact:true}).check()
     await dialog.getByRole('checkbox',{name:'Denominator itrans',exact:true}).uncheck()

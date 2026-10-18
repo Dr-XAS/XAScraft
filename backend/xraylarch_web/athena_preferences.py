@@ -189,7 +189,7 @@ class AthenaPreferences:
                     else previous.grid.model_dump() if previous else self.read()['grid'])
             standard = next((g for g in project['groups'] if request.preprocessing
                              and g['id'] == request.preprocessing.standard_id), None)
-            mapping = request.model_dump(exclude={'version', 'upload_id', 'edge_policy', 'rebin_grid', 'is_reference'})
+            mapping = request.model_dump(exclude={'version', 'upload_id', 'edge_policy', 'rebin_grid'})
             if mapping.get('rebin') is not None:
                 mapping['rebin'].pop('e0', None)  # Keep file-specific E0 only in the group's provenance.
             record = ColumnMemory(version=previous.version + 1 if previous else 1,
@@ -246,4 +246,5 @@ class AthenaPreferences:
                            signal_multiplier=1., invert=False, additional_fluorescence=None)
             mapping['rebin']['enabled'] = False
             prep.update(standard_id=None, copy_parameters=False, align=False)
-        return {'version': memory.version, 'matching_columns': matching, 'mapping': mapping, 'warnings': warnings}
+        return {'version': memory.version, 'matching_columns': matching, 'mapping': mapping, 'warnings': warnings,
+                **({'primary_is_reference': bool(old.get('is_reference', False))} if matching else {})}

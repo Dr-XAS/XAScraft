@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +20,7 @@ async function load(page:Page){
     await page.getByRole('button',{name:'Import data',exact:true}).click()
     await page.getByLabel('Choose data files',{exact:true}).setInputFiles(file)
     const dialog=page.getByRole('dialog',{name:'Import spectra',exact:true})
+    await selectImportSignals(dialog, ['transmission', 'reference'])
     await dialog.getByRole('button',{name:'Clear numerator',exact:true}).click()
     await dialog.getByRole('checkbox',{name:'Numerator i0',exact:true}).check()
     await dialog.getByRole('button',{name:'Clear denominator',exact:true}).click()
@@ -34,7 +36,7 @@ async function load(page:Page){
       const ts=await curves(dialog.getByLabel('Imported signal preview plot',{exact:true}))
       return ts.length===2&&ts.every(t=>t.x.length===rows.length&&t.x.every((x,i)=>x===rows[i][0])&&t.y.every((y,i)=>Math.abs(y-Math.log(rows[i][1]/rows[i][2]))<1e-12))
     }).toBe(true)
-    const wait=page.waitForResponse(r=>r.url().endsWith('/import'));await dialog.getByRole('button',{name:'Import spectrum',exact:true}).click()
+    const wait=page.waitForResponse(r=>r.url().endsWith('/import'));await dialog.getByRole('button',{name:'Import 2 spectra',exact:true}).click()
     const response=await wait;expect(response.ok()).toBe(true);project=await response.json();await expect(dialog).toHaveCount(0)
     const sample=project!.groups.at(-2)!
     const marked=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().action==='metadata')

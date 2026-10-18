@@ -2529,6 +2529,8 @@ class AthenaStore:
                 for sample in mapped["samples"]:
                     source = copy.deepcopy(source_base)
                     source["mapping"]["numerator"] = sample["columns"]
+                    if mapped["reference"] is not None:
+                        source["mapping"]["is_reference"] = False
                     if mode_request.data_type == 'chi':
                         source['mapping'].update(mode='mu', denominator=None, signal_multiplier=1., invert=False)
                     numerator, denominator = sample["numerator"], mapped["denominator"]

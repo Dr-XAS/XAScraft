@@ -1,3 +1,4 @@
+import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +29,7 @@ for (const [file, element, count, width] of [['cu_metal_rt', 'Cu', 408, 1500], [
     const inspection = await inspecting; expect(inspection.ok()).toBe(true)
     const i = await inspection.json(); expect(i.row_count).toBe(count)
     const dialog = page.getByRole('dialog', { name: 'Import spectra', exact: true })
+    await selectImportSignals(dialog, ['transmission'])
     const plot = dialog.getByLabel('Imported signal preview plot', { exact: true })
     await signal(plot, rows, element === 'Cu' ? -1 : 1)
     const metadata = dialog.getByRole('region', { name: 'XDI metadata' })

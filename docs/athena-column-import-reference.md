@@ -28,21 +28,26 @@ Each new file selection asks again, including ZIP or SPEC selections expanded
 into multiple entries. Failed imports retain the pending file and accepted
 earlier imports, so retry resumes without duplicating successful files.
 
-The Measurement choice **Transmission + fluorescence + reference** imports
-three spectra from the same file: transmission `ln(I0/It)`, fluorescence
-`If/I0`, and reference `ln(It/Iref)`. Files with all four detector signals
-identified default to this choice, unless matching remembered choices or the
-reader's sample-or-foil evidence select a different workflow. Missing or
-ambiguous columns require a manual choice.
+Checkboxes before **Transmission**, **Fluorescence**, and **Reference** choose
+which signals to import: transmission `ln(I0/It)`, fluorescence `If/I0`, and
+reference `ln(It/Iref)`. Detector imports start with all three checked. Uncheck
+signals that are not needed; missing columns only block import for checked
+signals. Direct absorption, extracted χ(k), FEFF xmu.dat and the reader's
+sample-or-foil decisions retain their single-signal workflows.
 
 **Transmission**, **Fluorescence**, and **Reference** tabs switch column controls
-without changing the preview's signal selection. The preview initially overlays
-all three curves. Transmission and fluorescence have independent detector
+without changing the checkboxes. They use the same outlined, rounded style as
+the viewer's component choices, with a white active tab and purple text.
+Reference import is controlled here; there is no separate **This is reference**
+checkbox. The preview overlays only the checked signals.
+Unchecking a signal retains its column choices for re-enabling it later.
+Transmission and fluorescence have independent detector
 selections, channel grouping, sign, and scale. Both samples link to one shared
 reference, and share the energy column and units.
 Imported spectra are ordered Transmission, Fluorescence, Reference and retain
-their own arithmetic and source columns. **Transmission + fluorescence** remains
-available for files without a reference.
+their own arithmetic and source columns. Every nonempty subset is supported,
+including Reference alone, which is imported as reference data. Import is
+disabled when no signal is checked.
 
 Normal import contains the column calculation and the controls needed to read
 the file. It does not apply remembered rebinning, marking, parameter copying,
@@ -81,8 +86,8 @@ refresh the previous curve is hidden. The import preview always updates
 automatically; the native pause and manual-replot controls are not included.
 **Retry preview** appears only after a failed API preview request and retries
 the current selection. Invalid local column settings must be corrected before
-a preview can run. Reference visibility can be toggled without repeating the
-calculation.
+a preview can run. Every checked signal is plotted automatically, including
+the reference; there is no separate reference-visibility toggle.
 
 `athena_columns.map_columns` is shared by preview and import. It evaluates
 every point for direct signal, logarithmic transmission, and fluorescence or

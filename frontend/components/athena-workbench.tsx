@@ -50,7 +50,7 @@ import { AthenaImportProgress, type ImportProgress } from "./athena-import-progr
 import { AthenaScanSelection } from './athena-scan-selection'
 import { AthenaArchiveSelection, type ArchiveInspection } from './athena-archive-selection'
 import { labelParts } from "@/lib/athena-labels"
-import { batchExclusions, columnPayload, initialColumnMapping, reuseColumnMapping, reuseProblem, withoutImportProcessing, defaultRebin, lastImportedSample, type ColumnMapping } from "@/lib/athena-import"
+import { batchExclusions, columnPayload, initialColumnMapping, prepareImportSignals, reuseColumnMapping, reuseProblem, withoutImportProcessing, defaultRebin, lastImportedSample, type ColumnMapping } from "@/lib/athena-import"
 import { isAthenaProjectFile } from "@/lib/athena-file-types"
 import { AthenaDifferenceDialog } from "./athena-difference"
 import { AthenaDatatype } from './athena-datatype'
@@ -1591,7 +1591,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       if (inspect.file_plugin?.review_required) setBatchImportNotice('Batch import paused: this file requires a separate reader review. Your shared parameters are ready below.')
     } else {
       if (reuseMapping && reuseFrom) setBatchImportNotice(`Batch import paused: ${reuseProblem(reuseFrom.inspection, inspect, reuseFrom.mapping) ?? 'selected columns are missing or have moved.'} Review the columns for this file; importing it continues the batch with the columns you choose here.`)
-      setMapping(m => withoutImportProcessing(initialColumnMapping(inspect, m, true, resetReference)))
+      setMapping(m => withoutImportProcessing(prepareImportSignals(initialColumnMapping(inspect, m, true, resetReference), inspect)))
     }
     return inspect
   }

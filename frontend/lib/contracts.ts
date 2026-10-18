@@ -73,6 +73,7 @@ export interface InspectionResponse {
   column_units?: Record<string, "eV" | "keV" | null>
   remembered_columns?: {
     version: number; matching_columns: boolean; mapping: import('./athena-import').ColumnMapping; warnings: string[]
+    primary_is_reference?: boolean
   }
 }
 
