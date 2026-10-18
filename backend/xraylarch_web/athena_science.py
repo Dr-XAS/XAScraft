@@ -277,12 +277,17 @@ def normalization_warnings(parameters, effective):
             for a in normalization_adjustments(parameters, effective)]
 
 
-def _fft_capacity(kmax, p):
+def _fft_capacity(kmax, p, *, window_kmax=None):
     # xftr returns only nfft/2 points. Avoid both forward truncation and q/chiq
-    # length mismatches, and bound xftf_prep's temporary interpolation grid.
+    # length mismatches using the extracted chi grid, not the FT window. A
+    # window beyond that grid changes the taper but adds no FFT input samples.
     if int(1.01 + kmax / p.kstep) > p.nfft // 2:
         raise ScientificError("The k grid exceeds nfft/2; increase nfft or kstep, or reduce bkg_kmax.")
-    if int(1.01 + (kmax + p.dk) / p.kstep) > MAX_NFFT:
+    # xftf_prep temporarily builds the window beyond the extracted chi grid,
+    # then slices it back before the FFT. Bound that allocation separately.
+    window_end = kmax if window_kmax is None else window_kmax
+    taper = max(p.dk, p.dk2 if p.dk2 is not None else p.dk)
+    if int(1.01 + max(kmax, window_end + taper) / p.kstep) > MAX_NFFT:
         raise ScientificError("The transform window creates an oversized grid; reduce dk or increase kstep.")
 
 
@@ -298,15 +303,32 @@ def _larch_window(window, width, warnings):
     return window
 
 
+def _cached_transform_effective(result):
+    """Read measured support from older caches without changing saved results.
+
+    Cached energy is already shifted, and effective E0 is on that same axis.
+    Chi-only input has no energy axis and keeps its extracted support limit.
+    """
+    effective = dict(result.get("effective") or {})
+    energy = (result.get("arrays") or {}).get("energy", [])
+    e0 = effective.get("e0")
+    if effective.get("measured_kmax") is None and len(energy) and e0 is not None:
+        if np.isfinite([energy[-1], e0]).all() and energy[-1] > e0:
+            effective["measured_kmax"] = float(np.sqrt(ETOK * (energy[-1] - e0)))
+    return effective
+
+
 def _transforms(group, p, effective, warnings):
     available = float(group.k[-1])
     kmin = p.kmin
     if p.kmax is not None:
         kmax = p.kmax
-        # AUTOBK's uniform output grid stops at the last full kstep, while
-        # its measured support can extend a fraction of a step beyond it.
-        # Larch xftf accepts a window ending within that physical support.
-        support = max(available, float(getattr(getattr(group, "autobk_details", None), "kmax", available)))
+        # The FT window and AUTOBK range are independent in Athena. Larch
+        # windows the extracted chi, then zero-pads the FFT beyond its last
+        # sample; it does not extrapolate chi up to the requested FT limit.
+        # Still reject limits outside the original measured energy support.
+        support = max(available, float(effective.get("measured_kmax") or
+            getattr(getattr(group, "autobk_details", None), "kmax", available)))
         if kmax > support + 1e-10:
             raise ScientificError(f"kmax exceeds available k={support:.4g}; lower kmax or extend the data.")
     else:
@@ -320,13 +342,18 @@ def _transforms(group, p, effective, warnings):
     # Slider boundaries can lose a few ulps on subtraction (13 - 12.9 < 0.1).
     # Accept the numerical boundary without changing the requested FT window.
     width = kmax - kmin
-    if kmin < group.k[0] - 1e-10 or (width < 2 * p.kstep and not np.isclose(width, 2 * p.kstep, rtol=1e-12, atol=1e-12)):
+    points = np.count_nonzero((group.k >= kmin - 1e-10) & (group.k <= kmax + 1e-10))
+    if kmin < group.k[0] - 1e-10 or points < 3:
         raise ScientificError("The FT range must contain at least three measured k points; adjust kmin/kmax.")
     if p.window not in ("kaiser", "gaussian") and p.dk > 2 * width and not np.isclose(p.dk, 2 * width, rtol=1e-12, atol=1e-12):
         raise ScientificError("dk is too wide for the selected k range; reduce dk or widen kmin/kmax.")
     if p.rwindow not in ("kaiser", "gaussian") and p.dr > 2 * (p.rmax - p.rmin):
         raise ScientificError("dr is too wide for the selected R range; reduce dr or widen rmin/rmax.")
-    _fft_capacity(available, p)
+    _fft_capacity(available, p, window_kmax=kmax)
+    extracted_support = max(available, float(getattr(getattr(group, "autobk_details", None), "kmax", available)))
+    if kmax > extracted_support + 1e-10:
+        warnings.append(f"FT window kmax={kmax:.10g} extends beyond extracted chi(k) at {available:.10g} Å⁻¹; "
+                        "the FFT is zero-padded beyond the extracted data, without extrapolating chi(k).")
     rstep = np.pi / (p.nfft * p.kstep)
     if p.rmax - p.rmin < rstep:
         raise ScientificError("The R window is narrower than one FFT bin; widen it or increase nfft.")
@@ -569,12 +596,13 @@ def process_spectrum(energy, mu, parameters: AthenaParameters | Mapping | None, 
             effective.update(e0=float(group.e0), step=float(group.edge_step), edge_step=float(group.edge_step))
             available = float(np.sqrt(ETOK * (x[-1] - e0)))
             effective["available_kmax"] = available
+            effective["measured_kmax"] = available
             if data_type != "xanes":
                 bmax = p.bkg_kmax if p.bkg_kmax is not None else available
                 if bmax > available + 1e-10 or p.bkg_kmin >= bmax:
                     raise ScientificError("bkg_kmin/bkg_kmax must be inside the available post-edge k range.")
-                if p.kmax is not None and p.kmax > bmax:
-                    raise ScientificError("kmax exceeds the background k range; lower kmax or increase bkg_kmax.")
+                if p.kmax is not None and p.kmax > available + 1e-10:
+                    raise ScientificError(f"kmax exceeds available k={available:.4g}; lower kmax or extend the data.")
                 _fft_capacity(bmax, p)
                 if bmax - p.bkg_kmin < 2 or np.count_nonzero(x > e0) < 10:
                     if p.fnorm or standard is not None:

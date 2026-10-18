@@ -203,7 +203,9 @@ def measurement_uncertainty(group):
         raise ScientificError('Larch could not resolve finite measurement uncertainties.')
     suggestion = float(f'{out.kmax_suggest:.3f}')
     note = _kmax_suggestion_problem(suggestion, float(k[-1]), p)
-    return values | {'nidp': float(2 * (kmax - kmin) * (p['rmax'] - p['rmin']) / np.pi),
+    # Extending the FT window beyond extracted chi only adds zero padding,
+    # not independent information.
+    return values | {'nidp': float(2 * (min(kmax, float(k[-1])) - kmin) * (p['rmax'] - p['rmin']) / np.pi),
                      'recommended_kmax': suggestion,
                      'recommended_kmax_applicable': note is None,
                      'warnings': [note] if note else [],
@@ -211,7 +213,7 @@ def measurement_uncertainty(group):
 
 
 def _kmax_suggestion_problem(suggestion, available, p):
-    """Why the parameters command would refuse kmax=suggestion, or None.
+    """Why a suggested kmax is unsuitable for the extracted data, or None.
 
     Larch measures over the effective range, but the command keeps the
     requested kmin: on short data the automatic kmin is lower than the saved
@@ -346,12 +348,12 @@ def context_plot(store, ident, request):
     arrays = (source.get('result') or {}).get('arrays', {})
     if not arrays.get('chi') or not arrays.get('k'):
         raise ScientificError('Process χ(k) before comparing Fourier-transform k weights.')
-    from .athena_science import _transforms
+    from .athena_science import _cached_transform_effective, _transforms
     curves, warnings = [], []
     for weight in (1, 2, 3):
         out = Group(k=np.asarray(arrays['k']), chi=np.asarray(arrays['chi']))
         recipe = AthenaParameters.model_validate(source['parameters'] | {'kweight': weight})
-        effective = deepcopy(source['result']['effective'])
+        effective = _cached_transform_effective(source['result'])
         if effective.get('bkg_kmax') is not None:
             out.autobk_details = Group(kmax=effective['bkg_kmax'])
         # Freeze the already resolved window to ensure only kweight changes.

@@ -16,19 +16,29 @@ def fail(message):
 
 def suggest_columns(columns, filename):
     """Suggest choices only; explicit selections and matching-batch reuse win."""
+    energy_columns = [c for c in columns if c.get('role_hint') == 'energy'
+                      or (not c.get('role_hint') and re.search(r'energy|enrg|^e$', c['name'], re.I))]
+    energy = next((c['column_id'] for c in energy_columns if c.get('role_hint') == 'energy'),
+                  (energy_columns or columns)[0]['column_id'])
+    infer_units = {c['column_id'] for c in energy_columns}
+    # An unlabelled table still needs Athena's first-column guess. Named
+    # signals do not: a rising detector count is not evidence of energy units.
+    if not energy_columns and not columns[0].get('role_hint') and re.fullmatch(
+            r'(?:col(?:umn)?[_ ]?\d+|x)', columns[0]['name'], re.I):
+        infer_units.add(energy)
     units = {}
     for c in columns:
         values = [v for v in c['preview'][:5] if v is not None]
-        explicit = str(c.get('unit') or '').lower()
+        explicit = str(c.get('unit') or '').strip().lower()
         if explicit in ('ev', 'kev'):
             units[c['column_id']] = 'keV' if explicit == 'kev' else 'eV'
-        elif len(values) == 5 and all(a < b for a, b in zip(values, values[1:])):
+        elif (not explicit and c['column_id'] in infer_units and len(values) == 5
+              and all(a < b for a, b in zip(values, values[1:]))):
             units[c['column_id']] = 'eV' if values[0] > 100 else 'keV'
         else:
             units[c['column_id']] = None
     def match(pattern):
         return next((c['column_id'] for c in columns if re.search(pattern, c['name'], re.I)), None)
-    energy = next((c['column_id'] for c in columns if c.get('role_hint') == 'energy'), columns[0]['column_id'])
     # FEFF xmu.dat contains both mu(E) and chi(k). Its absolute photon energy
     # is omega, while e is relative to the Fermi level: recognize it before
     # the generic k/chi pair, which otherwise imports the wrong representation.

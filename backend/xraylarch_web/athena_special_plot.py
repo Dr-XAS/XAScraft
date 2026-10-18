@@ -10,7 +10,7 @@ import numpy as np
 from larch import Group
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .athena_science import AthenaParameters, ScientificError, _pair, _transforms
+from .athena_science import AthenaParameters, ScientificError, _cached_transform_effective, _pair, _transforms
 
 
 class SpecialPlotOptions(BaseModel):
@@ -38,12 +38,13 @@ def _arrays(group, weight, notes):
     k, chi = _pair(a.get('k', []), a.get('chi', []), name=group['label'], minimum=4)
     if np.any(k < 0):
         raise ScientificError('The processed k grid must be nonnegative.')
+    notes.extend(result.get('warnings', []))
     if weight != result['effective']['kweight']:
         p = AthenaParameters.model_validate({**group['parameters'], 'kweight': weight})
         probe = Group(k=k, chi=chi)
         # AUTOBK's measured support can extend past the last uniform k bin.
         probe.autobk_details = Group(kmax=result['effective'].get('bkg_kmax') or k[-1])
-        _transforms(probe, p, {}, notes)
+        _transforms(probe, p, _cached_transform_effective(result), notes)
         for key in ('r', 'chir_mag', 'chir_re', 'chir_im', 'chir_pha', 'q', 'chiq_re', 'chiq_im', 'chiq_mag'):
             a[key] = getattr(probe, key).tolist()
     a['weighted_chi'] = (chi * k ** weight).tolist()
@@ -111,4 +112,4 @@ def special_plot(groups, options):
               [(i, 'q', 'chiq_re', 'Re[χ(q)]') for i in range(len(groups))])
         notes.append('Quad and Bi-Quad use unscaled spectra without group plot offsets.')
     notes.append('Plot k weight applies to every displayed group. Larch recalculates the transforms when this differs from the saved weight; saved processing and project data stay unchanged.')
-    return dict(group_ids=options.group_ids, kweight=weight, panels=panels, notes=notes)
+    return dict(group_ids=options.group_ids, kweight=weight, panels=panels, notes=list(dict.fromkeys(notes)))

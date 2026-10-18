@@ -636,10 +636,8 @@ def _native_processing_limits(parameters, energy, data_type, source):
             available = float(np.sqrt(ETOK * hi))
             if numeric(parameters.get("bkg_kmax")) and parameters["bkg_kmax"] > available:
                 resolve("bkg_kmax", available, "measured post-edge coverage")
-            background_max = parameters.get("bkg_kmax")
-            support = min(available, background_max) if numeric(background_max) and background_max > 0 else available
-            if numeric(parameters.get("kmax")) and parameters["kmax"] > support:
-                resolve("kmax", support, "available background coverage")
+            if numeric(parameters.get("kmax")) and parameters["kmax"] > available:
+                resolve("kmax", available, "measured post-edge coverage")
     if changes:
         source.setdefault("warnings", []).append("Native settings resolved for Larch; original values remain in source metadata: " + "; ".join(changes))
         source["native"]["resolved_parameters"] = resolved

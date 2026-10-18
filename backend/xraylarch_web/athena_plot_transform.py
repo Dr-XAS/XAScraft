@@ -1,11 +1,9 @@
 """Read-only weight and k-range overrides for the viewer's k, R and q plots."""
-from copy import deepcopy
-
 import numpy as np
 from larch import Group
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .athena_science import AthenaParameters, ScientificError, _pair, _transforms
+from .athena_science import AthenaParameters, ScientificError, _cached_transform_effective, _pair, _transforms
 
 
 class PlotTransformOptions(BaseModel):
@@ -31,7 +29,7 @@ TRANSFORM_PARAMETERS = ("kmin", "kmax", "dk", "window", "rmin", "rmax", "dr", "r
 
 def plot_transform(group: dict, options: PlotTransformOptions) -> dict:
     result = group.get("result") or {}
-    effective = deepcopy(result.get("effective") or {})
+    effective = _cached_transform_effective(result)
     if group.get("processing_error") or not effective.get("exafs"):
         raise ScientificError("Process an EXAFS group with usable chi(k) before changing its plot transform.")
     arrays = result.get("arrays") or {}

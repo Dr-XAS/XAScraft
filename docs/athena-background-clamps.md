@@ -13,7 +13,15 @@ measured above E₀. It is the same setting as **Spline k max**, using
 `E − E₀ = 3.8099821109685847 k²`. A maximum of 100 eV therefore permits
 extracted χ(k) only through about 5.12 Å⁻¹. Choose a background range covering
 the useful EXAFS to be fitted; a stronger clamp cannot extend that range.
-The Fourier-transform range is a separate setting within that support.
+The Fourier-transform window is a separate setting. Its upper bound can be
+larger than the spline maximum, provided it remains within the measured
+post-edge energy support and the window overlaps at least three extracted
+χ(k) points. For example, spline k max = 15 Å⁻¹ and FT k max = 15.3 Å⁻¹ can
+coexist when the scan reaches 15.3 Å⁻¹. The extracted χ(k) still stops at
+15 Å⁻¹: Larch applies the requested Fourier window to those samples and
+zero-pads the remaining FFT input. It does not extrapolate the background
+or add measured χ(k) beyond the spline maximum. The result reports the
+requested FT limit and the shorter available χ(k) support separately.
 
 The μ(E) viewer displays the background only within the effective spline
 energy interval, including when the limits were entered in k. It uses the

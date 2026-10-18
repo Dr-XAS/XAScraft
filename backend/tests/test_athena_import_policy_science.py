@@ -168,6 +168,36 @@ def test_automatic_ft_upper_bound_respects_explicit_shorter_spline(copper):
     final_processing(x, y, result)
 
 
+@pytest.mark.parametrize("bkg_kmax,kmax", [(8., 9.), (7.98, 7.98)])
+def test_explicit_ft_window_can_extend_past_extracted_chi_without_changing_bounds(copper, bkg_kmax, kmax):
+    x, y = copper
+    params = {"bkg_kmax": bkg_kmax, "kmax": kmax}
+    original = deepcopy(params)
+    result = initialize_import(x, y, params, policy=CU_POLICY)
+    assert params == original
+    assert result["parameters"]["bkg_kmax"] == bkg_kmax
+    assert result["parameters"]["kmax"] == kmax
+    assert "kmax" not in result["defaults"]["final_adjustments"]
+    processed = final_processing(x, y, result)
+    grid_end = .05 * (int(1.01 + bkg_kmax / .05) - 1)
+    assert processed["effective"]["bkg_kmax"] == bkg_kmax
+    assert processed["effective"]["kmax"] == kmax
+    assert processed["arrays"]["k"][-1] == pytest.approx(grid_end)
+    assert len(processed["arrays"]["k"]) == len(processed["arrays"]["chi"])
+
+
+@pytest.mark.parametrize("params,message", [
+    ({"bkg_kmax": 8., "kmax": 12.}, "measured post-edge support"),
+    ({"bkg_kmax": 8., "kmin": 7.95, "kmax": 9.}, "three extracted k points"),
+    ({"bkg_kmax": 8., "kmin": 8.1, "kmax": 9.}, "three extracted k points"),
+])
+def test_extended_ft_window_still_requires_measured_support_and_extracted_overlap(copper, params, message):
+    original = deepcopy(params)
+    with pytest.raises(ScientificError, match=message):
+        initialize_import(*copper, params, policy=CU_POLICY)
+    assert params == original
+
+
 @pytest.mark.parametrize("data_type", ["mu", "xanes"])
 def test_short_scans_use_seeded_xanes_defaults_and_live_auto_norm_endpoint(data_type):
     x = np.linspace(8779, 9049, 1081)
@@ -313,8 +343,7 @@ def test_invalid_policy_does_not_fall_back_to_another_seed(copper, policy):
 
 @pytest.mark.parametrize("params", [
     {"norm1":499.5,"norm2":800}, {"pre2": -300}, {"norm1": 600, "norm2": 800},
-    {"bkg_kmax": 15}, {"bkg_kmax": 8, "kmax": 9},
-    {"bkg_kmax": 7.98, "kmax": 7.98}, {"bkg_kmin": 10},
+    {"bkg_kmax": 15}, {"bkg_kmin": 10},
     {"kmin": 11}, {"kmin": 9, "dk": 4}, {"bkg_kmin": 9, "bkg_dk": 10},
 ])
 def test_unusable_explicit_ranges_are_rejected_without_mutation(copper, params):

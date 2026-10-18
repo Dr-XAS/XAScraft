@@ -113,17 +113,24 @@ def _at_e0(x, base, automatic, e0, data_type, is_normalized=False):
         grid_end = recipe["kstep"] * (int(1.01 + bmax / recipe["kstep"]) - 1)
         if "kmax" in automatic:
             recipe["kmax"] = min(recipe["kmax"], grid_end)
-        if recipe["kmax"] > min(bmax, grid_end):
-            raise ScientificError("Import kmax exceeds the processed spline/FT grid; lower the explicit kmax or increase bkg_kmax.")
+        # Explicit FT windows are independent of the spline endpoint. Larch
+        # applies that window to extracted chi and zero-pads the FFT; it does
+        # not extrapolate chi to the requested end of the window.
+        if recipe["kmax"] > available + 1e-10:
+            raise ScientificError("Import kmax exceeds measured post-edge support; lower the explicit kmax or extend the scan.")
         if recipe["kmin"] < 0 or recipe["kmax"] - recipe["kmin"] < 2 * recipe["kstep"]:
             raise ScientificError("Import FT range is too short; lower kmin, supply a usable kmax, or use XANES input. Explicit FT limits are not changed.")
+        first_bin = int(np.ceil((recipe["kmin"] - 1e-10) / recipe["kstep"]))
+        last_bin = int(np.floor((min(recipe["kmax"], grid_end) + 1e-10) / recipe["kstep"]))
+        if last_bin - first_bin + 1 < 3:
+            raise ScientificError("Import FT range must overlap at least three extracted k points; lower kmin or increase the spline range.")
         if recipe["dk"] > 2 * (recipe["kmax"] - recipe["kmin"]):
             raise ScientificError("Import dk is too wide for the resolved FT range; reduce dk or lower kmin.")
         if recipe["bkg_dk"] > 2 * (bmax - recipe["bkg_kmin"]):
             raise ScientificError("Import bkg_dk is too wide for the resolved spline range; reduce bkg_dk or lower bkg_kmin.")
         if recipe["dr"] > 2 * (recipe["rmax"] - recipe["rmin"]):
             raise ScientificError("Import dr is too wide for the selected R range; reduce dr or widen rmin/rmax.")
-        _fft_capacity(bmax, AthenaParameters.model_validate(recipe))
+        _fft_capacity(bmax, AthenaParameters.model_validate(recipe), window_kmax=recipe["kmax"])
     return AthenaParameters.model_validate(recipe).model_dump()
 
 
