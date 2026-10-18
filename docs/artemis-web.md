@@ -227,7 +227,13 @@ JSON/PRJ exchange, and Undo/Redo. The original CIF text, mineral name, source ID
 upload filename, and existing FEFF paths are preserved.
 
 Open **Search / attach CIF** from **Crystal structures** in the fitting panel. Search by formula, mineral, chemical system, or source ID,
-optionally adding a **Contains element** filter. Formula searches include the same
+optionally adding a **Contains elements** filter. Use **Pick elements** to toggle
+several periodic-table tiles, then **Done** to return to the search. Clicking a
+selected tile removes it; **Clear selection** removes every selected element.
+You can also type symbols separated by commas or spaces, such as `Rh, O`.
+Both databases require all selected elements while allowing additional elements.
+Changing the selection does not run a search; choose **Search structures** when ready.
+Formula searches include the same
 set of elements with different proportions: `LiMnNiO2` can find
 `LiMn0.5Ni0.5O2`. Exact element counts rank first, equivalent scaled formulas
 next (such as `Li2MnNiO4` for `LiMn0.5Ni0.5O2`), then other proportions.
@@ -254,8 +260,8 @@ closed and reopened while retaining the selected structure and calculation state
 
 Select **Source → Materials Project** or **Source → AMCSD** to search only that
 database. Materials Project accepts a formula such as `Cu2O`, an exact chemical system such as `Cu-O`,
-or an MP identifier such as `mp-30`. The **Contains element** filter finds
-compounds containing that element; a formula query of `Cu` finds elemental
+or an MP identifier such as `mp-30`. The **Contains elements** filter finds
+compounds containing all specified elements; a formula query of `Cu` finds elemental
 copper. Mineral-name searches remain available under AMCSD. Both older numeric
 and newer letter-based MP IDs are supported.
 
@@ -862,7 +868,7 @@ Structure search and calculation use:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/artemis/structures?q=...&element=...&limit=...` | API default remains AMCSD; `provider=materials_project` searches MP and `provider=auto` (the UI default) searches MP then AMCSD with formula relevance ranking and per-source warnings. `element` is one optional symbol and `limit` is 1–50. |
+| `GET /api/artemis/structures?q=...&element=...&limit=...` | API default remains AMCSD; `provider=materials_project` searches MP and `provider=auto` (the UI default) searches MP then AMCSD with formula relevance ranking and per-source warnings. `element` optionally lists required symbols separated by commas or whitespace (up to 500 characters); all must be present, and additional elements are allowed. `limit` is 1–50. |
 | `GET /api/artemis/structures/{id}` | Retrieve CIF text, citation, lattice parameters, native site indices, and supported/unsupported status. MP IDs require `provider=materials_project`. |
 | `GET /api/artemis/projects/{id}/structures` | List the current project's saved CIF snapshots and project version. |
 | `POST /api/artemis/projects/{id}/structures` | Attach using `{version, amcsd_id}`, `{version, provider: "materials_project", material_id}`, or `{version, provider: "uploaded", filename, cif}` with full CIF text; return the updated project. |

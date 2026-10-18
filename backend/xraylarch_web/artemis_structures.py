@@ -39,7 +39,7 @@ from .artemis import PathInput, StrictModel, inspect_path
 from .artemis_coordination import FirstShellRequest, first_shell
 from .artemis_shells import RadialShellRequest, radial_shells
 from .errors import WebInputError
-from .structure_search import formula_match_rank, parse_formula
+from .structure_search import formula_match_rank, parse_element_filter, parse_formula
 from .artemis_provenance import INPUT_GENERATOR, path_source, text_sha256
 
 _DATABASE = Path(larixite.__file__).parent / "amcsd_cif1.db"
@@ -150,6 +150,7 @@ def _summary(row):
 
 def search_structures(query: str = "", element: str = "", limit: int = 25):
     query = query.strip()
+    required_elements = parse_element_filter(element)
     literal = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     compact = re.sub(r"\s+", "", query)
     compact_literal = re.sub(r"\s+", "", literal)
@@ -179,9 +180,14 @@ def search_structures(query: str = "", element: str = "", limit: int = 25):
                     AND count(DISTINCT CASE WHEN ce.element IN ({placeholders})
                                            THEN ce.element END)=?))"""
                 args += [len(symbols)] + symbols + [len(symbols)]
-    if element.strip():
-        clauses.append("EXISTS (SELECT 1 FROM cif_elements ce WHERE ce.cif_id=c.id AND ce.element=?)")
-        args.append(_element(element))
+    if required_elements:
+        placeholders = ",".join("?" for _ in required_elements)
+        # Require every selected symbol; other elements in the CIF are allowed.
+        # Group once because the bundled element table has no lookup index.
+        clauses.append(f"""c.id IN (SELECT ce.cif_id FROM cif_elements ce
+          WHERE ce.element IN ({placeholders}) GROUP BY ce.cif_id
+          HAVING count(DISTINCT ce.element)=?)""")
+        args += required_elements + [len(required_elements)]
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
     with _connection() as connection:
         connection.create_function("formula_rank", 1, lambda formula: formula_match_rank(query, formula or ""))
@@ -201,6 +207,7 @@ def search_all_structures(query: str = "", element: str = "", limit: int = 25):
     """Search MP first, then AMCSD, keeping useful results if one is unavailable."""
     from .materials_project import search_structures as mp_search
 
+    element = ",".join(parse_element_filter(element))
     results, warnings, failures = [], [], []
     limited = False
     for provider, search in (("materials_project", mp_search), ("amcsd", search_structures)):
@@ -840,7 +847,9 @@ def build_structures_router(store, jobs=None):
         return radial_shells(request.cif, request.absorber, request.site_index, request.radius, request.tolerance)
 
     @router.get("/structures")
-    def search(q: str = Query(default="", max_length=120), element: str = Query(default="", max_length=2),
+    def search(q: str = Query(default="", max_length=120),
+               element: str = Query(default="", max_length=500,
+                                    description="Required element symbols, separated by commas or spaces; all must be present."),
                limit: int = Query(default=25, ge=1, le=50), provider: Literal["auto", "amcsd", "materials_project"] = "amcsd"):
         if provider == "auto":
             return search_all_structures(q, element, limit)

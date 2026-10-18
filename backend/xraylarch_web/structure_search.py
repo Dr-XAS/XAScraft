@@ -1,11 +1,31 @@
-"""Chemical-formula relevance shared by the CIF search providers."""
+"""Chemical-formula relevance and element filters shared by CIF search providers."""
 from __future__ import annotations
 
 import math
 import re
 from functools import lru_cache
 
-from pymatgen.core import Composition
+from pymatgen.core import Composition, Element
+
+from .errors import WebInputError
+
+
+def parse_element_filter(value: str) -> list[str]:
+    """Canonical required elements, separated by commas or whitespace."""
+    if not value.strip():
+        return []
+    try:
+        tokens = [item for item in re.split(r"[,\s]+", value.strip()) if item]
+        if not tokens or any(not re.fullmatch(r"[A-Za-z]{1,2}", item) for item in tokens):
+            raise ValueError("Invalid element symbols")
+        return sorted({Element(item.capitalize()).symbol for item in tokens})
+    except (ValueError, TypeError, KeyError):
+        raise WebInputError(
+            "invalid_structure_elements",
+            "Use valid chemical element symbols separated by commas or spaces, for example Rh, O.",
+            fields=("element",),
+            recovery="Select one or more elements, or clear the element filter, then search again.",
+        ) from None
 
 
 @lru_cache(maxsize=1024)

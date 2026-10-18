@@ -5,9 +5,7 @@ import { createPortal } from "react-dom"
 import { ELEMENTS, type ChemicalElement } from "./elements"
 import styles from "./element-picker.module.css"
 
-export interface ElementPickerProps {
-  value: string | null
-  onChange: (symbol: string | null) => void
+interface ElementPickerBaseProps {
   disabled?: boolean
   triggerLabel?: string
   className?: string
@@ -15,7 +13,18 @@ export interface ElementPickerProps {
   style?: CSSProperties & { [token: `--ep-${string}`]: string | number }
 }
 
+export type ElementPickerProps = ElementPickerBaseProps & ({
+  multiple?: false
+  value: string | null
+  onChange: (symbol: string | null) => void
+} | {
+  multiple: true
+  value: string[]
+  onChange: (symbols: string[]) => void
+})
+
 const orderedElements = [...ELEMENTS].sort((a, b) => a.number - b.number)
+const elementsBySymbol = new Map(orderedElements.map(item => [item.symbol.toLowerCase(), item]))
 const directions: Record<string, [number, number]> = {
   ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0],
 }
@@ -32,7 +41,8 @@ function TableIcon() {
 }
 
 /** A controlled symbol picker. The host owns persistence, validation and requests. */
-export function ElementPicker({ value, onChange, disabled = false, triggerLabel = "Pick element", className, style }: ElementPickerProps) {
+export function ElementPicker(props: ElementPickerProps) {
+  const { disabled = false, triggerLabel = props.multiple ? "Pick elements" : "Pick element", className, style } = props
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -44,17 +54,34 @@ export function ElementPicker({ value, onChange, disabled = false, triggerLabel 
 
   useEffect(() => { if (disabled) setOpen(false) }, [disabled])
 
+  const values = props.multiple ? props.value : props.value ? [props.value] : []
+  const selectedSymbols = new Set(values.map(value => value.trim().toLowerCase()))
+  const selected = [...selectedSymbols].flatMap(symbol => {
+    const item = elementsBySymbol.get(symbol)
+    return item ? [item] : []
+  })
+
+  function select(symbol: string | null) {
+    if (props.multiple) {
+      const symbols = selected.map(item => item.symbol)
+      props.onChange(symbol === null ? [] : symbols.includes(symbol) ? symbols.filter(item => item !== symbol) : [...symbols, symbol])
+    } else {
+      close()
+      props.onChange(symbol)
+    }
+  }
+
   return <>
     <button ref={trigger} type="button" className={`${styles.trigger}${className ? ` ${className}` : ""}`} style={style}
       disabled={disabled} aria-haspopup="dialog" aria-expanded={open && !disabled} aria-controls={open && !disabled ? id : undefined}
       onClick={() => setOpen(true)}><TableIcon />{triggerLabel}</button>
-    {open && !disabled && createPortal(<PickerDialog id={id} value={value} style={style}
-      onClose={close} onSelect={symbol => { close(); onChange(symbol) }} />, document.body)}
+    {open && !disabled && createPortal(<PickerDialog id={id} selected={selected} hasValue={values.length > 0} multiple={props.multiple === true} style={style}
+      onClose={close} onSelect={select} />, document.body)}
   </>
 }
 
-function PickerDialog({ id, value, style, onClose, onSelect }: {
-  id: string; value: string | null; style?: ElementPickerProps["style"]
+function PickerDialog({ id, selected, hasValue, multiple, style, onClose, onSelect }: {
+  id: string; selected: ChemicalElement[]; hasValue: boolean; multiple: boolean; style?: ElementPickerProps["style"]
   onClose: () => void; onSelect: (symbol: string | null) => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -64,12 +91,13 @@ function PickerDialog({ id, value, style, onClose, onSelect }: {
   const [focused, setFocused] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const normalized = query.trim().toLowerCase()
-  const selected = orderedElements.find(item => item.symbol.toLowerCase() === value?.trim().toLowerCase())
+  const selectedSymbols = new Set(selected.map(item => item.symbol))
   const matches = orderedElements.filter(item => !normalized || item.symbol.toLowerCase().startsWith(normalized)
     || item.name.toLowerCase().includes(normalized) || String(item.number) === normalized)
   const matchingSymbols = new Set(matches.map(item => item.symbol))
-  const tabStop = [focused, selected?.symbol, matches[0]?.symbol].find(symbol => symbol && matchingSymbols.has(symbol))
-  const preview = orderedElements.find(item => item.symbol === (hovered ?? focused)) ?? selected
+  const tabStop = [focused, ...selectedSymbols, matches[0]?.symbol].find(symbol => symbol && matchingSymbols.has(symbol))
+  const preview = orderedElements.find(item => item.symbol === (hovered ?? focused)) ?? selected[0]
+  const selectionSummary = multiple ? selected.map(item => item.symbol).join(", ") : selected[0]?.name
 
   useEffect(() => {
     const node = dialog.current!
@@ -89,7 +117,7 @@ function PickerDialog({ id, value, style, onClose, onSelect }: {
   }
 
   function choose(symbol: string | null) {
-    dialog.current?.close()
+    if (!multiple) dialog.current?.close()
     onSelect(symbol)
   }
 
@@ -123,7 +151,7 @@ function PickerDialog({ id, value, style, onClose, onSelect }: {
     onClose={event => { event.stopPropagation(); if (!event.currentTarget.open) onClose() }}
     onKeyDown={event => { if (event.key === "Escape") event.stopPropagation() }}>
     <header className={styles.header}>
-      <div><h2 id={`${id}-title`}>Pick element</h2><p id={`${id}-help`}>Choose an element to fill the field.</p></div>
+      <div><h2 id={`${id}-title`}>{multiple ? "Pick elements" : "Pick element"}</h2><p id={`${id}-help`}>{multiple ? "Select all elements to include. Click again to deselect." : "Choose an element to fill the field."}</p></div>
       <button type="button" className={styles.close} aria-label="Close element picker" onClick={dismiss}>
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="m4 4 10 10M14 4 4 14" stroke="currentColor" strokeWidth="1.5" /></svg>
       </button>
@@ -157,7 +185,7 @@ function PickerDialog({ id, value, style, onClose, onSelect }: {
           className={styles.tile} data-column={item.column} data-category={item.category}
           style={{ gridRow: item.row, gridColumn: item.column }}
           aria-label={`${item.symbol} · ${item.name} · Atomic number ${item.number}`} title={`${item.name} (${item.symbol}) · ${item.number} · ${categories[item.category]}`}
-          aria-pressed={selected?.symbol === item.symbol} disabled={!matchingSymbols.has(item.symbol)} tabIndex={tabStop === item.symbol ? 0 : -1}
+          aria-pressed={selectedSymbols.has(item.symbol)} disabled={!matchingSymbols.has(item.symbol)} tabIndex={tabStop === item.symbol ? 0 : -1}
           onMouseEnter={() => setHovered(item.symbol)} onMouseLeave={() => setHovered(null)} onFocus={() => setFocused(item.symbol)}
           onKeyDown={event => navigate(event, item)} onClick={() => choose(item.symbol)}>
           <span className={styles.number}>{item.number}</span><strong className={styles.symbol}>{item.symbol}</strong><span className={styles.name}>{item.name}</span>
@@ -168,8 +196,16 @@ function PickerDialog({ id, value, style, onClose, onSelect }: {
         <div className={styles.series} style={{ gridRow: 10 }}><strong>Actinides</strong><span>89–103</span></div>
       </div>
     </div>
-    <footer className={styles.footer}><span>{selected ? <><strong>{selected.symbol}</strong> · {selected.name}</> : "No element selected"}<small>Arrow keys to move · Enter to select</small></span>
-      <button type="button" className={styles.clear} disabled={!value} onClick={() => choose(null)}>Clear selection</button>
+    <footer className={styles.footer}><span className={styles.selection}>
+      <span className={styles.selectionSummary} title={selectionSummary} aria-live={multiple ? "polite" : undefined}>{selected.length ? multiple
+        ? <><strong>{selectionSummary}</strong> · {selected.length} selected</>
+        : <><strong>{selected[0].symbol}</strong> · {selected[0].name}</>
+        : multiple ? "No elements selected" : "No element selected"}</span>
+      <small>Arrow keys to move · Enter to {multiple ? "toggle" : "select"}</small></span>
+      <div className={styles.actions}>
+        <button type="button" className={styles.clear} disabled={!hasValue} onClick={() => choose(null)}>Clear selection</button>
+        {multiple && <button type="button" className={styles.done} onClick={dismiss}>Done</button>}
+      </div>
     </footer>
   </dialog>
 }

@@ -134,10 +134,15 @@
 .series span { color: var(--picker-muted); }
 .footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px; border-top: 1px solid var(--picker-border); background: var(--picker-surface); color: var(--picker-ink); }
 .footer > span { font-size: 12px; }
+.selection { flex: 1; min-width: 0; }
+.selectionSummary { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .footer small { display: block; margin-top: 3px; color: var(--picker-muted); font-size: 10px; }
-.dialog .clear { padding: 7px 10px; min-height: 32px; border: 1px solid var(--picker-border); border-radius: 6px; background: var(--picker-surface); color: var(--picker-ink); font-size: 12px; font-weight: 500; line-height: 1.3; cursor: pointer; }
+.dialog .clear, .dialog .done { padding: 7px 10px; min-height: 32px; border: 1px solid var(--picker-border); border-radius: 6px; background: var(--picker-surface); color: var(--picker-ink); font-size: 12px; font-weight: 500; line-height: 1.3; cursor: pointer; }
 .dialog .clear:hover:not(:disabled) { background: var(--picker-bg); border-color: var(--picker-accent); }
 .dialog .clear:disabled { opacity: .48; cursor: default; }
+.dialog .done { border-color: var(--picker-accent); background: var(--picker-accent); color: var(--picker-surface); }
+.dialog .done:hover { filter: brightness(1.1); }
 @media (max-width: 940px) { .mobileHint { display: block; flex: 0 0 auto; margin: 0; padding: 0 22px 8px; color: var(--picker-muted); font-size: 11px; } }
 @media (max-width: 760px) {
   .number { font-size: clamp(7px, 1vw, 9px); line-height: 1; }
@@ -153,6 +158,7 @@
   .count { font-size: 11px; }
   .mobileHint { padding: 0 14px 6px; }
   .tableScroll { padding: 6px 14px 14px; }
-  .footer { padding: 10px 14px; }
+  .footer { flex-wrap: wrap; padding: 10px 14px; }
+  .selection { flex-basis: 180px; }
 }
 @media (prefers-reduced-motion: reduce) { .dialog .tile { transition: none; } }

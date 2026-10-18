@@ -172,7 +172,9 @@ def capabilities() -> dict:
     return {
         "workflow": [
             "GET /api/artemis/structures?q=copper&element=Cu; GET /api/artemis/structures/{id} "
-            "for sites (indices from 1). For DFT-relaxed MP structures, add provider=materials_project "
+            "for sites (indices from 1). The element filter accepts comma- or space-separated symbols "
+            "(element=Cu,O), requiring all of them while allowing additional elements. "
+            "For DFT-relaxed MP structures, add provider=materials_project "
             "and use q=Cu2O. Attach with POST /api/artemis/projects/{id}/structures "
             "{version,provider:'materials_project',material_id}; use project_id,attachment_id,version for FEFF.",
             "POST /api/artemis/feff/jobs?view=summary with feff_job: 202 running; "

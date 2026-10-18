@@ -1275,16 +1275,23 @@ describe("ArtemisStructures", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 
-  it("picks a canonical element without searching until Search structures is requested", async () => {
+  it("picks multiple canonical elements without searching until Search structures is requested", async () => {
     setup()
     fireEvent.change(screen.getByLabelText("CIF search query"), { target: { value: "CuSP" } })
-    await click("Pick element")
-    const picker = screen.getByRole("dialog", { name: "Pick element" })
+    await click("Pick elements")
+    const picker = screen.getByRole("dialog", { name: "Pick elements" })
     fireEvent.change(within(picker).getByLabelText("Find element"), { target: { value: "sulfur" } })
     fireEvent.click(within(picker).getByRole("button", { name: "S · Sulfur · Atomic number 16" }))
     expect(screen.getByLabelText("CIF element filter")).toHaveValue("S")
+    expect(picker).toBeVisible()
+    fireEvent.change(within(picker).getByLabelText("Find element"), { target: { value: "phosphorus" } })
+    fireEvent.click(within(picker).getByRole("button", { name: "P · Phosphorus · Atomic number 15" }))
+    expect(screen.getByLabelText("CIF element filter")).toHaveValue("S, P")
+    expect(within(picker).getByRole("button", { name: "S · Sulfur · Atomic number 16" })).toHaveAttribute("aria-pressed", "true")
+    expect(within(picker).getByRole("button", { name: "P · Phosphorus · Atomic number 15" })).toHaveAttribute("aria-pressed", "true")
+    await click("Done")
     expect(screen.getByLabelText("CIF search query")).toHaveValue("CuSP")
-    expect(screen.queryByRole("dialog", { name: "Pick element" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("dialog", { name: "Pick elements" })).not.toBeInTheDocument()
     expect(screen.getByRole("dialog", { name: "Crystal structures" })).toBeVisible()
     expect(api.mock.calls.some(([url]) => url.startsWith("/structures?"))).toBe(false)
 
@@ -1292,22 +1299,43 @@ describe("ArtemisStructures", () => {
     const searches = api.mock.calls.filter(([url]) => url.startsWith("/structures?"))
     expect(searches).toHaveLength(1)
     const params = new URLSearchParams(searches[0][0].split("?")[1])
-    expect(params.get("element")).toBe("S")
+    expect(params.get("element")).toBe("S, P")
     expect(params.get("q")).toBe("CuSP")
   })
 
-  it("preserves a typed element on picker cancellation and clears it only on request", async () => {
+  it("preserves typed elements on picker dismissal and clears them only on request", async () => {
     setup()
-    fireEvent.change(screen.getByLabelText("CIF element filter"), { target: { value: "Fe" } })
-    await click("Pick element")
-    const picker = screen.getByRole("dialog", { name: "Pick element" })
+    fireEvent.change(screen.getByLabelText("CIF element filter"), { target: { value: "Fe, O" } })
+    await click("Pick elements")
+    const picker = screen.getByRole("dialog", { name: "Pick elements" })
+    expect(within(picker).getByRole("button", { name: "Fe · Iron · Atomic number 26" })).toHaveAttribute("aria-pressed", "true")
+    expect(within(picker).getByRole("button", { name: "O · Oxygen · Atomic number 8" })).toHaveAttribute("aria-pressed", "true")
     fireEvent(picker, new Event("cancel", { bubbles: true, cancelable: true }))
-    expect(screen.getByLabelText("CIF element filter")).toHaveValue("Fe")
+    expect(screen.getByLabelText("CIF element filter")).toHaveValue("Fe, O")
     expect(screen.getByRole("dialog", { name: "Crystal structures" })).toBeVisible()
-    await click("Pick element")
+    await click("Pick elements")
     await click("Clear selection")
     expect(screen.getByLabelText("CIF element filter")).toHaveValue("")
+    await click("Done")
+    expect(screen.getByRole("button", { name: "Search structures" })).toBeDisabled()
     expect(api.mock.calls.some(([url]) => url.startsWith("/structures?"))).toBe(false)
+  })
+
+  it.each([
+    ["auto", "CIF"], ["amcsd", "AMCSD"], ["materials_project", "Materials Project"],
+  ])("passes a typed multi-element filter to %s on Enter without a text query", async (provider, label) => {
+    setup()
+    fireEvent.change(screen.getByLabelText("Structure source"), { target: { value: provider } })
+    const filter = screen.getByLabelText(`${label} element filter`)
+    fireEvent.change(filter, { target: { value: "Rh, O" } })
+    expect(api.mock.calls.some(([url]) => url.startsWith("/structures?"))).toBe(false)
+    await act(async () => { fireEvent.keyDown(filter, { key: "Enter" }) })
+    const searches = api.mock.calls.filter(([url]) => url.startsWith("/structures?"))
+    expect(searches).toHaveLength(1)
+    const params = new URLSearchParams(searches[0][0].split("?")[1])
+    expect(params.get("element")).toBe("Rh, O")
+    expect(params.get("q")).toBe("")
+    expect(params.get("provider")).toBe(provider === "amcsd" ? null : provider)
   })
 
   it("searches only on request and supports an element filter with literal URL encoding", async () => {

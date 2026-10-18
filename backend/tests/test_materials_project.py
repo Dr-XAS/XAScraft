@@ -113,6 +113,17 @@ def test_formula_search_finds_different_proportions_and_preserves_exact_priority
         assert "structure" not in request.url.params["_fields"].split(",")
 
 
+def test_multiple_required_elements_reach_exact_and_broad_formula_searches(monkeypatch):
+    row = _search_document("mp-1", "LiMnNiO2")
+    requests = _search_upstream(monkeypatch, [row], [row])
+    response = mp.search_structures("LiMnNiO2", "ni, o Ni")
+    assert response["results"][0]["id"] == "mp-1"
+    assert len(requests) == 2
+    assert all(request.url.params["elements"] == "Ni,O" for request in requests)
+    assert requests[0].url.params["formula"] == "LiMnNiO2"
+    assert requests[1].url.params["chemsys"] == "Li-Mn-Ni-O"
+
+
 def test_formula_search_uses_reduced_integer_formula_and_ranks_equivalent_stoichiometry(monkeypatch):
     equivalent = _search_document("mp-1", "Li2MnNiO4")
     different = _search_document("mp-2", "LiMnNiO2")
@@ -148,7 +159,7 @@ def test_duplicate_records_do_not_create_false_truncation(monkeypatch):
     assert response["limited"] is False
 
 
-@pytest.mark.parametrize("query,element", [("copper", ""), ("", ""), ("Cu-*", ""), ("Cu-XX", ""), ("Cu", "Xx"), ("mp-invalid", "")])
+@pytest.mark.parametrize("query,element", [("copper", ""), ("", ""), ("Cu-*", ""), ("Cu-XX", ""), ("mp-invalid", "")])
 def test_invalid_queries_do_not_reach_upstream(upstream, query, element):
     with pytest.raises(WebInputError, match="chemical formula"):
         mp.search_structures(query, element)

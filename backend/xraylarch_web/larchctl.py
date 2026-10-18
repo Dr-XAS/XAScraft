@@ -1105,7 +1105,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     structures = sub.add_parser("structures", help="search the bundled crystal structures for `fit --structure`")
     structures.add_argument("query", nargs="*", help="mineral, formula or words from the title")
-    structures.add_argument("--element", help="only structures containing this element")
+    structures.add_argument("--element", help="required elements, separated by commas or spaces (all must be present)")
     structures.add_argument("--limit", type=int, default=10)
 
     log = sub.add_parser("log", help="every command issued against this project")

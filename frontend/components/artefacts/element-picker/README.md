@@ -29,14 +29,29 @@ export function StructureFilter() {
 inside a client component so that its callback stays on the client. The included
 `element-picker.module.css.d.ts` supplies the stylesheet's TypeScript declaration.
 
+To allow several elements, pass `multiple` and control an array of symbols:
+
+```tsx
+const [elements, setElements] = useState<string[]>([])
+
+<ElementPicker multiple value={elements} onChange={setElements} />
+```
+
+Clicking a tile toggles that element and updates the array immediately. The dialog
+stays open for additional selections; **Clear selection** emits an empty array.
+**Done**, the close button, and Escape close the dialog while keeping the current
+selection. Reopening displays the selected elements. Multiple selections use
+canonical, unique chemical symbols.
+
 ## API
 
 | Prop | Type | Behavior |
 | --- | --- | --- |
-| `value` | `string \| null` | Selected chemical symbol; `null` means no filter. |
-| `onChange` | `(symbol: string \| null) => void` | Selection callback; clearing emits `null`. |
+| `multiple` | `boolean` | Defaults to single selection. Set to `true` to enable multiple selection. |
+| `value` | `string \| null`, or `string[]` when `multiple` is `true` | Selected chemical symbols; `null` or an empty array means no filter. |
+| `onChange` | `(symbol: string \| null) => void`, or `(symbols: string[]) => void` when `multiple` is `true` | Selection callback; clearing emits `null` or an empty array. |
 | `disabled` | `boolean` | Disables the trigger. |
-| `triggerLabel` | `string` | Trigger text; defaults to `Pick element`. |
+| `triggerLabel` | `string` | Trigger text; defaults to `Pick element`, or `Pick elements` in multiple mode. |
 | `className` | `string` | Additional class on the trigger button. |
 | `style` | `CSSProperties` with `--ep-*` custom properties | Applied to the trigger and portalled dialog. |
 
@@ -46,8 +61,9 @@ picker has no API, local-storage, icon-package, or application-context dependenc
 
 Search by symbol, element name, or atomic number. Arrow keys navigate the table
 spatially; Home and End move to the first and last matching elements in atomic
-number order. Enter selects a focused element. Escape dismisses the dialog
-without changing the value, and selection returns focus to the trigger.
+number order. Enter selects a focused element, or toggles it in multiple mode.
+Escape dismisses the dialog without changing the current value. Closing the
+dialog returns focus to the trigger.
 
 ## Theme
 

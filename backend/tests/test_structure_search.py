@@ -9,7 +9,7 @@ from xraylarch_web import materials_project as mp
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
-from xraylarch_web.structure_search import formula_match_rank, parse_formula
+from xraylarch_web.structure_search import formula_match_rank, parse_element_filter, parse_formula
 
 
 @pytest.mark.parametrize("query,formula,rank", [
@@ -70,6 +70,35 @@ def test_amcsd_formula_broadens_and_ranks_before_truncating(formula_database):
     assert structures.search_structures("1")["results"][0]["id"] == 1
     assert structures.search_structures("Synthetic oxide")["count"] == 5
     assert structures.search_structures("%_")["results"] == []
+
+
+def test_multiple_element_filter_requires_every_element_but_allows_others(formula_database):
+    result = structures.search_structures(element="ni, o NI", limit=25)
+    assert {item["id"] for item in result["results"]} == {1, 2, 3, 4}
+    assert structures.search_structures(element="Ni Co")["results"][0]["id"] == 4
+    assert structures.search_structures(element="Ni, Fe")["results"] == []
+    assert structures.search_structures("5", element="Ni O")["results"] == []
+    assert structures.search_structures("Synthetic oxide", element="Ni, Co")["count"] == 1
+
+
+@pytest.mark.parametrize("value,expected", [("", []), (" \t", []), ("rh", ["Rh"]),
+                                         ("rh, O RH\nO", ["O", "Rh"]), ("Og, H", ["H", "Og"])])
+def test_element_filters_normalize_symbols_and_duplicates(value, expected):
+    assert parse_element_filter(value) == expected
+
+
+@pytest.mark.parametrize("value", ["Xx", "Rh, Xx", "Cu2O", "Rh-O", "1", ", ,", "Cu;O"])
+def test_invalid_element_filters_fail_before_search(monkeypatch, value):
+    def unexpected(*args, **kwargs):
+        pytest.fail("Invalid elements reached a structure provider")
+
+    monkeypatch.setattr(structures, "_connection", unexpected)
+    monkeypatch.setattr(mp, "_get", unexpected)
+    for search in (structures.search_structures, mp.search_structures, structures.search_all_structures):
+        with pytest.raises(WebInputError) as error:
+            search("Cu", element=value)
+        assert error.value.code == "invalid_structure_elements"
+        assert error.value.fields == ("element",)
 
 
 def search_result(*rows, limited=False):
@@ -147,3 +176,26 @@ def test_http_auto_source_and_legacy_default(tmp_path, monkeypatch):
         assert response.status_code == 200
         assert [item["id"] for item in response.json()["results"]] == ["mp-30", 1]
         assert client.get("/api/artemis/structures", params=dict(q="Cu")).json()["results"][0]["id"] == 1
+
+
+@pytest.mark.parametrize("provider", ["amcsd", "materials_project", "auto"])
+def test_http_multiple_required_elements_and_validation(tmp_path, monkeypatch, formula_database, provider):
+    requests = []
+
+    def remote(path, params):
+        requests.append(params)
+        assert params["elements"] == "Co,Ni"
+        return {"data": [{"material_id": "mp-1", "formula_pretty": "LiMn0.5Ni0.5Co0.1O2",
+                          "symmetry": {"symbol": "P1"}}]}
+
+    monkeypatch.setattr(mp, "_get", remote)
+    with TestClient(create_app(Settings(data_root=tmp_path))) as client:
+        response = client.get("/api/artemis/structures", params={"element": "ni, co Ni", "provider": provider})
+        assert response.status_code == 200
+        expected = [4] if provider == "amcsd" else ["mp-1"] if provider == "materials_project" else ["mp-1", 4]
+        assert [item["id"] for item in response.json()["results"]] == expected
+        assert len(requests) == (0 if provider == "amcsd" else 1)
+        invalid = client.get("/api/artemis/structures", params={"element": "Ni, Xx", "provider": provider})
+        assert invalid.status_code == 400
+        assert invalid.json()["error"]["fields"] == ["element"]
+        assert len(requests) == (0 if provider == "amcsd" else 1)

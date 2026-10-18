@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest"
 
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { useState } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ElementPicker } from "./index"
 import { ELEMENTS } from "./elements"
@@ -9,11 +10,17 @@ const copper = "Cu · Copper · Atomic number 29"
 const zinc = "Zn · Zinc · Atomic number 30"
 const sulfur = "S · Sulfur · Atomic number 16"
 
-function openPicker() {
-  const trigger = screen.getByRole("button", { name: "Pick element" })
+function openPicker(multiple = false) {
+  const name = multiple ? "Pick elements" : "Pick element"
+  const trigger = screen.getByRole("button", { name })
   trigger.focus()
   fireEvent.click(trigger)
-  return { trigger, dialog: screen.getByRole("dialog", { name: "Pick element" }) }
+  return { trigger, dialog: screen.getByRole("dialog", { name }) }
+}
+
+function MultiplePicker({ initial = [], onChange = () => {} }: { initial?: string[]; onChange?: (symbols: string[]) => void }) {
+  const [value, setValue] = useState(initial)
+  return <ElementPicker multiple value={value} onChange={symbols => { setValue(symbols); onChange(symbols) }} />
 }
 
 beforeEach(() => {
@@ -126,5 +133,81 @@ describe("ElementPicker", () => {
     fireEvent.click(trigger)
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("selects and deselects multiple elements without closing, using canonical unique symbols", () => {
+    const onChange = vi.fn()
+    render(<MultiplePicker initial={[" cU ", "cu"]} onChange={onChange} />)
+    const { dialog } = openPicker(true)
+    const cu = within(dialog).getByRole("button", { name: copper })
+    const zn = within(dialog).getByRole("button", { name: zinc })
+    expect(cu).toHaveAttribute("aria-pressed", "true")
+    fireEvent.click(zn)
+    expect(onChange).toHaveBeenLastCalledWith(["Cu", "Zn"])
+    expect(dialog).toBeInTheDocument()
+    expect(cu).toHaveAttribute("aria-pressed", "true")
+    expect(zn).toHaveAttribute("aria-pressed", "true")
+    expect(dialog).toHaveTextContent("Cu, Zn · 2 selected")
+    fireEvent.click(cu)
+    expect(onChange).toHaveBeenLastCalledWith(["Zn"])
+    expect(cu).toHaveAttribute("aria-pressed", "false")
+    expect(zn).toHaveAttribute("aria-pressed", "true")
+    expect(dialog).toBeInTheDocument()
+  })
+
+  it("clears all selections while leaving the multiple picker open", () => {
+    const onChange = vi.fn()
+    render(<MultiplePicker initial={["Cu", "Zn"]} onChange={onChange} />)
+    const { dialog } = openPicker(true)
+    const clear = within(dialog).getByRole("button", { name: "Clear selection" })
+    fireEvent.click(clear)
+    expect(onChange).toHaveBeenCalledExactlyOnceWith([])
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole("button", { name: copper })).toHaveAttribute("aria-pressed", "false")
+    expect(within(dialog).getByRole("button", { name: zinc })).toHaveAttribute("aria-pressed", "false")
+    expect(clear).toBeDisabled()
+    expect(dialog).toHaveTextContent("No elements selected")
+  })
+
+  it("preserves the existing selection order when another element is selected", () => {
+    const onChange = vi.fn()
+    render(<MultiplePicker initial={["Zn", "Cu"]} onChange={onChange} />)
+    const { dialog } = openPicker(true)
+    fireEvent.click(within(dialog).getByRole("button", { name: sulfur }))
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(["Zn", "Cu", "S"])
+  })
+
+  it.each(["Done", "close button", "Escape"])("preserves controlled selections when closed with %s and reopened", action => {
+    const onChange = vi.fn()
+    render(<MultiplePicker initial={["Cu"]} onChange={onChange} />)
+    const { trigger, dialog } = openPicker(true)
+    fireEvent.click(within(dialog).getByRole("button", { name: zinc }))
+    if (action === "Escape") fireEvent(dialog, new Event("cancel", { bubbles: true, cancelable: true }))
+    else fireEvent.click(within(dialog).getByRole("button", { name: action === "Done" ? "Done" : "Close element picker" }))
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    const reopened = openPicker(true).dialog
+    expect(within(reopened).getByRole("button", { name: copper })).toHaveAttribute("aria-pressed", "true")
+    expect(within(reopened).getByRole("button", { name: zinc })).toHaveAttribute("aria-pressed", "true")
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(["Cu", "Zn"])
+  })
+
+  it("keeps search and keyboard navigation available while toggling multiple selections", () => {
+    const onChange = vi.fn()
+    render(<MultiplePicker onChange={onChange} />)
+    const { dialog } = openPicker(true)
+    const search = within(dialog).getByLabelText("Find element")
+    fireEvent.change(search, { target: { value: "cu" } })
+    fireEvent.keyDown(search, { key: "Enter" })
+    expect(onChange).toHaveBeenLastCalledWith(["Cu"])
+    expect(dialog).toBeInTheDocument()
+    fireEvent.keyDown(search, { key: "Enter" })
+    expect(onChange).toHaveBeenLastCalledWith([])
+    fireEvent.keyDown(search, { key: "ArrowDown" })
+    const cu = within(dialog).getByRole("button", { name: copper })
+    expect(cu).toHaveFocus()
+    fireEvent.keyDown(cu, { key: "ArrowRight" })
+    expect(within(dialog).getByRole("button", { name: "Hg · Mercury · Atomic number 80" })).toHaveFocus()
+    expect(onChange).toHaveBeenCalledTimes(2)
   })
 })

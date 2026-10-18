@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 import httpx
 
 from .errors import WebInputError
-from .structure_search import formula_match_rank, parse_formula
+from .structure_search import formula_match_rank, parse_element_filter, parse_formula
 
 _BASE = "https://api.materialsproject.org"
 _ID = re.compile(r"^mp-(?:[1-9][0-9]{0,11}|[a-z]{8})$")
@@ -116,12 +116,13 @@ def search_structures(query="", element="", limit=25):
     from pymatgen.core import Element
 
     query = query.strip()
+    required_elements = parse_element_filter(element)
     params = {"_fields": "material_id,formula_pretty,symmetry", "_limit": limit + 1,
               "_skip": 0, "deprecated": "false"}
     composition = None
     try:
-        if element.strip():
-            params["elements"] = Element(element.strip().capitalize()).symbol
+        if required_elements:
+            params["elements"] = ",".join(required_elements)
         if _ID.fullmatch(query):
             params["material_ids"] = query
         elif "-" in query:
@@ -134,7 +135,7 @@ def search_structures(query="", element="", limit=25):
             # MP stores reduced formulas, including integer formulas for partial
             # occupancies (LiMn0.5Ni0.5O2 is stored as Li2MnNiO4).
             params["formula"] = composition.get_integer_formula_and_factor()[0]
-        elif not element.strip():
+        elif not required_elements:
             raise ValueError("Empty search")
     except (ValueError, TypeError, KeyError):
         _fail("Use a chemical formula (Cu2O), chemical system (Cu-O), element filter (Cu), or MP ID (mp-30).",
