@@ -130,7 +130,9 @@
 .ath-app .ath-group-drag-handle:hover:not(:disabled), .ath-app .ath-group-drag-handle:focus-visible { color: var(--ath-primary); background: var(--ath-primary-soft); }
 .ath-app .ath-group-drag-handle:active:not(:disabled) { cursor: grabbing; }
 .ath-app .ath-group-select { display: flex; justify-content: flex-start; text-align: left; gap: 8px; width: 100%; min-width: 0; padding: 5px 0; user-select: none; -webkit-user-select: none; }
-.ath-group-select > span:nth-child(2) { display: grid; gap: 7px; min-width: 0; flex: 1; }
+.ath-group-copy { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.ath-group-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.ath-group-meta small { white-space: nowrap; }
 .ath-group strong { font-size: var(--text-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 /* Shorten the middle of a long name: the tail holds the scan number. */
 .ath-group-label { display: flex; min-width: 0; white-space: nowrap; }
@@ -171,6 +173,7 @@ html[data-theme="dark"] .ath-measurement-tag[data-tag="theory"] { border-color: 
 .ath-group-folder-form .ath-modal-actions { flex-wrap: wrap; }
 .ath-modal-spacer { flex: 1 1 24px; }
 .ath-app .ath-remove-folder { color: var(--ath-muted); }
+.ath-mobile-workspace-nav { display: none; }
 .ath-center { grid-area: spectrum; padding: 16px; min-width: 0; }
 .ath-viewer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .ath-colormap-control { display: flex; align-items: center; gap: 9px; color: var(--ath-muted); font-size: var(--text-label); white-space: nowrap; }
@@ -376,7 +379,15 @@ html[data-theme="dark"] .ath-viewer-chip[data-viewer-theme="fit"] { --viewer-acc
 @media(max-width:950px) { .ath-header { padding: 10px 15px; gap: 8px; } }
 @media(max-width:1200px) { .ath-header { flex-wrap: wrap; row-gap: 8px; }.ath-brand { flex: 1 1 max-content; }.ath-header nav { order: 3; flex: 1 0 100%; justify-content: flex-start; } }
 @media(max-width:620px) { .ath-header { padding: 8px 9px; gap: 6px; }.ath-header nav { row-gap: 2px; }.ath-app .ath-menu-wrap > button { padding: 5px 7px; }.ath-project-bar { min-height: 47px; padding: 5px 9px; gap: 5px; } }
-@media(max-width:620px) { .ath-brand { flex: 1 0 100%; flex-wrap: wrap; min-width: 0; padding-bottom: 4px; }.ath-brand-copy { flex: 1 0 100%; } }
+@media(max-width:620px) {
+  .ath-brand { flex: 1 0 100%; min-width: 0; gap: 9px; padding-bottom: 4px; }
+  .ath-brand-copy { flex: 1; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .ath-brand .ath-brand-credits { padding: 0; font-size: var(--text-caption); }
+  .ath-brand-credits::before { display: none; }
+  .ath-mobile-workspace-nav { position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; padding: 6px 9px; background: var(--ath-surface); border-bottom: 1px solid var(--ath-line); }
+  .ath-mobile-workspace-nav a { flex: 1; padding: 6px 8px; text-align: center; text-decoration: none; border: 1px solid var(--ath-primary-line); border-radius: 5px; background: var(--ath-primary-soft); font-weight: 600; }
+  #athena-data-groups, #athena-processing-parameters, #athena-spectrum-viewer { scroll-margin-top: 48px; }
+}
 @media(max-width:360px) { .ath-project-bar > div:last-child { width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 2px; }.ath-project-bar .ath-divider { margin: 0 2px; }.ath-plot-top { min-height: 0; padding: 4px 6px; flex-wrap: wrap; }.ath-space-tabs { width: 100%; min-height: 40px; } }
 
 /* Larger readable labels keep their size on small screens; let navigation wrap. */
