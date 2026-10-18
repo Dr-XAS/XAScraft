@@ -85,7 +85,7 @@ it('rejects incomplete curves and stops invalid physical corrections before prev
   expect(await screen.findByRole('alert')).toHaveTextContent('invalid numerical data')
   fireEvent.change(screen.getByLabelText('Scale by (edge-step fraction)'),{target:{value:'-1'}})
   fireEvent.change(screen.getByLabelText('Broadening (eV)'),{target:{value:'0'}})
-  expect(screen.getByRole('button',{name:'Preview again'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:/^(Refresh|Retry) preview$/})).toBeDisabled()
   expect(saveButton()).toBeDisabled()
   expect(screen.getByRole('status')).toHaveTextContent('nonnegative amplitude and broadening of at least 0.01 eV')
   expect(api).toHaveBeenCalledTimes(1)

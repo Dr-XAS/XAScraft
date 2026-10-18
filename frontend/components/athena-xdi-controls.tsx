@@ -99,7 +99,8 @@ export function AthenaXDIControls({ projectId, groupId, onSaved, onBusyChange, c
     const bounds = returnFocus.getBoundingClientRect()
     setContext({ family, tag, returnFocus, anchor: anchor ?? { x: bounds.left, y: bounds.bottom } })
   }
-  return <section aria-label="File metadata controls" className={styles.controls}>
+  return <section aria-label="File metadata controls" className={`ath-modal-body ath-modal-body-framed ${styles.controls}`}>
+    <div className="ath-modal-scroll">
     {pending && <p role="status">Loading or saving metadata…</p>}
     {error && <p role="alert" className="ath-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -145,10 +146,11 @@ export function AthenaXDIControls({ projectId, groupId, onSaved, onBusyChange, c
         onChange={e => { setComments(e.target.value); setNotice('') }} /></label>
       {comments !== saved.comments && <p role="status">Unsaved XDI comments</p>}
     </>}
-    <div className={styles.actions}>
-      <button type="button" disabled={pending} onClick={() => { void reload() }}>Reload saved metadata</button> <SectionHelp label="Reload metadata">Reload replaces unsaved comments with the saved version.</SectionHelp>
-      <button type="button" disabled={pending || !saved || comments === saved.comments} onClick={() => { void save() }}>Save comments</button>
+    </div>
+    <div className="ath-modal-actions">
       <button type="button" disabled={pending} onClick={close}>Close metadata</button>
+      <button type="button" disabled={pending} onClick={() => { void reload() }}>Reload saved metadata</button> <SectionHelp label="Reload metadata">Reload replaces unsaved comments with the saved version.</SectionHelp>
+      <button type="button" className="ath-primary" disabled={pending || !saved || comments === saved.comments} onClick={() => { void save() }}>Save comments</button>
     </div>
     {context && !pending && <AthenaContextMenu key={`${context.family}.${context.tag}`} label={`${context.family}.${context.tag} actions`}
       anchor={context.anchor} returnFocus={context.returnFocus} onClose={() => setContext(null)} items={[

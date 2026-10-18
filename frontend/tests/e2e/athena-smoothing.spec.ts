@@ -43,7 +43,7 @@ async function configure(page: Page, dialog: Locator, options: SmoothingPreview[
   if (options.repetitions !== undefined) await dialog.getByLabel('Repetitions', {exact: true}).fill(String(options.repetitions))
   await expect(dialog.getByRole('button', {name: 'Make smoothed data', exact: true})).toBeEnabled()
   const waiting = page.waitForResponse(r => r.url().endsWith('/smooth/preview'))
-  await dialog.getByRole('button', {name: 'Plot data and smoothed', exact: true}).click()
+  await dialog.getByRole('button', {name: 'Refresh preview', exact: true}).click()
   const response = await waiting; expect(response.ok()).toBe(true)
   await expect(dialog.getByRole('button', {name: 'Make smoothed data', exact: true})).toBeEnabled()
   return await response.json() as SmoothingPreview
@@ -110,7 +110,7 @@ test('mobile Gaussian preview, native width reset and stale-save recovery preser
   await expect(dialog.getByText('Gaussian width was reset to 4 samples.', {exact: true})).toBeVisible()
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
   const bounds = await dialog.boundingBox()
-  for (const name of ['Close smoothing tool', 'Plot data and smoothed', 'Make smoothed data']) {
+  for (const name of ['Close smoothing tool', 'Refresh preview', 'Make smoothed data']) {
     const button = await dialog.getByRole('button', {name, exact: true}).boundingBox()
     expect(button!.x).toBeGreaterThanOrEqual(bounds!.x); expect(button!.x + button!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width)
   }

@@ -82,7 +82,7 @@ test('mobile arctangent clamps and a cross-window conflict cannot save an obsole
   await expect(dialog.getByText('Negative amplitude was reset to zero, as in Athena.',{exact:true})).toBeVisible()
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true)
   const bounds=await dialog.boundingBox()
-  for(const name of ['Close MEE tool','Preview again','Save MEE-corrected data']) {
+  for(const name of ['Close MEE tool','Refresh preview','Save MEE-corrected data']) {
     const button=await dialog.getByRole('button',{name,exact:true}).boundingBox()
     expect(button!.x).toBeGreaterThanOrEqual(bounds!.x)
     expect(button!.x+button!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width)

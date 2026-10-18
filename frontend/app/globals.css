@@ -46,6 +46,15 @@
   --ath-popover: var(--ath-surface);
   --ath-surface-muted: hsl(240 4.8% 95.9%);
   --ath-canvas: hsl(42 33% 97%);
+  /* Shared semantic colors for status messages in panels and dialogs. */
+  --ath-error-ink: #9d3f2d;
+  --ath-error-bg: #fff2ee;
+  --ath-error-line: #f1c1b4;
+  --ath-warning-ink: #795011;
+  --ath-warning-bg: #fff8e9;
+  --ath-warning-line: #ead2a4;
+  --ath-success-ink: #286342;
+  --ath-success-bg: #edf7ef;
   /* Shared subdued palette for viewer chips and fit-report reference checks. */
   --ath-olive-ink: #56652e;
   --ath-olive-soft: #f2f5e8;

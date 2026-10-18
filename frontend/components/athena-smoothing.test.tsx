@@ -51,7 +51,7 @@ it.each([
   const calls = api.mock.calls.length
   change('Algorithm', method)
   change(label, value)
-  expect(screen.getByRole('button', {name: 'Plot data and smoothed'})).toBeDisabled()
+  expect(screen.getByRole('button', {name: 'Refresh preview'})).toBeDisabled()
   expect(saveButton()).toBeDisabled()
   expect(screen.getByRole('status')).toHaveTextContent('Use kernel sizes up to 501')
   expect(api).toHaveBeenCalledTimes(calls)
@@ -145,7 +145,7 @@ it.each(['conflict', 'wrong arrays', 'wrong parent'] as const)('keeps the draft 
   expect(await screen.findByRole('alert')).toHaveTextContent(/Changed|could not be confirmed/)
   expect(p.saved).not.toHaveBeenCalled(); expect(p.close).not.toHaveBeenCalled(); expect(saveButton()).toBeDisabled()
   expect(p.setBusy).toHaveBeenLastCalledWith(''); expect(screen.getByLabelText('Kernel size · points')).toHaveValue(11)
-  api.mockResolvedValueOnce(result); fireEvent.click(screen.getByRole('button', {name: 'Plot data and smoothed'})); await ready()
+  api.mockResolvedValueOnce(result); fireEvent.click(screen.getByRole('button', {name: 'Retry preview'})); await ready()
 })
 
 it('opens chi data in k space and explicitly reports unavailable energy comparisons', async () => {

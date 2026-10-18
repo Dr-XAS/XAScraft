@@ -115,7 +115,8 @@ export function AthenaCalibration({project,activeId,selectGroup,initialDraft,rem
       {x:[curve.marker.x],y:[curve.marker.y],name:'Reference point',type:'scatter',mode:'markers',marker:{color:'#bb6542',size:11,symbol:'circle-open',line:{width:2}}})
   }
   const axis=draft.display==='mu'?'μ(E)':draft.display==='norm'?'Normalized μ(E)':draft.display==='derivative'?'dμ/dE':'d²μ/dE²'
-  return <div className={`ath-modal-body ${controls.body}`} onKeyDown={e=>{if(e.key==='Escape'&&picking){e.stopPropagation();setPicking(false)}}}>
+  return <div className={`ath-modal-body ath-modal-body-framed ${controls.body}`} onKeyDown={e=>{if(e.key==='Escape'&&picking){e.stopPropagation();setPicking(false)}}}>
+    <div className="ath-modal-scroll">
     <div className={styles.layout}><fieldset className={styles.controls} disabled={disabled}>
       <label className="ath-field"><span>Source data <SectionHelp label="Source data">Choose the measured data whose energy axis needs calibration. Its linked references move with it; frozen data cannot be calibrated.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e=>selectGroup(e.target.value)}>{project.groups.map(g=><option key={g.id} value={g.id}>{g.label}{g.frozen?' · frozen':''}</option>)}</select></label>
       <label className="ath-field"><span>Display <SectionHelp label="Display">Use a derivative to locate a sharp edge feature, or absorption to inspect the signal. Changing this view does not change the calibration.</SectionHelp></span><select aria-label="Calibration display" value={draft.display} onChange={e=>setDraft(d=>({...d,display:e.target.value as Display}))}><option value="mu">μ(E)</option><option value="norm">Normalized μ(E)</option><option value="derivative">First derivative</option><option value="second">Second derivative</option></select></label>
@@ -140,6 +141,7 @@ export function AthenaCalibration({project,activeId,selectGroup,initialDraft,rem
       </section>}
       {(actionError||error)&&<div className="ath-error" role="alert">{actionError||error}</div>}
     </section></div>
-    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Cancel calibration</button><button disabled={disabled||!eligible||!valid||loading} onClick={()=>{setPreview(null);setActionError('');setRetry(n=>n+1)}}>Replot calibration</button><button className="ath-primary" disabled={disabled||!current||loading} onClick={()=>void apply()}>Calibrate</button></div>
+    </div>
+    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Cancel calibration</button><button disabled={disabled||!eligible||!valid||loading} onClick={()=>{setPreview(null);setActionError('');setRetry(n=>n+1)}}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled||!current||loading} onClick={()=>void apply()}>Calibrate</button></div>
   </div>
 }

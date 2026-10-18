@@ -16,20 +16,21 @@
 .removeButton svg { flex-shrink: 0; }
 .attachedList strong { font-size: var(--text-body); font-weight: 500; overflow-wrap: anywhere; }
 .attachmentInfo small { overflow-wrap: anywhere; font-size: var(--text-caption); color: var(--ath-muted, #647669); }
-.dialog { display: none; width: min(940px, calc(100vw - 36px)); max-width: none; max-height: min(90dvh, 920px); padding: 0; margin: auto; border: 1px solid var(--ath-line, #dce5dc); border-radius: 9px; background: var(--ath-popover, #fff); color: var(--ath-ink, #24362c); box-shadow: 0 20px 70px #14241b40; }
+.dialog { display: none; width: min(940px, calc(100vw - 30px)); max-width: none; max-height: 88dvh; padding: 0; margin: auto; border: 1px solid var(--ath-line, #dce5dc); border-radius: 10px; background: var(--ath-popover, #fff); color: var(--ath-ink, #24362c); box-shadow: 0 25px 100px rgb(24 24 27 / 24%); overflow: hidden; }
 .dialog[open] { display: flex; flex-direction: column; }
-.dialog::backdrop { background: var(--ath-backdrop, #10241b70); }
-.dialogHeader { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 18px 22px; border-bottom: 1px solid var(--ath-line, #dce5dc); }
+.dialog::backdrop { background: var(--ath-backdrop, rgb(24 24 27 / 32%)); backdrop-filter: blur(3px); }
+.dialogHeader { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--ath-line, #dce5dc); background: var(--ath-surface-muted); }
 .dialog .dialogHeader h3 { margin: 0; font-size: var(--text-title); font-weight: 600; line-height: var(--leading-heading); }
 .dialogHeader p { margin: 6px 0 0; font-size: var(--text-body); color: var(--ath-muted, #647669); }
-.dialogHeader > button { flex-shrink: 0; }
-.dialogActions { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 10px 22px; border-bottom: 1px solid var(--ath-line, #dce5dc); background: var(--ath-canvas, #f5f8f5); }
+.dialog .dialogHeader > button { flex: 0 0 32px; width: 32px; height: 32px; padding: 6px; }
+.dialogActions { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--ath-line, #dce5dc); background: var(--ath-canvas, #f5f8f5); }
 .panel button.primaryButton, .feffLauncher button.primaryButton { min-height: 32px; padding: 6px 12px; border-color: var(--ath-primary, #7c3aed); background: var(--ath-primary, #7c3aed); color: var(--ath-primary-foreground, #fff); font-weight: 500; }
 .panel button.primaryButton:not(:disabled):hover, .feffLauncher button.primaryButton:not(:disabled):hover { border-color: var(--ath-primary-hover, #6d28d9); background: var(--ath-primary-hover, #6d28d9); color: var(--ath-primary-foreground, #fff); }
 .content { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.4fr); min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .searchColumn { min-width: 0; padding: 16px 20px; border-right: 1px solid var(--ath-line, #dce5dc); background: var(--ath-canvas, #f5f8f5); }
 .detailColumn { min-width: 0; padding: 16px 22px; }
-.dialogFooter { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 22px; border-top: 1px solid var(--ath-line, #dce5dc); }
+.dialogFooter { display: flex; flex-shrink: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--ath-line, #dce5dc); background: var(--ath-popover); }
+.dialog .dialogFooter > button { min-height: 32px; padding: 6px 12px; border-color: var(--ath-line); }
 .dialogFooter span { color: var(--ath-muted, #647669); font-size: var(--text-caption); }
 .placeholder { padding: 24px 10px; color: var(--ath-muted, #647669); text-align: center; font-size: var(--text-body); line-height: var(--leading-body); }
 .savedStructures { margin-top: 18px; border-top: 1px solid var(--ath-line, #dce5dc); }
@@ -82,7 +83,7 @@
 .paths { max-height: 260px; overflow-y: auto; margin-bottom: 8px; }
 .paths label + label { border-top: 1px solid var(--ath-line, #dce5dc); }
 .job { border-top: 1px solid var(--ath-line, #dce5dc); margin-top: 14px; }
-@media(max-width:700px) { .dialog { width: calc(100vw - 20px); max-height: 94dvh; }.content { grid-template-columns: minmax(0, 1fr); }.searchColumn { border-right: 0; border-bottom: 1px solid var(--ath-line, #dce5dc); }.dialogHeader, .dialogActions, .dialogFooter, .detailColumn, .searchColumn { padding-left: 14px; padding-right: 14px; }.dialogActions > button { flex: 1 1 auto; }.dialogFooter span { max-width: 70%; } }
+@media(max-width:700px) { .dialog { width: calc(100vw - 30px); }.content { grid-template-columns: minmax(0, 1fr); }.searchColumn { border-right: 0; border-bottom: 1px solid var(--ath-line, #dce5dc); }.dialogHeader, .dialogActions, .dialogFooter, .detailColumn, .searchColumn { padding-left: 14px; padding-right: 14px; }.dialogActions > button { flex: 1 1 auto; }.dialogFooter span { max-width: 70%; } }
 
 .provider { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--ath-muted, #647669); font-size: var(--text-label); }
 .provider select { flex: 1; min-width: 0; }

@@ -157,7 +157,7 @@ describe("AthenaWorkbench integrated request gating", () => {
       {pointEdit(project, { preview: false, deglitch: true, truncate: false, undo: false, redo: false })}
     </AthenaProvider>)
 
-    attemptDisabledAction("Replot selection")
+    attemptDisabledAction("Refresh preview")
     await new Promise(resolve => window.setTimeout(resolve, 400))
     expect(fetcher).not.toHaveBeenCalled()
   })

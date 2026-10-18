@@ -41,7 +41,7 @@ async function configure(page: Page, dialog: Locator, options: ConvolutionPrevie
   await dialog.getByLabel('Noise σ · fraction of edge step', {exact: true}).fill(String(options.noise))
   await expect(dialog.getByRole('button', {name: 'Make modified data', exact: true})).toBeEnabled()
   const waiting=page.waitForResponse(r=>r.url().endsWith('/convolve/preview'))
-  await dialog.getByRole('button',{name:'Plot data and modified',exact:true}).click()
+  await dialog.getByRole('button',{name:'Refresh preview',exact:true}).click()
   const response=await waiting;expect(response.ok()).toBe(true);await expect(dialog.getByRole('button',{name:'Make modified data',exact:true})).toBeEnabled()
   return await response.json() as ConvolutionPreview
 }

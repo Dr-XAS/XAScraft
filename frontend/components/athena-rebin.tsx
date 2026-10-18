@@ -76,7 +76,8 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
     type: 'scatter' as const, mode: 'lines' as const, line: { color: colors[i % colors.length], dash: t.role === 'original' ? 'dot' : 'solid', width: t.role === 'original' ? 1 : 2 },
     opacity: t.role === 'original' ? .6 : 1,
   }))) ?? []
-  return <div className="ath-modal-body">
+  return <div className="ath-modal-body ath-modal-body-framed">
+    <div className="ath-modal-scroll">
     <div className={styles.layout}><fieldset disabled={saving} className={styles.controls}>
       <label className="ath-field"><span>Rebin source data <SectionHelp label="Rebin source">Uses saved processing parameters. Main-inspector edits process automatically; wait for processing to finish before using this tool. Frozen sources can be used to create new data items.</SectionHelp></span><select value={activeId} onChange={e => selectGroup(e.target.value)}>
         {project.groups.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
@@ -91,10 +92,8 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
       </label>)}</div>
       <label className="ath-check"><input type="checkbox" checked={previewMarked} onChange={e => setPreviewMarked(e.target.checked)} />Preview marked data ({marked.length}) <SectionHelp label="Rebin batch">New data follow their sources and start unmarked. χ(k) and already-rebinned data are skipped in a marked batch. Undo restores the entire batch.</SectionHelp></label>
       <div className={styles.actions}>
-        <button disabled={!!problem || !groupIds.length} onClick={() => { setSpace('E'); setRetry(n => n + 1) }}>Plot data and rebinned data</button>
-        <button disabled={!!problem || !groupIds.length} onClick={() => { setSpace('k'); setRetry(n => n + 1) }}>Plot data and rebinned data in k</button>
-        <button className="ath-primary" disabled={!!problem || !active || !!unavailable} onClick={() => { void make(false) }}>Make rebinned data</button>
-        <button disabled={!!problem || !marked.length} onClick={() => { void make(true) }}>Rebin marked data</button>
+        <button aria-pressed={space === 'E'} disabled={!!problem || !groupIds.length} onClick={() => { setSpace('E'); setRetry(n => n + 1) }}>Plot data and rebinned data</button>
+        <button aria-pressed={space === 'k'} disabled={!!problem || !groupIds.length} onClick={() => { setSpace('k'); setRetry(n => n + 1) }}>Plot data and rebinned data in k</button>
       </div>
       {defaultsControls}
     </fieldset><section className={styles.preview} aria-label="Rebin preview">
@@ -119,5 +118,10 @@ export function AthenaRebin({ project, activeId, selectGroup, grid, setGrid, sav
       {value && Object.entries(value.skipped_reasons).map(([id, reason]) => <p className="ath-warning" key={id}>{project.groups.find(g => g.id === id)?.label}: {reason}</p>)}
     </section></div>
     {error && <p role="alert" className="ath-error">{error}</p>}{notice && <p role="status">{notice}</p>}
+    </div>
+    <div className="ath-modal-actions">
+        <button disabled={saving || !!problem || !marked.length} onClick={() => { void make(true) }}>Rebin marked data</button>
+        <button className="ath-primary" disabled={saving || !!problem || !active || !!unavailable} onClick={() => { void make(false) }}>Make rebinned data</button>
+    </div>
   </div>
 }

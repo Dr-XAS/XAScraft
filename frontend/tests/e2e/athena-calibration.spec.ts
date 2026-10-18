@@ -33,7 +33,7 @@ async function open(page:Page){
   await expect(dialog.getByRole('button',{name:'Calibrate',exact:true})).toBeEnabled();return dialog
 }
 async function review(page:Page,dialog:Locator){
-  const replot=dialog.getByRole('button',{name:'Replot calibration',exact:true});await expect(replot).toBeEnabled()
+  const replot=dialog.getByRole('button',{name:'Refresh preview',exact:true});await expect(replot).toBeEnabled()
   const waiting=page.waitForResponse(r=>r.url().endsWith('/calibration/preview'));await replot.click()
   const response=await waiting;expect(response.ok()).toBe(true);const result=await response.json() as CalibrationPreview
   await expect(dialog.getByRole('button',{name:'Calibrate',exact:true})).toBeEnabled()

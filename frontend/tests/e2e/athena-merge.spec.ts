@@ -45,7 +45,7 @@ async function load(page:Page){
   return await (await page.request.get(`/api/backend/api/athena/projects/${project!.id}`)).json() as AthenaProject
 }
 async function review(page:Page,dialog:Locator){
-  const replot=dialog.getByRole('button',{name:'Replot merge',exact:true});await expect(replot).toBeEnabled()
+  const replot=dialog.getByRole('button',{name:'Refresh preview',exact:true});await expect(replot).toBeEnabled()
   const wait=page.waitForResponse(r=>r.url().endsWith('/merge/preview'));await replot.click();const response=await wait
   expect(response.ok()).toBe(true);const v=await response.json() as MergePreview
   await expect(dialog.getByRole('button',{name:'Save merged data',exact:true})).toBeEnabled()
@@ -54,7 +54,7 @@ async function review(page:Page,dialog:Locator){
 }
 
 for(const mobile of [false,true])test(`${mobile?'mobile':'desktop'} measured Fe merge, linked references, saved spread plots and bare PRJ`,async({page},info)=>{
-  test.setTimeout(180000);await page.setViewportSize(mobile?{width:390,height:844}:{width:1500,height:1100})
+  test.setTimeout(180000);await page.setViewportSize(mobile?{width:390,height:844}:{width:1280,height:800})
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   const initial=await load(page);expect(initial.groups).toHaveLength(6)
   expect(initial.groups.map(g=>g.marked)).toEqual([true,false,true,false,true,false])
@@ -62,6 +62,16 @@ for(const mobile of [false,true])test(`${mobile?'mobile':'desktop'} measured Fe 
   await page.locator('body').click({position:{x:2,y:2}});await page.keyboard.press('Control+Shift+N')
   const dialog=page.getByRole('dialog',{name:'Merge marked data',exact:true})
   await expect(dialog.getByLabel('Merge as',{exact:true})).toHaveValue('norm')
+  const saveMerge = dialog.getByRole('button', { name: 'Save merged data', exact: true })
+  await expect(saveMerge).toBeInViewport({ ratio: 1 })
+  const headerBefore = await dialog.locator(':scope > header').boundingBox()
+  const footerBefore = await saveMerge.boundingBox()
+  const body = dialog.locator('.ath-modal-scroll')
+  await body.evaluate(element => { element.scrollTop = element.scrollHeight })
+  await expect(saveMerge).toBeInViewport({ ratio: 1 })
+  expect((await dialog.locator(':scope > header').boundingBox())?.y).toBe(headerBefore?.y)
+  expect((await saveMerge.boundingBox())?.y).toBe(footerBefore?.y)
+  await body.evaluate(element => { element.scrollTop = 0 })
   let v=await review(page,dialog);expect(v.outputs).toHaveLength(2)
   for(const weighting of mobile?['step']:['step','noise']){
     await dialog.getByLabel('Merge weighting',{exact:true}).selectOption(weighting);v=await review(page,dialog)

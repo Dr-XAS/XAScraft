@@ -2702,12 +2702,12 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
         inspect={id => { setModal(null); setActiveId(id); setAnalysisVisible(false); setShownViewers(previous => new Set([...previous, 'single'])) }} /></div>
     </Modal>}
     {modal === "data_export" && project && active && <Modal title="Export column data" close={() => { if (!busy) setModal(null) }}>
-      <div className="ath-modal-body"><AthenaDataExport key={`${project.id}:${active.id}`} project={project} groupId={active.id}
-        close={() => { if (!busy) setModal(null) }} onBusyChange={pending => setBusy(pending ? 'Preparing export' : '')} /></div>
+      <AthenaDataExport key={`${project.id}:${active.id}`} project={project} groupId={active.id}
+        close={() => { if (!busy) setModal(null) }} onBusyChange={pending => setBusy(pending ? 'Preparing export' : '')} />
     </Modal>}
     {modal === 'xdi' && active && project && <Modal title="File metadata" close={() => { if (!busy) setModal(null) }}>
-      <div className="ath-modal-body"><AthenaXDIControls key={`${project.id}:${active.id}`} projectId={project.id} groupId={active.id}
-        onSaved={accept} onBusyChange={pending => setBusy(pending ? 'File metadata' : '')} close={() => setModal(null)} /></div>
+      <AthenaXDIControls key={`${project.id}:${active.id}`} projectId={project.id} groupId={active.id}
+        onSaved={accept} onBusyChange={pending => setBusy(pending ? 'File metadata' : '')} close={() => setModal(null)} />
     </Modal>}
     {modal === "plugins" && <Modal title="Plugin registry" close={closePluginRegistry}><div className="ath-modal-body"><AthenaPluginRegistry onPendingChange={setRegistryPending} /><div className="ath-modal-actions"><button disabled={registryPending} onClick={closePluginRegistry}>{registryReturn.current === "import" ? "Return to import" : "Close registry"}</button></div></div></Modal>}
     {modal === "context_report" && contextReport && <Modal title={contextReport.title} wide close={() => setModal(null)}><div className="ath-modal-body"><AthenaContextReport key={`${contextReport.project.id}:${contextReport.project.version}:${contextReport.kind}:${contextReport.groups.map(g => g.id).join()}`} {...contextReport} /><div className="ath-modal-actions"><button onClick={() => setModal(null)}>Close report</button></div></div></Modal>}

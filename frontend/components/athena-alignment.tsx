@@ -122,7 +122,8 @@ export function AthenaAlignment({project,activeId,selectGroup,initialDraft,remem
   const traces=row?[{x:row.standard.x,y:row.standard.y,name:`Standard · ${row.standard.label}`,type:'scatter',mode:'lines',line:{color:'#16736b'}},
     {x:row.before.x,y:row.before.y,name:'Before alignment',type:'scatter',mode:'lines',line:{color:'#a5afa9',dash:'dot'}},
     {x:row.after.x,y:row.after.y,name:`Aligned · ${row.after.label}`,type:'scatter',mode:'lines',line:{color:'#bb6542'}}]:[]
-  return <div className={`ath-modal-body ${controls.body}`}>
+  return <div className={`ath-modal-body ath-modal-body-framed ${controls.body}`}>
+    <div className="ath-modal-scroll">
     <div className={styles.layout}><fieldset className={styles.controls} disabled={disabled}>
       <label className="ath-field"><span>Source data <SectionHelp label="Source data">Choose the spectrum to shift against the fixed alignment standard. The standard and its linked family stay fixed.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e=>selectGroup(e.target.value)}>{project.groups.map(g=><option key={g.id} value={g.id}>{g.label}{g.frozen?' · frozen':''}</option>)}</select></label>
       <label className="ath-field"><span>Alignment standard <SectionHelp label="Energy alignment">Compare the current spectrum with a fixed standard. Alignment changes the energy shift and preserves each data item’s E₀.</SectionHelp></span><select aria-label="Alignment standard" value={draft.standard_id} onChange={e=>{setDraft(d=>({...d,standard_id:e.target.value}));setOperation('inspect');setScope('current')}}><option value="">Choose a standard</option>{project.groups.filter(g=>g.data_type!=='chi'&&g.data_type!=='detector'&&!g.is_difference).map(g=><option key={g.id} value={g.id}>{g.label}</option>)}</select></label>
@@ -145,6 +146,7 @@ export function AthenaAlignment({project,activeId,selectGroup,initialDraft,remem
       {Object.entries(current?.processing_errors??{}).map(([id,reason])=><p key={id} className="ath-warning">{project.groups.find(g=>g.id===id)?.label}: processing needs attention: {reason}</p>)}
       {error&&<div className="ath-error" role="alert">{error}</div>}
     </section></div>
-    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Cancel alignment</button><button disabled={disabled||!valid||loading} onClick={()=>{setPreview(null);setRetry(n=>n+1)}}>Replot alignment</button><button className="ath-primary" disabled={disabled||!current||loading||operation==='inspect'} onClick={()=>void apply()}>Save alignment</button></div>
+    </div>
+    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Cancel alignment</button><button disabled={disabled||!valid||loading} onClick={()=>{setPreview(null);setRetry(n=>n+1)}}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled||!current||loading||operation==='inspect'} onClick={()=>void apply()}>Save alignment</button></div>
   </div>
 }

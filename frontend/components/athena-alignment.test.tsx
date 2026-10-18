@@ -119,6 +119,6 @@ it('rejects a save response that moves E0 and exposes server conflicts for retry
   const next=structuredClone(project);next.version=5;next.groups[1].parameters.energy_shift=2;next.groups[1].parameters.e0=next.groups[1].parameters.e0!+2
   api.mockResolvedValueOnce(next);fireEvent.click(save());await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('saved alignment does not match'))
   expect(p.saved).not.toHaveBeenCalled();expect(save()).toBeDisabled()
-  serve();fireEvent.click(screen.getByRole('button',{name:'Replot alignment'}));await ready();api.mockRejectedValueOnce(new Error('Project changed in another tab.'))
+  serve();fireEvent.click(screen.getByRole('button',{name:'Retry preview'}));await ready();api.mockRejectedValueOnce(new Error('Project changed in another tab.'))
   fireEvent.click(save());await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Project changed'));expect(p.setBusy).toHaveBeenLastCalledWith('')
 })

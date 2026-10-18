@@ -75,14 +75,14 @@ describe("Athena Difference dialog", () => {
     expect(button("Preview difference")).toBeDisabled()
     expect(button("Save difference data")).toBeDisabled()
     expect(screen.getByRole("combobox", { name: "Difference form" })).toHaveValue("norm")
-    expect(screen.getByRole("spinbutton", { name: "STANDARD multiplier" })).toHaveValue(1)
+    expect(screen.getByRole("spinbutton", { name: "Standard multiplier" })).toHaveValue(1)
     expect(screen.getByRole("textbox", { name: "Name template" })).toHaveValue("diff %d - %s")
     expect(screen.getByRole("textbox", { name: "Name template" })).toHaveAttribute("maxlength", "200")
     expect(screen.getByRole("checkbox", { name: "Integrate difference" })).toBeChecked()
-    expect(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "Plot data and standard" })).toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Invert difference spectrum" })).not.toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Allow difference data to be renormalized" })).not.toBeChecked()
-    select("STANDARD", "standard")
+    select("Standard", "standard")
     const response = await preview()
     expect(api.mock.calls).toEqual([[`/projects/${project.id}/difference/preview`, { version: 7, action: "difference", group_ids: ["data"], options: differenceOptions }]])
     expect(plot().preview).toEqual(response)
@@ -95,14 +95,14 @@ describe("Athena Difference dialog", () => {
 
   it.each(["xmu", "norm", "der", "nder", "sec", "nsec"] as DifferenceForm[])("previews and saves %s with explicit options and the returned names", async form => {
     const { project, onSaved, close, onBusyChange } = setup()
-    select("STANDARD", "standard")
+    select("Standard", "standard")
     select("Difference form", form)
     expect(screen.getByRole("checkbox", { name: "Allow difference data to be renormalized" })).toHaveProperty("checked", form === "xmu")
-    number(/^STANDARD multiplier$/, 1.75)
+    number(/^Standard multiplier$/, 1.75)
     number(/^Integration minimum/, -12)
     number(/^Integration maximum/, 24)
     fireEvent.click(screen.getByRole("checkbox", { name: "Invert difference spectrum" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "Plot data and standard" }))
     fireEvent.change(screen.getByRole("textbox", { name: "Name template" }), { target: { value: "%d / %s %f %m %n %x %a %%" } })
     const options = { ...differenceOptions, form, multiplier: 1.75, xmin: -12, xmax: 24, invert: true, plot_inputs: false, renormalize: form === "xmu", name_template: "%d / %s %f %m %n %x %a %%" }
     const response = differencePreview(project, ["data"], options)
@@ -125,7 +125,7 @@ describe("Athena Difference dialog", () => {
     project.groups[1].frozen = true
     freeze(project)
     const { onSaved } = setup(project)
-    select("STANDARD", "standard"); select("DATA targets", "marked")
+    select("Standard", "standard"); select("Data targets", "marked")
     const response = await preview(differencePreview(project, ["other", "data"]))
     expect(api.mock.calls[0][1]).toEqual({ version: 7, action: "difference", group_ids: ["other", "data"], options: differenceOptions })
     expect(within(screen.getByRole("list", { name: "Difference targets" })).getAllByRole("listitem").map(item => item.textContent)).toEqual(["Other scan", "DATA foil · frozen (read only)"])
@@ -145,24 +145,24 @@ describe("Athena Difference dialog", () => {
     project.groups[2].data_type = "chi"
     project.groups.forEach(group => { group.marked = false })
     setup(project)
-    select("STANDARD", "data")
+    select("Standard", "data")
     expect(button("Preview difference")).toBeDisabled()
-    select("STANDARD", "standard"); select("DATA targets", "marked")
+    select("Standard", "standard"); select("Data targets", "marked")
     expect(button("Preview difference")).toBeDisabled()
-    select("DATA targets", "current"); select("Current DATA", "other")
+    select("Data targets", "current"); select("Current data", "other")
     expect(button("Preview difference")).toBeDisabled()
-    expect(within(screen.getByRole("combobox", { name: "STANDARD" })).queryByRole("option", { name: "Other scan" })).not.toBeInTheDocument()
+    expect(within(screen.getByRole("combobox", { name: "Standard" })).queryByRole("option", { name: "Other scan" })).not.toBeInTheDocument()
     fireEvent.click(button("Preview difference"))
     expect(api).not.toHaveBeenCalled()
   })
 
   it("validates numeric fields and naming, and clears area view when integration is disabled", async () => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     for (const value of ["", "Infinity"]) {
-      number(/^STANDARD multiplier$/, value); fireEvent.click(button("Preview difference"))
+      number(/^Standard multiplier$/, value); fireEvent.click(button("Preview difference"))
       expect(screen.getByRole("alert")).toHaveTextContent("finite standard multiplier")
     }
-    number(/^STANDARD multiplier$/, -2)
+    number(/^Standard multiplier$/, -2)
     number(/^Integration minimum/, 40); fireEvent.click(button("Preview difference"))
     expect(screen.getByRole("alert")).toHaveTextContent("minimum below the maximum")
     number(/^Integration minimum/, -20)
@@ -183,9 +183,9 @@ describe("Athena Difference dialog", () => {
   })
 
   it("recovers from preview failure without exposing a previous successful result", async () => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     await preview()
-    number(/^STANDARD multiplier$/, 2)
+    number(/^Standard multiplier$/, 2)
     expect(screen.queryByTestId("difference-plot")).not.toBeInTheDocument()
     api.mockRejectedValueOnce(new Error("Cannot integrate DATA foil over this range"))
     fireEvent.click(button("Preview difference"))
@@ -197,10 +197,10 @@ describe("Athena Difference dialog", () => {
   })
 
   it.each(["success", "failure"] as const)("ignores stale preview %s after options change and another preview finishes", async outcome => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     const old = deferred<DifferencePreview>()
     api.mockReturnValueOnce(old.promise); fireEvent.click(button("Preview difference"))
-    number(/^STANDARD multiplier$/, 2)
+    number(/^Standard multiplier$/, 2)
     const fresh = await preview(differencePreview(undefined, undefined, { multiplier: 2 }))
     await act(async () => { if (outcome === "success") old.resolve(differencePreview()); else old.reject(new Error("Obsolete error")) })
     expect(plot().preview).toEqual(fresh)
@@ -210,11 +210,11 @@ describe("Athena Difference dialog", () => {
 
   it.each(["target", "standard", "version", "marks"] as const)("hides a preview and blocks save after a %s change", async change => {
     const { project, changeProject } = setup()
-    select("STANDARD", "standard")
-    if (change === "marks") select("DATA targets", "marked")
+    select("Standard", "standard")
+    if (change === "marks") select("Data targets", "marked")
     await preview(differencePreview(project, change === "marks" ? ["data", "other"] : ["data"]))
-    if (change === "target") select("Current DATA", "other")
-    if (change === "standard") select("STANDARD", "other")
+    if (change === "target") select("Current data", "other")
+    if (change === "standard") select("Standard", "other")
     if (change === "version") changeProject({ ...project, version: 8 })
     if (change === "marks") changeProject({ ...project, groups: project.groups.map(group => ({ ...group, marked: group.id === "other" })) })
     expect(screen.queryByTestId("difference-plot")).not.toBeInTheDocument()
@@ -224,7 +224,7 @@ describe("Athena Difference dialog", () => {
   })
 
   it.each(Object.keys(differenceOptions) as (keyof DifferenceOptions)[])("rejects mismatched resolved %s rather than saving a mislabeled preview", async key => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     const response = differencePreview()
     const original = response.options[key]
     Object.assign(response.options, { [key]: typeof original === "boolean" ? !original : typeof original === "number" ? original + 1 : "wrong" })
@@ -235,7 +235,7 @@ describe("Athena Difference dialog", () => {
   })
 
   it("rejects mismatched target results and an obsolete response version", async () => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     for (const response of [differencePreview(undefined, ["other"]), { ...differencePreview(), version: 6 }]) {
       api.mockResolvedValueOnce(response); fireEvent.click(button("Preview difference"))
       await screen.findByRole("alert")
@@ -245,12 +245,12 @@ describe("Athena Difference dialog", () => {
 
   it("locks save/dismissal, preserves a good preview on a reversible failure, and retries the exact snapshot", async () => {
     const { project, close, onSaved } = setup()
-    select("STANDARD", "standard")
+    select("Standard", "standard")
     const response = await preview()
     const pending = deferred<AthenaProject>()
     api.mockReturnValueOnce(pending.promise); fireEvent.click(button("Save difference data"))
-    expect(screen.getByRole("combobox", { name: "Current DATA" })).toBeDisabled()
-    expect(screen.getByRole("combobox", { name: "STANDARD" })).toBeDisabled()
+    expect(screen.getByRole("combobox", { name: "Current data" })).toBeDisabled()
+    expect(screen.getByRole("combobox", { name: "Standard" })).toBeDisabled()
     expect(button("Cancel")).toBeDisabled()
     expect(button("k preview")).toBeDisabled()
     fireEvent.click(button("Close dialog"))
@@ -267,7 +267,7 @@ describe("Athena Difference dialog", () => {
 
   it("invalidates the preview on a stale-version save conflict and requires a fresh project preview", async () => {
     const { project, onSaved, changeProject } = setup()
-    select("STANDARD", "standard"); await preview()
+    select("Standard", "standard"); await preview()
     api.mockRejectedValueOnce(new ApiRequestError({ code: "stale_version", message: "Project revision changed", fields: [], recovery: "Reload" }, 409))
     fireEvent.click(button("Save difference data"))
     expect(await screen.findByRole("alert")).toHaveTextContent("Reload the project")
@@ -281,7 +281,7 @@ describe("Athena Difference dialog", () => {
 
   it("consults the live project getter before saving and never overwrites a project changed during save", async () => {
     const { project, changeProject, onSaved } = setup()
-    select("STANDARD", "standard"); await preview()
+    select("Standard", "standard"); await preview()
     changeProject({ ...project, version: 8 }, false)
     fireEvent.click(button("Save difference data"))
     expect(screen.getByRole("alert")).toHaveTextContent("project changed after this preview")
@@ -298,7 +298,7 @@ describe("Athena Difference dialog", () => {
   })
 
   it("picks absolute energy relative to the returned E₀ without recalculation and rejects old/nonfinite callbacks", async () => {
-    setup(); select("STANDARD", "standard"); await preview()
+    setup(); select("Standard", "standard"); await preview()
     fireEvent.click(button("Pick integration minimum"))
     const oldPick = plot().onPick
     expect(plot().picking).toBe(true)
@@ -326,9 +326,9 @@ describe("Athena Difference dialog", () => {
   })
 
   it("clears picking across DATA changes and restricts it to current E previews with effective E₀", async () => {
-    setup(); select("STANDARD", "standard"); await preview()
+    setup(); select("Standard", "standard"); await preview()
     fireEvent.click(button("Pick integration maximum")); const stale = plot().onPick
-    select("Current DATA", "other")
+    select("Current data", "other")
     act(() => stale(9100))
     expect(screen.getByRole("spinbutton", { name: /^Integration maximum/ })).toHaveValue(30)
     const response = differencePreview(undefined, ["other"]); response.results[0].e0 = null
@@ -338,7 +338,7 @@ describe("Athena Difference dialog", () => {
 
   it("requests ephemeral k processing, renders extrapolation/k errors and saves the energy difference", async () => {
     const { project, onSaved } = setup()
-    select("STANDARD", "standard"); fireEvent.click(button("k preview"))
+    select("Standard", "standard"); fireEvent.click(button("k preview"))
     const response = differencePreview(project, ["data"], { plot_space: "k" })
     Object.assign(response.results[0], { k: [], weighted_chi: [], kweight: null, k_error: "Insufficient EXAFS range", extrapolated_points: 2, warnings: ["2 points linearly extrapolated outside DATA coverage"] })
     await preview(response)
@@ -354,18 +354,18 @@ describe("Athena Difference dialog", () => {
 
   it("accepts input k curves and recoverable input errors, retains energy data and applies the overlay checkbox to both spaces", async () => {
     const { project, onSaved } = setup()
-    select("STANDARD", "standard"); fireEvent.click(button("k preview"))
+    select("Standard", "standard"); fireEvent.click(button("k preview"))
     const response = differencePreview(project, ["data"], { plot_space: "k" })
     response.results[0].input_k = differenceInputs()
     Object.assign(response.results[0].input_k[1], { k: [], weighted_chi: [], kweight: null, error: "STANDARD has no processed EXAFS" })
     await preview(response)
-    expect(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "Plot data and standard" })).toBeChecked()
     expect(plot().preview.results[0].input_k).toEqual(response.results[0].input_k)
     expect(screen.getByText(/STANDARD has no processed EXAFS/)).toHaveTextContent("energy difference can still be saved")
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
     expect(button("Download energy CSV")).toBeEnabled()
     expect(screen.queryByRole("button", { name: "Download preview CSV" })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole("checkbox", { name: "Plot DATA and STANDARD" }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "Plot data and standard" }))
     expect(button("Save difference data")).toBeDisabled()
     const hidden = { ...response, options: { ...response.options, plot_inputs: false } }
     await preview(hidden)
@@ -377,10 +377,10 @@ describe("Athena Difference dialog", () => {
   })
 
   it("accepts empty E input curves and reports a shared failed k STANDARD once across marked results", async () => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     const energy = differencePreview(); energy.results[0].input_k = []
     await preview(energy)
-    fireEvent.click(button("k preview")); select("DATA targets", "marked")
+    fireEvent.click(button("k preview")); select("Data targets", "marked")
     const response = differencePreview(undefined, ["data", "other"], { plot_space: "k" })
     for (const result of response.results) {
       result.input_k = differenceInputs(result.group_id)
@@ -392,7 +392,7 @@ describe("Athena Difference dialog", () => {
   })
 
   it.each(["role", "data-id", "standard-id", "duplicate-role", "array-length", "nonfinite", "weight", "label", "error", "E-space-mixing"] as const)("rejects invalid input k %s without exposing or saving mixed preview data", async kind => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     if (kind !== "E-space-mixing") fireEvent.click(button("k preview"))
     const response = differencePreview(undefined, undefined, { plot_space: kind === "E-space-mixing" ? "E" : "k" })
     const inputs = differenceInputs()
@@ -414,7 +414,7 @@ describe("Athena Difference dialog", () => {
   })
 
   it.each(["backend", "unrelated", "none"] as const)("shows one integration nonconvergence notice with %s warnings", async warningKind => {
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     const response = differencePreview()
     response.results[0].integration!.converged = false
     response.results[0].integration!.iterations = 6
@@ -434,7 +434,7 @@ describe("Athena Difference dialog", () => {
     const createObjectURL = vi.fn((blob: Blob) => { blobs.push(blob); return "blob:preview" })
     vi.stubGlobal("URL", class extends URL { static createObjectURL = createObjectURL; static revokeObjectURL = vi.fn() })
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
-    setup(); select("STANDARD", "standard")
+    setup(); select("Standard", "standard")
     const response = differencePreview(); response.results[0].label = 'diff "foil", one\nminus standard'
     await preview(response)
     fireEvent.click(button("Download preview JSON")); fireEvent.click(button("Download energy CSV"))

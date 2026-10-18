@@ -90,7 +90,8 @@ export function AthenaDataExport({ project, groupId, close, onBusyChange }: {
       running.current = false; setDownloading(false); busy.current(false)
     }
   }
-  return <section className={styles.export} aria-label="Data export controls">
+  return <section className={`ath-modal-body ath-modal-body-framed ${styles.export}`} aria-label="Data export controls">
+    <div className="ath-modal-scroll">
     <div className="ath-fields">
       <label className="ath-field"><span>Export data <SectionHelp label="Export data"><p>The first marked data item supplies the axis for one table. Energy data are linearly interpolated; any extrapolation is listed below. k/R/q grids must match.</p><p>The ZIP contains one column file per marked data item, retaining each data item’s grid. Duplicate labels receive distinct filenames.</p></SectionHelp></span><select value={scope} disabled={downloading} onChange={e => chooseScope(e.target.value)}>
         <option value="current">Current data</option><option value="marked">Marked data · one table</option><option value="each">Each marked data item · ZIP</option>
@@ -120,9 +121,10 @@ export function AthenaDataExport({ project, groupId, close, onBusyChange }: {
       <details><summary>File header and processing parameters</summary><pre>{file.header.join('\n')}</pre></details>
     </article>)}
     {notice && <p role="status">{notice}</p>}
+    </div>
     <div className={`ath-modal-actions ${styles.actions}`}>
-      <button disabled={downloading || loading || badWeight || !selected.length} onClick={() => setRetry(value => value+1)}>Retry preview</button>
       <button disabled={downloading} onClick={close}>Close export</button>
+      <button disabled={downloading || loading || badWeight || !selected.length} onClick={() => setRetry(value => value+1)}>{error ? 'Retry preview' : 'Refresh preview'}</button>
       <button className="ath-primary" disabled={downloading || loading || preview?.signature !== signature || badWeight} onClick={() => { void download() }}>{downloading ? 'Preparing download…' : scope === 'each' ? 'Download ZIP' : 'Download column file'}</button>
     </div>
   </section>

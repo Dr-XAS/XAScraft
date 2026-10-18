@@ -95,7 +95,8 @@ export function AthenaMEE({ project, activeId, selectGroup, setBusy, saved, clos
     if (shift <= 0 || (space === 'k' && x < 0)) { setError('Pick a point above the primary edge.'); return }
     setDraft(d => ({ ...d, shift: shift.toFixed(3) })); setPicking(false)
   }
-  return <div className="ath-modal-body">
+  return <div className="ath-modal-body ath-modal-body-framed">
+    <div className="ath-modal-scroll">
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
         <label className="ath-field"><span>Source data <SectionHelp label="Corrected data">The corrected data keeps the source recipe and is processed again. Frozen sources can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
@@ -126,6 +127,7 @@ export function AthenaMEE({ project, activeId, selectGroup, setBusy, saved, clos
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close MEE tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save MEE-corrected data</button></div>
+    </div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close MEE tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save MEE-corrected data</button></div>
   </div>
 }

@@ -156,7 +156,8 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
   // the one comparison the eye makes.
   const slab = depthView ? current?.options.thickness : undefined
   const normalization = result?.normalization
-  return <div className="ath-modal-body">
+  return <div className="ath-modal-body ath-modal-body-framed">
+    <div className="ath-modal-scroll">
     <p>Fluorescence self-absorption flattens a spectrum because the sample re-absorbs its own emission. Correct it either with Larch’s thick-sample approximation or, for a sample too thin for that, with the Booth finite-thickness slab model. Give the composition, geometry and, for the slab, the thickness and density.</p>
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
@@ -204,6 +205,7 @@ export function AthenaSelfAbsorption({ project, activeId, selectGroup, setBusy, 
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close correction tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Preview again</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save corrected data</button></div>
+    </div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close correction tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Save corrected data</button></div>
   </div>
 }

@@ -53,7 +53,7 @@ async function open(page:Page) {
   return page.getByRole('dialog',{name:'Deglitch and truncate',exact:true})
 }
 async function review(page:Page,dialog:Locator) {
-  const replot=dialog.getByRole('button',{name:'Replot selection',exact:true});await expect(replot).toBeEnabled()
+  const replot=dialog.getByRole('button',{name:'Refresh preview',exact:true});await expect(replot).toBeEnabled()
   const waiting=page.waitForResponse(r=>r.url().endsWith('/point-edit/preview'))
   await replot.click();const response=await waiting;expect(response.ok()).toBe(true)
   const value=await response.json() as PointEditPreview

@@ -122,7 +122,8 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
     : space !== 'E' && arrays[xkey]?.length && arrays[ykey]?.length ? [{ role: 'original', label: group!.label, x: arrays[xkey], y: arrays[ykey] }] : []
   const traces = result?.traces[space] ?? original
   const names = { window: draft.method === 'three_point' ? 'Repetitions' : 'Kernel size · points', sigma: 'Gaussian σ · samples', sgWindow: 'Savitzky–Golay window · points', order: 'Polynomial order' }
-  return <div className={`ath-modal-body ${smoothingStyles.body}`}>
+  return <div className={`ath-modal-body ath-modal-body-framed ${smoothingStyles.body}`}>
+    <div className="ath-modal-scroll">
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
         <label className="ath-field"><span>Source data <SectionHelp label="Smoothing source">Frozen source data can be compared and copied. Main-pane parameter changes process automatically; wait for processing to finish before using this tool.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
@@ -153,6 +154,7 @@ export function AthenaSmoothing({ project, activeId, selectGroup, setBusy, saved
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close smoothing tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and smoothed</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make smoothed data</button></div>
+    </div>
+    <div className={`ath-modal-actions ${styles.actions}`}><button disabled={disabled} onClick={close}>Close smoothing tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make smoothed data</button></div>
   </div>
 }

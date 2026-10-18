@@ -125,7 +125,8 @@ export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,dis
   }
   const curves=output?.plots[draft.plot]??[]
   const displayedSources=completed?project.groups.filter(g=>completed.group_ids.includes(g.id)):marked
-  return <div className={`ath-modal-body ${controls.body}`}>
+  return <div className={`ath-modal-body ath-modal-body-framed ${controls.body}`}>
+    <div className="ath-modal-scroll">
     <div className={styles.layout}><fieldset className={styles.controls} disabled={disabled}>
       <fieldset disabled={disabled||!!completed} className={styles.controls}>
         <label className="ath-field"><span>Merge as <SectionHelp label="Merging spectra">Merge the marked spectra into new data. Review the contributing scans, weights and standard deviation before saving.</SectionHelp></span><select aria-label="Merge as" value={draft.array} onChange={e=>edit({array:e.target.value as Options['array']})}><option value="mu">μ(E)</option><option value="norm">Normalized μ(E)</option><option value="chi">χ(k)</option></select></label>
@@ -150,6 +151,7 @@ export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,dis
         {output.result.excluded.map(e=><p className="ath-warning" key={e.group_id}>Excluded {e.label}: {e.reason}</p>)}{output.result.warnings.map((w,i)=><p className="ath-warning" key={i}>{w}</p>)}{output.processing_error&&<p className="ath-warning">Processing needs attention: {output.processing_error}</p>}</>}
       {current?.notes.map((n,i)=><p className="ath-hint" key={i}>{n}</p>)}{error&&<div className="ath-error" role="alert">{error}</div>}
     </section></div>
-    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>{completed?'Close merge result':'Cancel merge'}</button>{!completed&&<><button disabled={disabled||!valid||loading||!ready} onClick={()=>{setPreview(null);setRetry(n=>n+1)}}>Replot merge</button><button className="ath-primary" disabled={disabled||!current||loading} onClick={()=>void apply()}>Save merged data</button></>}</div>
+    </div>
+    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>{completed?'Close merge result':'Cancel merge'}</button>{!completed&&<><button disabled={disabled||!valid||loading||!ready} onClick={()=>{setPreview(null);setRetry(n=>n+1)}}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled||!current||loading} onClick={()=>void apply()}>Save merged data</button></>}</div>
   </div>
 }

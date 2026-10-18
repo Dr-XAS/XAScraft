@@ -103,7 +103,8 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
   const original = space === 'E' && group && group.data_type !== 'chi' ? [{ role: 'original', label: group.label, x: group.energy.map(x => x + group.parameters.energy_shift), y: group.mu }]
     : space !== 'E' && arrays[xkey]?.length && arrays[ykey]?.length ? [{ role: 'original', label: group!.label, x: arrays[xkey], y: arrays[ykey] }] : []
   const traces = result?.traces[space] ?? original
-  return <div className={`ath-modal-body ${convolutionStyles.body}`}>
+  return <div className={`ath-modal-body ath-modal-body-framed ${convolutionStyles.body}`}>
+    <div className="ath-modal-scroll">
     <div className={styles.layout}>
       <fieldset className={styles.controls} disabled={disabled}>
         <label className="ath-field"><span>Source data <SectionHelp label="Convolution and noise">Compare the original with Gaussian or Lorentzian broadening, artificial noise, or both. Zero width leaves the spectrum unbroadened; zero noise adds no randomness. Saving keeps the exact noise realization shown in the preview.</SectionHelp></span><select aria-label="Source data" value={activeId} onChange={e => selectGroup(e.target.value)}>{project.groups.map(g => <option key={g.id} value={g.id}>{g.label}{g.frozen ? ' · frozen' : ''}</option>)}</select></label>
@@ -132,6 +133,7 @@ export function AthenaConvolution({ project, activeId, selectGroup, setBusy, sav
         {error && <div className="ath-error" role="alert">{error}</div>}
       </section>
     </div>
-    <div className={`ath-modal-actions ${convolutionStyles.actions}`}><button disabled={disabled} onClick={close}>Close convolution tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>Plot data and modified</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make modified data</button></div>
+    </div>
+    <div className={`ath-modal-actions ${convolutionStyles.actions}`}><button disabled={disabled} onClick={close}>Close convolution tool</button><button disabled={disabled || !canCalculate || loading} onClick={() => { setPreview(null); setRetry(v => v + 1) }}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled || !current || loading} onClick={() => { void save() }}>Make modified data</button></div>
   </div>
 }

@@ -1,4 +1,4 @@
-.layout { display: grid; grid-template-columns: minmax(248px, 300px) minmax(0, 1fr); align-items: start; gap: 16px; }
+.layout { display: grid; grid-template-columns: minmax(248px, 300px) minmax(0, 1fr); align-items: start; gap: 12px; }
 .controls { min-width: 0; border: 0; padding: 0; margin: 0; }
 .results { min-width: 0; }
 .plot { height: 390px; min-width: 0; border: 1px solid var(--ath-line); border-radius: 6px; background: var(--ath-surface); overflow: hidden; }

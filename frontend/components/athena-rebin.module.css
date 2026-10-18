@@ -5,5 +5,6 @@
 .plot > p { padding: 16px; }
 .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .actions button { white-space: normal; }
+.actions button[aria-pressed="true"] { border-color: var(--ath-primary); background: var(--ath-primary-soft); color: var(--ath-primary); }
 @media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } .preview { grid-row: 1; } .plot { height: 350px; } }
 @media (max-width: 420px) { .actions { grid-template-columns: minmax(0, 1fr); } }

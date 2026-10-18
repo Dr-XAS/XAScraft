@@ -39,7 +39,7 @@ async function open(page:Page){
   await expect(dialog.getByText(/Preview ready at project revision/)).toBeVisible();return dialog
 }
 async function review(page:Page,dialog:Locator){
-  const replot=dialog.getByRole('button',{name:'Replot alignment',exact:true});await expect(replot).toBeEnabled()
+  const replot=dialog.getByRole('button',{name:'Refresh preview',exact:true});await expect(replot).toBeEnabled()
   const wait=page.waitForResponse(r=>r.url().endsWith('/alignment/preview'));await replot.click();const response=await wait
   expect(response.ok()).toBe(true);const v=await response.json() as AlignmentPreview,r=v.rows[0]
   await expect(dialog.getByText(/Preview ready at project revision/)).toBeVisible()

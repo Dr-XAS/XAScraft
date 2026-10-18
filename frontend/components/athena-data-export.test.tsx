@@ -72,7 +72,7 @@ it('ignores late previews and rejects malformed output data', async () => {
   await act(async () => { first({ ...data, files: [] }) })
   expect(screen.queryByRole('alert')).toBeNull()
   api.mockResolvedValueOnce({ ...data, version: 3 })
-  fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('could not be confirmed')
   expect(screen.getByRole('button', { name: 'Download column file' })).toBeDisabled()
 })
