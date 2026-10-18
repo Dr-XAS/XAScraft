@@ -223,7 +223,7 @@ export function AthenaColumnSelection({ projectId, version, inspection, mapping,
         <AthenaImportPreview projectId={projectId} version={version} uploadId={inspection.upload_id} mapping={mapping} disabled={busy} automaticExafs={!replacement} />
         <AthenaBeamlineMetadata value={inspection.beamline_metadata} />
         <AthenaBeamlineMetadata value={inspection.xdi_metadata} />
-        {inspection.source_preview && <details className={styles.raw}><summary>{inspection.source_preview_format === 'hex' ? 'Binary source bytes (hex)' : 'Source file contents'}{inspection.source_preview_truncated ? " (first section)" : ""}</summary><AthenaDownloadButton path={`/projects/${projectId}/uploads/${inspection.upload_id}/file`}>Download original file</AthenaDownloadButton><pre>{inspection.source_preview.replaceAll('\0', '␀')}</pre></details>}
+        {inspection.source_preview && <details className={styles.raw} open><summary>{inspection.source_preview_format === 'hex' ? 'Binary source bytes (hex)' : 'Source file contents'}{inspection.source_preview_truncated ? " (first section)" : ""}</summary><AthenaDownloadButton path={`/projects/${projectId}/uploads/${inspection.upload_id}/file`}>Download original file</AthenaDownloadButton><pre>{inspection.source_preview.replaceAll('\0', '␀')}</pre></details>}
         {inspection.converted_preview && <details className={styles.raw}><summary>Converted columns{inspection.converted_preview_truncated ? " (first section)" : ""}</summary><AthenaDownloadButton path={`/projects/${projectId}/uploads/${inspection.upload_id}/file?variant=converted`}>Download converted file</AthenaDownloadButton><pre>{inspection.converted_preview}</pre></details>}
       </div>
     </div>

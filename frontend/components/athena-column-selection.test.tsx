@@ -469,7 +469,7 @@ it('prevents reader suggestion changes while importing', () => {
 })
 it('presents binary source bytes as hexadecimal with the original download', () => {
   render(<Harness inspection={{ source_preview_format: 'hex', source_preview: '00000000  53 53 52 4c' }} />)
-  fireEvent.click(screen.getByText('Binary source bytes (hex) (first section)'))
+  expect(screen.getByText('Binary source bytes (hex) (first section)').closest('details')).toHaveAttribute('open')
   expect(screen.getByText(/00000000\s+53 53 52 4c/)).toBeVisible()
   expect(screen.getByRole('button', { name: 'Download original file' })).toBeVisible()
 })
@@ -479,7 +479,7 @@ it('shows file conversion and separate original/converted downloads without chan
     source_preview: 'EXAFS\0padding', converted_preview: '# energy 1 2 3 4 5 6 7', converted_preview_truncated: true }} />)
   const before = accepted()
   expect(screen.getByLabelText('File conversion')).toHaveTextContent('NSLS beamline X10C')
-  fireEvent.click(screen.getByText('Source file contents (first section)'))
+  expect(screen.getByText('Source file contents (first section)').closest('details')).toHaveAttribute('open')
   fireEvent.click(screen.getByText('Converted columns (first section)'))
   expect(screen.getByText('EXAFS␀padding')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Download original file' })).toBeEnabled()
@@ -488,7 +488,7 @@ it('shows file conversion and separate original/converted downloads without chan
 })
 it('offers transport-backed original and converted upload downloads', () => {
   render(<Harness inspection={{ source_preview: 'source', converted_preview: 'converted' }} />)
-  fireEvent.click(screen.getByText('Source file contents (first section)'))
+  expect(screen.getByText('Source file contents (first section)').closest('details')).toHaveAttribute('open')
   fireEvent.click(screen.getByText('Converted columns'))
   expect(screen.getByRole('button', { name: 'Download original file' })).toBeEnabled()
   expect(screen.getByRole('button', { name: 'Download converted file' })).toBeEnabled()
@@ -496,7 +496,7 @@ it('offers transport-backed original and converted upload downloads', () => {
 
 it('offers the original full file for ordinary tables without a conversion label', () => {
   render(<Harness />)
-  fireEvent.click(screen.getByText('Source file contents (first section)'))
+  expect(screen.getByText('Source file contents (first section)').closest('details')).toHaveAttribute('open')
   expect(screen.getByRole('button', { name: 'Download original file' })).toBeVisible()
   expect(screen.queryByLabelText('File conversion')).not.toBeInTheDocument()
   expect(screen.queryByText(/Converted columns/)).not.toBeInTheDocument()
