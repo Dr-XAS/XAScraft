@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 import base64
 import binascii
 import ctypes
-import fcntl
 import hashlib
 import hmac
 import json
@@ -22,6 +21,7 @@ import unicodedata
 
 from pydantic import TypeAdapter
 
+from .file_lock import exclusive_file_lock
 from .integration_contracts import (
     ArtifactSourceIdentity,
     DraftStatus,
@@ -268,6 +268,10 @@ class IntegrationStorage:
 
     @staticmethod
     def _fsync_directory(path: Path) -> None:
+        # Windows CRT descriptors cannot open directories. Individual files
+        # are still flushed before replacement; POSIX keeps directory fsync.
+        if os.name == "nt":
+            return
         descriptor = os.open(path, os.O_RDONLY)
         try:
             os.fsync(descriptor)
@@ -422,14 +426,8 @@ class IntegrationStorage:
     @contextmanager
     def _lock(self, name: str) -> Iterator[None]:
         path = self.root / f".{name}.lock"
-        descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            os.fchmod(descriptor, 0o600)
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        with exclusive_file_lock(path):
             yield
-        finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-            os.close(descriptor)
 
     @staticmethod
     def _validate_project_id(project_id: str) -> str:

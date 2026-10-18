@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-import fcntl
 import json
 import os
 import re
@@ -12,6 +11,7 @@ from typing import Any, Iterator, Mapping
 import numpy as np
 
 from .errors import WorkspaceStateError
+from .file_lock import exclusive_file_lock
 
 _OPAQUE_ID = re.compile(r"[A-Za-z0-9_-]{16,128}\Z")
 _SAFE_NAME = re.compile(r"[A-Za-z0-9_.-]+\Z")
@@ -72,20 +72,14 @@ class WorkspaceStorage:
     def lock(self, workspace_id: str, name: str = "workspace.lock") -> Iterator[None]:
         """Serialize workspace mutation across threads and local worker processes.
 
-        A caller that needs a second, independent lock names it. flock is held
+        A caller that needs a second, independent lock names it. Locks are held
         per descriptor, so taking the same lock twice in one thread deadlocks;
         separate names are how a side file gets ordering of its own without
         having to nest inside the mutation lock.
         """
         path = self.path(workspace_id, name)
-        descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            os.fchmod(descriptor, 0o600)
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        with exclusive_file_lock(path):
             yield
-        finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-            os.close(descriptor)
 
     def _atomic_replace(self, path: Path, writer) -> None:
         temp = path.with_name(f".{path.name}.{secrets.token_urlsafe(8)}.tmp")
