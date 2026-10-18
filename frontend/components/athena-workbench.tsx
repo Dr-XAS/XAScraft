@@ -59,6 +59,7 @@ import { AthenaPluginRegistry } from './athena-plugin-registry'
 import { AthenaBeamlineMetadata, AthenaBeamlinePreferences } from './athena-beamline-metadata'
 import { AthenaSupportedFormats } from './athena-supported-formats'
 import { AthenaXDIControls } from './athena-xdi-controls'
+import { useCompactNumberDisplay } from './use-compact-number-display'
 import { AthenaDataExport } from './athena-data-export'
 import { AthenaParameterReport } from './athena-parameter-report'
 import { AthenaQualityReport } from './athena-quality-report'
@@ -254,18 +255,19 @@ function NumberField({ label, visibleLabel = label, value, onChange, unit, effec
   const inputId = useId()
   const [emptyWhileEditing, setEmptyWhileEditing] = useState(false)
   const automaticValue = optional && typeof effective === "number" && Number.isFinite(effective)
-    ? Number(effective.toPrecision(10)) : null
+    ? effective : null
   // Display the result without turning an automatic (null) recipe into an
   // explicit override. Clearing stays blank until blur so typing still works.
   const displayedValue = value ?? (!emptyWhileEditing ? automaticValue : null) ?? ""
+  const numberDisplay = useCompactNumberDisplay(displayedValue, { min: range.min, max: range.max, step: range.integer ? 1 : step })
   const problem = numericRangeProblem(value, range, label, optional)
-  const input = (descriptionId?: string, helpIcon?: ReactNode) => <label className="ath-field" htmlFor={inputId}>{contextMenu ? <ContextLabel label={label} open={contextMenu}><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</ContextLabel> : <span><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</span>}<input ref={node => { node?.setCustomValidity(problem ?? "") }} id={inputId} disabled={disabled} aria-invalid={!!problem} aria-describedby={[descriptionId, problem ? `${inputId}-range-error` : undefined, optional && value === null ? `${inputId}-calculated` : undefined].filter(Boolean).join(" ") || undefined} aria-label={`${label}${unit ? ` ${unit}` : ""}`} type="number" min={range.min} max={range.max} step={range.integer ? 1 : step} value={displayedValue} onFocus={() => onIncompleteChange?.(emptyWhileEditing)} onChange={e => {
+  const input = (descriptionId?: string, helpIcon?: ReactNode) => <label className="ath-field" htmlFor={inputId}>{contextMenu ? <ContextLabel label={label} open={contextMenu}><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</ContextLabel> : <span><span className="ath-field-title">{visibleLabel}{helpIcon}</span>{unit && <small>{unit}</small>}</span>}<input ref={node => { node?.setCustomValidity(problem ?? "") }} id={inputId} disabled={disabled} aria-invalid={!!problem} aria-describedby={[descriptionId, problem ? `${inputId}-range-error` : undefined, optional && value === null ? `${inputId}-calculated` : undefined].filter(Boolean).join(" ") || undefined} aria-label={`${label}${unit ? ` ${unit}` : ""}`} type="number" min={range.min} max={range.max} step={range.integer ? 1 : step} value={numberDisplay.value} title={numberDisplay.title} onFocus={() => { numberDisplay.onFocus(); onIncompleteChange?.(emptyWhileEditing) }} onChange={e => {
     setEmptyWhileEditing(e.target.value === "")
     // A valid value can process while focused. Hold a cleared/partial number
     // until blur or Enter so it is not submitted as an automatic (null) value.
     onIncompleteChange?.(e.target === document.activeElement && e.target.value === "")
     onChange(e.target.value === "" ? null : Number(e.target.value))
-  }} onBlur={() => { setEmptyWhileEditing(false); onIncompleteChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}</label>
+  }} onBlur={() => { numberDisplay.onBlur(); setEmptyWhileEditing(false); onIncompleteChange?.(false) }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur() } }} />{optional && value === null && <span id={`${inputId}-calculated`} className="ath-sr-only">Calculated from this spectrum. Edit to override; clear to use the calculated value.</span>}</label>
   // Messages grow below the controls so stepping a value cannot move its pick
   // button or push the neighbouring input down to the message's baseline.
   const content = (descriptionId?: string, helpIcon?: ReactNode) => <div className="ath-number-field">

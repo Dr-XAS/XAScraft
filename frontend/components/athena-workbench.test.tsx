@@ -3600,11 +3600,19 @@ describe("AthenaWorkbench plot picking", () => {
     const pickK = armPick("Spline k min")
     expect(plotProps("current").space).toBe("k")
     act(() => pickK(2, "k"))
-    expect(screen.getByRole("spinbutton", { name: /^Spline energy min/ })).toHaveValue(4 * conversion)
+    const energyMin = screen.getByRole("spinbutton", { name: /^Spline energy min/ })
+    expect(energyMin).toHaveValue(15.23993)
+    fireEvent.focus(energyMin)
+    expect(energyMin).toHaveValue(4 * conversion)
+    fireEvent.blur(energyMin)
     editNumber(/^Spline energy max/, 25 * conversion)
     expect(screen.getByRole("spinbutton", { name: /^Spline k max/ })).toHaveValue(5)
     editNumber(/^Spline k max/, 4)
-    expect(screen.getByRole("spinbutton", { name: /^Spline energy max/ })).toHaveValue(16 * conversion)
+    const energyMax = screen.getByRole("spinbutton", { name: /^Spline energy max/ })
+    expect(energyMax).toHaveValue(60.95971)
+    fireEvent.focus(energyMax)
+    expect(energyMax).toHaveValue(16 * conversion)
+    fireEvent.blur(energyMax)
     const pickEnergy = armPick("Spline energy max")
     expect(plotProps("current").space).toBe("E")
     act(() => pickEnergy(8979 + 9 * conversion, "E"))
@@ -4946,7 +4954,12 @@ describe("AthenaWorkbench automatic normalization values", () => {
     initial.groups[0].result!.effective = { ...initial.groups[0].result!.effective, bkg_kmax: 25.019, kmax: 12.5 }
     await openSaved(initial)
     expect(screen.getByRole("spinbutton", { name: /^Spline k max/ })).toHaveValue(25.019)
-    expect(Number((screen.getByRole("spinbutton", { name: /^Spline energy max/ }) as HTMLInputElement).value)).toBeCloseTo(25.019 ** 2 * 3.8099821109685847, 5)
+    const energyLimit = screen.getByRole("spinbutton", { name: /^Spline energy max/ })
+    expect(energyLimit).toHaveValue(2384.86)
+    fireEvent.focus(energyLimit)
+    expect(Number((energyLimit as HTMLInputElement).value)).toBeCloseTo(25.019 ** 2 * 3.8099821109685847, 10)
+    fireEvent.blur(energyLimit)
+    expect(energyLimit).toHaveValue(2384.86)
     expect(screen.getByRole("spinbutton", { name: /^FT k max/ })).toHaveValue(12.5)
     expect(screen.queryByText(/^Auto:/)).not.toBeInTheDocument()
     expect(screen.queryByPlaceholderText("Auto")).not.toBeInTheDocument()
@@ -4956,17 +4969,20 @@ describe("AthenaWorkbench automatic normalization values", () => {
 
   it("shows calculated normalization values without changing the automatic recipe or creating a draft", async () => {
     const project = await openSaved(automaticProject())
-    for (const [label, value] of [
-      [/^E₀/, 8979.125], [/^Edge step/, 0.0000123456789],
-      [/^Pre-edge start/, -145], [/^Pre-edge end/, -72.5],
-      [/^Post-edge start/, 25], [/^Post-edge end/, 620],
+    vi.useFakeTimers()
+    for (const [label, exact, compact] of [
+      [/^E₀/, 8979.125, 8979.125], [/^Edge step/, 0.0000123456789, 0.00001234568],
+      [/^Pre-edge start/, -145, -145], [/^Pre-edge end/, -72.5, -72.5],
+      [/^Post-edge start/, 25, 25], [/^Post-edge end/, 620, 620],
     ] as const) {
       const input = screen.getByRole("spinbutton", { name: label })
-      expect(input).toHaveValue(value)
+      expect(input).toHaveValue(compact)
       fireEvent.focus(input)
+      expect(input).toHaveValue(exact)
       fireEvent.blur(input)
-      expect(input).toHaveValue(value)
+      expect(input).toHaveValue(compact)
     }
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
     const degree = screen.getByRole("combobox", { name: "Polynomial degree" })
     expect(degree).toHaveValue("")
     expect(degree.querySelector('option[value=""]')).toHaveTextContent("2")
@@ -4979,7 +4995,46 @@ describe("AthenaWorkbench automatic normalization values", () => {
       expect(plotProps().active!.parameters[key]).toBeNull()
     }
     expect(plotProps().active!.parameters).toEqual(project.groups[0].parameters)
+    expect(plotProps().active!.result!.effective.edge_step).toBe(0.0000123456789)
     expect(api.mock.calls).toEqual([[`/projects/${project.id}`]])
+  })
+
+  it("preserves full parameter precision when editing and never submits compact automatic values", async () => {
+    const initial = automaticProject()
+    initial.groups[0].parameters.pre1 = -145.123456789
+    initial.groups[0].result!.effective.e0 = 8979.123456789
+    const project = await openSaved(initial)
+    vi.useFakeTimers()
+    const preEdge = screen.getByRole("spinbutton", { name: /^Pre-edge start/ })
+    const energy = screen.getByRole("spinbutton", { name: /^E₀/ })
+    expect(preEdge).toHaveValue(-145.1235)
+    expect(energy).toHaveValue(8979.123)
+    expect(energy).toHaveAttribute("title", "8979.123456789")
+    act(() => energy.focus())
+    expect(energy).toHaveValue(8979.123456789)
+    act(() => preEdge.focus())
+    expect(preEdge).toHaveValue(-145.123456789)
+    act(() => preEdge.blur())
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    expect(api.mock.calls).toEqual([[`/projects/${project.id}`]])
+    expect(plotProps().active!.parameters).toMatchObject({ e0: null, step: null, pre1: -145.123456789 })
+    expect(screen.queryByRole("button", { name: /Discard parameter changes/ })).not.toBeInTheDocument()
+
+    const edited = -144.234567891
+    api.mockResolvedValueOnce(nextProject(project, { foil: {
+      parameters: { ...project.groups[0].parameters, pre1: edited },
+    } }))
+    act(() => preEdge.focus())
+    editNumber(/^Pre-edge start/, edited)
+    expect(preEdge).toHaveValue(edited)
+    act(() => preEdge.blur())
+    expect(preEdge).toHaveValue(-144.2346)
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "parameters", group_ids: ["foil"], options: { pre1: edited },
+    })
+    expect(plotProps().active!.parameters).toMatchObject({ e0: null, step: null, pre1: edited })
+    expect(plotProps().active!.result!.effective.e0).toBe(8979.123456789)
   })
 
   it("applies only edited parameters and refreshes automatic numbers from the returned result", async () => {
