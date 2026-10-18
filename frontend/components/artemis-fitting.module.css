@@ -46,6 +46,7 @@
 .metadata { margin: 5px 0 8px; color: var(--ath-muted, #647669); font-size: var(--text-caption); }
 .modelField { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin: 8px 0; }
 .editor button.insertModel { min-height: 30px; color: var(--ath-primary, #268553); white-space: nowrap; }
+.editor button.applyModel { color: var(--ath-primary, #7c3aed); font-weight: 600; }
 .insertModel[aria-expanded=true] svg { transform: rotate(180deg); }
 .modelPanel { grid-column: 1 / -1; min-width: 0; padding: 8px; border: 1px solid var(--ath-line, #dce5dc); border-radius: 4px; }
 .modelPanel[hidden] { display: none; }

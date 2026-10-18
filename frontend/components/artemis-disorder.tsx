@@ -42,7 +42,7 @@ export function ArtemisDisorderControl({ index, enabled, onApply, onPreview }: {
       <p className={styles.disorderExpression}>On apply: σ² = <code>{preview.expression}</code></p>
       {preview.removed.length > 0 && <p>Sync removes unused parameters: {preview.removed.join(", ")}, including any used only by excluded paths. Project Undo restores their values and bounds.</p>}
     </div>}
-    <button type="button" disabled={!enabled} onClick={() => onApply(options)}>Apply σ² model and sync</button>
+    <button type="button" className={styles.applyModel} disabled={!enabled} onClick={() => onApply(options)}>Apply σ² model and sync</button>
     <SectionHelp label="Apply σ² model">Apply replaces this path’s σ² expression and syncs parameters for included paths. Share names in the σ² fields to couple paths, or enter a justified constraint such as 2 * sig2_1.</SectionHelp>
   </>
 }

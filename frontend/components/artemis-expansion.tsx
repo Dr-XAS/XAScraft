@@ -24,6 +24,6 @@ export function ArtemisExpansionControl({ index, enabled, reff, onApply, onPrevi
       <p className={styles.disorderExpression}>On apply: ΔR = <code>{preview.expression}</code></p>
       {preview.removed.length > 0 && <p>Sync removes unused parameters: {preview.removed.join(", ")}, including any used only by excluded paths. Project Undo restores their values and bounds.</p>}
     </div>}
-    <button type="button" disabled={!enabled} aria-label={`Apply ΔR model for path ${index}`} onClick={() => onApply(options)}>Apply ΔR model and sync</button>
+    <button type="button" className={styles.applyModel} disabled={!enabled} aria-label={`Apply ΔR model for path ${index}`} onClick={() => onApply(options)}>Apply ΔR model and sync</button>
   </>
 }
