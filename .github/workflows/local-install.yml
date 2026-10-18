@@ -1,0 +1,105 @@
+name: Local installation
+
+on:
+  push:
+    branches: [master]
+    tags: ['xascraft-v*']
+    paths:
+      - 'Install.command'
+      - 'Install Windows.cmd'
+      - 'installers/local/**'
+      - 'tests/local_install/**'
+      - 'backend/xraylarch_web/**'
+      - 'backend/requirements.txt'
+      - 'frontend/**'
+      - 'larch/**'
+      - 'pyproject.toml'
+      - 'deploy/python-release-constraints.txt'
+      - '.github/workflows/local-install.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'installers/local/**'
+      - 'tests/local_install/**'
+      - 'Install.command'
+      - 'Install Windows.cmd'
+      - 'backend/xraylarch_web/file_lock.py'
+      - 'backend/xraylarch_web/storage.py'
+      - 'backend/xraylarch_web/integration_storage.py'
+      - '.github/workflows/local-install.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      XASCRAFT_INSTALL_ROOT: ${{ runner.temp }}/XAScraft local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer regressions
+        run: |
+          python -m pip install pytest==8.4.1
+          python -m pytest tests/local_install -q
+      - name: Install from source (macOS / Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash Install.command --no-shortcuts
+      - name: Install from source (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./installers/local/install-windows.ps1 --no-shortcuts
+      - name: Check installed lifecycle and native shortcuts
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path(os.environ['XASCRAFT_INSTALL_ROOT'])
+          subprocess.run([sys.executable, 'tests/local_install/smoke_installed.py', str(root)], check=True)
+          current = json.loads((root / 'current.json').read_text())
+          metadata = json.loads((root / 'releases' / current['release'] / 'release.json').read_text())
+          subprocess.run([metadata['controller_python'], 'installers/local/run.py', '--root', str(root),
+                          'shortcuts', '--directory', str(root / 'test shortcuts')], check=True)
+      - name: Preserve diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-install-${{ runner.os }}
+          path: ${{ env.XASCRAFT_INSTALL_ROOT }}/logs/
+
+  publish-source:
+    if: startsWith(github.ref, 'refs/tags/xascraft-v') && github.repository == 'Dr-XAS/XAScraft'
+    needs: install
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build versioned source distribution
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python installers/local/run.py package --source . --tag "$RELEASE_TAG" --output dist/xascraft-source.zip
+      - name: Publish source after platform checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/xascraft-source.zip dist/xascraft-source.zip.sha256 \
+            --repo Dr-XAS/XAScraft --verify-tag --title "XAScraft $RELEASE_TAG" \
+            --notes "Local source installer. See docs/local-installation.md for installation, platform support and updates."

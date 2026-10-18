@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XAScraft Manager</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#182d3d;background:#f4f7fa;color-scheme:light dark}
+body{max-width:780px;margin:56px auto;padding:0 20px}h1{font-size:28px;letter-spacing:-.8px;margin-bottom:4px}
+p{line-height:1.6}.sub{color:#526777;margin-top:0}section{background:#fff;border:1px solid #dbe4eb;border-radius:14px;padding:20px;margin:16px 0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,a.button{font:inherit;background:#156291;color:#fff;border:0;border-radius:7px;padding:10px 15px;text-decoration:none;cursor:pointer}
+button.secondary{background:#e8eef3;color:#182d3d}button:disabled{opacity:.45;cursor:default}h2{font-size:17px;margin:0 0 12px}
+.tag{font-size:13px;padding:4px 9px;background:#e8eef3;border-radius:20px}#error{color:#a52727;white-space:pre-wrap}#message{color:#385a71}
+dl{display:grid;grid-template-columns:95px 1fr;gap:10px;font-size:14px}dt{color:#526777}dd{margin:0;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:360px;overflow:auto}small{color:#526777;line-height:1.5}
+@media(prefers-color-scheme:dark){:root{background:#121c24;color:#e4edf5}section{background:#1b2934;border-color:#344552}.sub,small,dt,#message{color:#b2c5d5}.tag,button.secondary{background:#344552;color:#e4edf5}#error{color:#ffafab}}
+</style>
+<h1>XAScraft <span style="font-weight:400">Manager</span></h1>
+<p class="sub">Run and update XAScraft on this computer.</p>
+<section><div class="row"><h2 style="margin:0">Local application</h2><span class="tag" id="state">Connecting…</span></div>
+<p id="message" role="status" aria-live="polite"></p><p id="error" role="alert"></p>
+<div class="row"><button id="start">Start</button><a id="open" class="button" hidden target="_blank" rel="noreferrer">Open XAScraft</a><button id="stop" class="secondary">Stop</button><button id="quit" class="secondary">Quit Manager</button></div>
+<p><small>Save your work before stopping. Closing a browser tab leaves XAScraft running.</small></p>
+<dl><dt>Version</dt><dd id="version"></dd><dt>Data folder</dt><dd id="data"></dd><dt>Latest backup</dt><dd id="backup">—</dd></dl></section>
+<section><h2>Updates</h2><p id="update-note">Updates are installed only when you choose. Stop the application first.</p>
+<div class="row"><button id="check" class="secondary">Check for updates</button><button id="update" disabled>Install update</button></div>
+<p><small>Only packaged releases from Dr-XAS/XAScraft are offered. Updating preserves your data and saves a backup.</small></p></section>
+<section><div class="row"><h2 style="margin:0">Logs</h2><button id="logs" class="secondary">Show logs</button></div><pre id="log-output" hidden></pre></section>
+<script>
+let latest = null, quitting = false;
+const el = id => document.getElementById(id);
+async function action(name) {
+  if (name === 'quit') quitting = true;
+  const res = await fetch('api/action', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:name,tag:latest?.tag})});
+  const body = await res.json();
+  if (!res.ok) {quitting=false; el('error').textContent=body.error; return;}
+  if (name === 'quit') {el('message').textContent='Manager closed. You can close this tab.'; return;}
+  await refresh();
+}
+async function refresh() {
+  if (quitting) return;
+  try {
+    const res = await fetch('api/status'); if (!res.ok) throw new Error('Manager unavailable');
+    const s = await res.json(); latest = s.latest;
+    el('state').textContent = s.busy ? ({start:'Starting…',stop:'Stopping…',check:'Checking…',update:'Installing update…'}[s.busy] || s.busy) : s.running ? 'Running' : 'Stopped';
+    el('message').textContent=s.message; el('error').textContent=s.error;
+    el('version').textContent=s.label;el('data').textContent=s.data;el('backup').textContent=s.backup || '—';
+    el('open').hidden=!s.running;el('open').href=s.url;
+    el('start').disabled=!!s.busy || s.running || s.restart_required;
+    el('stop').disabled=!!s.busy || !s.active;el('quit').disabled=!!s.busy;
+    el('check').disabled=!!s.busy;
+    el('update').disabled=!!s.busy || s.active || !s.update_available || s.restart_required;
+    if (s.restart_required) el('message').textContent='Update installed. Quit this Manager and reopen XAScraft to load the new version.';
+    el('update-note').textContent=latest ? (!s.update_available ? 'You have the latest published release or a newer version.' : 'Available: '+latest.tag+'. Stop XAScraft, then install when you are ready.') : 'Updates are installed only when you choose. Stop the application first.';
+  } catch(e) {el('error').textContent='Manager is not reachable. Reopen the XAScraft Manager shortcut.';}
+}
+for (const name of ['start','stop','quit','check','update']) el(name).onclick=()=>action(name).catch(e=>{el('error').textContent=e.message;});
+el('logs').onclick=async()=>{const res=await fetch('api/logs');const logs=await res.json();el('log-output').hidden=false;el('log-output').textContent=Object.entries(logs).map(([name,text])=>name+'\n'+text).join('\n\n');};
+refresh();setInterval(refresh,1500);
+</script></html>

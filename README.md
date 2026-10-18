@@ -506,6 +506,15 @@ endpoint or admin page: reports are reviewed on disk.
 
 ### Run locally
 
+For a per-user installation with **XAScraft** and **XAScraft Manager** application
+icons, use `Install.command` (macOS/Linux) or `Install Windows.cmd` (Windows x64)
+from this source folder. The installer prepares private Python/Node runtimes,
+builds the application, and checks bundled spectra and native FEFF before
+activating it. Projects live outside the code directory. See the
+[local installation and update guide](docs/local-installation.md) for supported
+platforms, manual updates, backups, and troubleshooting. The developer commands
+below remain available.
+
 The frontend uses Node.js 24 LTS (`frontend/.nvmrc`); Node.js 22 or newer is
 required by Plotly 4. Select that runtime before installing dependencies with
 `npm ci` inside `frontend/`, and use the same Node major in CI and deployment.
