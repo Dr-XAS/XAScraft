@@ -47,7 +47,14 @@ export function measurementModeLabel(group: AthenaGroup): "trans" | "fluo" | nul
   return mode === "transmission" ? "trans" : mode === "fluorescence" ? "fluo" : null
 }
 export function importedAsReference(group: AthenaGroup): boolean {
+  // Legacy combined imports could copy the foil flag onto their samples.
+  // A linked sample (or a retained sample/reference recipe) is not itself a foil.
+  if (group.reference_id) return false
   const mapping = group.source.mapping
+  if (mapping && typeof mapping === "object" && !Array.isArray(mapping)) {
+    const columns = mapping as Record<string, unknown>
+    if (columns.reference_numerator || columns.reference_denominator) return false
+  }
   return !!mapping && typeof mapping === "object" && !Array.isArray(mapping)
     && (mapping as Record<string, unknown>).is_reference === true
 }

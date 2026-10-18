@@ -1176,6 +1176,23 @@ describe("AthenaWorkbench measurement mode tags", () => {
     expect(api).toHaveBeenCalledOnce()
   })
 
+  it("does not label legacy linked samples as reference even with a copied foil flag", async () => {
+    const reference = group("foil", "Actual foil")
+    reference.source = { mapping: { mode: "transmission", is_reference: true } }
+    const samples = ["transmission", "fluorescence"].map(mode => {
+      const sample = group(mode, `${mode} sample`)
+      sample.reference_id = reference.id
+      sample.source = { mapping: { mode, is_reference: true, reference_numerator: "it", reference_denominator: "iref" } }
+      return sample
+    })
+    await openSaved(projectFixture({ groups: [...samples, reference] }))
+    for (const sample of samples) {
+      const row = screen.getByRole("button", { name: new RegExp(`^${sample.label}`) })
+      expect(within(row).queryByText(/^ref/)).toBeNull()
+    }
+    expect(within(screen.getByRole("button", { name: /^Actual foil/ })).getByText("ref · 2")).toBeVisible()
+  })
+
   it("labels imported measurement modes and references without guessing direct signals", async () => {
     const transmission = group("transmission", "Transmission scan")
     transmission.source = { mapping: { mode: "transmission" } }
