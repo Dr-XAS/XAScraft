@@ -40,8 +40,6 @@ jobs:
         os: [macos-14, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
-    env:
-      XASCRAFT_INSTALL_ROOT: ${{ runner.temp }}/XAScraft local
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +47,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Set installation directory
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'XAScraft local'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+              env.write(f'XASCRAFT_INSTALL_ROOT={root}\n')
       - name: Installer regressions
         run: |
           python -m pip install pytest==8.4.1
