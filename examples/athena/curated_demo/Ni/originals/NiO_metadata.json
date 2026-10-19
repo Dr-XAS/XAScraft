@@ -1,0 +1,72 @@
+{
+  "sample_id": "d49dcb8b-2905-44fb-8dfd-04f1e2e7a1e4",
+  "name": "Nickel(II) oxide",
+  "formula": "NiO",
+  "beamline": null,
+  "detection_modes": [],
+  "asset_id": "measurement_27b86705-ee5f-4178-bcc5-aece53a1f53a",
+  "file_name": "20260211_NiO_CAS_1313-99-1.0001",
+  "available": true,
+  "size_bytes": 466100,
+  "expected_sha256": "5deb7048849dfda5592a77c92cafb351085a77f8e3eb77560a71e849cd05acde",
+  "sample_url": "http://drxas.xray.aps.anl.gov:6767/samples/d49dcb8b-2905-44fb-8dfd-04f1e2e7a1e4",
+  "asset_url": "http://drxas.xray.aps.anl.gov:6767/api/v1/export/samples/d49dcb8b-2905-44fb-8dfd-04f1e2e7a1e4/assets/measurement_27b86705-ee5f-4178-bcc5-aece53a1f53a",
+  "measurement": {
+    "xas_status": "measured",
+    "xas_readiness": "needs_attention",
+    "xrd_status": "blank",
+    "absorption_edge": null,
+    "reference_elements": [],
+    "detection_modes": [],
+    "sample_environment": null,
+    "temperature": null,
+    "sensitivity": null,
+    "beamline": null,
+    "proposal": null
+  },
+  "selected_channel": "XMAP12B:NiKa_Sum",
+  "header_E0_eV": 8331.49,
+  "header_beamline": "20 BM",
+  "points": 445,
+  "column_1based": {
+    "energy": 1,
+    "I0": 4,
+    "It": 5,
+    "fluorescence": 9
+  },
+  "scan_header": "# 1-D Scan File created by LabVIEW Control Panel  2/11/2026  10:17:44 PM; Scan time 0 hrs 7 min 42 sec. ",
+  "normalization": {
+    "pre_relative_eV": [
+      -150,
+      -30
+    ],
+    "post_relative_eV": [
+      150,
+      450
+    ],
+    "transmission": {
+      "pre_linear_coeff": [
+        -0.0005003265171390765,
+        -1.5496596187174496
+      ],
+      "post_linear_coeff": [
+        -0.0011005596057863593,
+        0.3543168405470984
+      ],
+      "edge_step_at_header_E0": 1.903976459264548
+    },
+    "fluorescence": {
+      "pre_linear_coeff": [
+        7.877919048895486e-05,
+        0.01084852105134888
+      ],
+      "post_linear_coeff": [
+        0.00014223076462944721,
+        0.8470698832131458
+      ],
+      "edge_step_at_header_E0": 0.8362213621617969
+    }
+  },
+  "max_ROI_counts": 506306.0,
+  "comparison_note": "Same raw scan; no independent energy alignment; no dead-time/self-absorption correction applied to FY ratio. Different amplifier gains produce only a constant transmission offset when gains are fixed."
+}

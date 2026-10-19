@@ -1,0 +1,95 @@
+{
+  "id": "4fc19e4a457041dd8c5d461a3d783227",
+  "status": "complete",
+  "request": {
+    "amcsd_id": 11371,
+    "project_id": null,
+    "attachment_id": null,
+    "version": null,
+    "absorber": "Ni",
+    "edge": "K",
+    "site_index": 1,
+    "cluster_radius": 6.0,
+    "path_radius": 4.0,
+    "max_legs": 4,
+    "max_paths": null
+  },
+  "provenance": {
+    "cif": "data_global\n_chemical_name_mineral 'Bunsenite'\nloop_\n_publ_author_name\n'Wyckoff R W G'\n_journal_name_full 'Crystal Structures'\n_journal_volume 1\n_journal_year 1963\n_journal_page_first 85\n_journal_page_last 237\n_publ_section_title\n;\n Second edition. Interscience Publishers, New York, New York\n rocksalt structure\n;\n_database_code_amcsd 11371\n_chemical_formula_sum 'Ni O'\n_cell_length_a 4.1684\n_cell_length_b 4.1684\n_cell_length_c 4.1684\n_cell_angle_alpha 90.0\n_cell_angle_beta 90.0\n_cell_angle_gamma 90.0\n_cell_volume 72.428\n_exptl_crystal_density_diffrn  6.85\n_symmetry_space_group_name_H-M 'F m 3 m'\nloop_\n_space_group_symop_operation_xyz\n  'x,y,z'\n  'x,1/2+y,1/2+z'\n  '1/2+x,y,1/2+z'\n  '1/2+x,1/2+y,z'\n  'z,-x,y'\n  'z,1/2-x,1/2+y'\n  '1/2+z,-x,1/2+y'\n  '1/2+z,1/2-x,y'\n  '-y,z,-x'\n  '-y,1/2+z,1/2-x'\n  '1/2-y,z,1/2-x'\n  '1/2-y,1/2+z,-x'\n  'x,-y,z'\n  'x,1/2-y,1/2+z'\n  '1/2+x,-y,1/2+z'\n  '1/2+x,1/2-y,z'\n  '-z,x,-y'\n  '-z,1/2+x,1/2-y'\n  '1/2-z,x,1/2-y'\n  '1/2-z,1/2+x,-y'\n  'y,-z,x'\n  'y,1/2-z,1/2+x'\n  '1/2+y,-z,1/2+x'\n  '1/2+y,1/2-z,x'\n  '-x,y,-z'\n  '-x,1/2+y,1/2-z'\n  '1/2-x,y,1/2-z'\n  '1/2-x,1/2+y,-z'\n  'x,-z,-y'\n  'x,1/2-z,1/2-y'\n  '1/2+x,-z,1/2-y'\n  '1/2+x,1/2-z,-y'\n  '-z,y,x'\n  '-z,1/2+y,1/2+x'\n  '1/2-z,y,1/2+x'\n  '1/2-z,1/2+y,x'\n  'y,-x,-z'\n  'y,1/2-x,1/2-z'\n  '1/2+y,-x,1/2-z'\n  '1/2+y,1/2-x,-z'\n  '-x,z,y'\n  '-x,1/2+z,1/2+y'\n  '1/2-x,z,1/2+y'\n  '1/2-x,1/2+z,y'\n  'z,-y,-x'\n  'z,1/2-y,1/2-x'\n  '1/2+z,-y,1/2-x'\n  '1/2+z,1/2-y,-x'\n  '-y,x,z'\n  '-y,1/2+x,1/2+z'\n  '1/2-y,x,1/2+z'\n  '1/2-y,1/2+x,z'\n  'x,z,y'\n  'x,1/2+z,1/2+y'\n  '1/2+x,z,1/2+y'\n  '1/2+x,1/2+z,y'\n  '-z,-y,-x'\n  '-z,1/2-y,1/2-x'\n  '1/2-z,-y,1/2-x'\n  '1/2-z,1/2-y,-x'\n  'y,x,z'\n  'y,1/2+x,1/2+z'\n  '1/2+y,x,1/2+z'\n  '1/2+y,1/2+x,z'\n  '-x,-z,-y'\n  '-x,1/2-z,1/2-y'\n  '1/2-x,-z,1/2-y'\n  '1/2-x,1/2-z,-y'\n  'z,y,x'\n  'z,1/2+y,1/2+x'\n  '1/2+z,y,1/2+x'\n  '1/2+z,1/2+y,x'\n  '-y,-x,-z'\n  '-y,1/2-x,1/2-z'\n  '1/2-y,-x,1/2-z'\n  '1/2-y,1/2-x,-z'\n  'z,x,-y'\n  'z,1/2+x,1/2-y'\n  '1/2+z,x,1/2-y'\n  '1/2+z,1/2+x,-y'\n  '-y,-z,x'\n  '-y,1/2-z,1/2+x'\n  '1/2-y,-z,1/2+x'\n  '1/2-y,1/2-z,x'\n  'x,y,-z'\n  'x,1/2+y,1/2-z'\n  '1/2+x,y,1/2-z'\n  '1/2+x,1/2+y,-z'\n  '-z,-x,y'\n  '-z,1/2-x,1/2+y'\n  '1/2-z,-x,1/2+y'\n  '1/2-z,1/2-x,y'\n  'y,z,-x'\n  'y,1/2+z,1/2-x'\n  '1/2+y,z,1/2-x'\n  '1/2+y,1/2+z,-x'\n  '-x,-y,z'\n  '-x,1/2-y,1/2+z'\n  '1/2-x,-y,1/2+z'\n  '1/2-x,1/2-y,z'\n  '-z,x,y'\n  '-z,1/2+x,1/2+y'\n  '1/2-z,x,1/2+y'\n  '1/2-z,1/2+x,y'\n  'y,-z,-x'\n  'y,1/2-z,1/2-x'\n  '1/2+y,-z,1/2-x'\n  '1/2+y,1/2-z,-x'\n  '-x,y,z'\n  '-x,1/2+y,1/2+z'\n  '1/2-x,y,1/2+z'\n  '1/2-x,1/2+y,z'\n  'z,-x,-y'\n  'z,1/2-x,1/2-y'\n  '1/2+z,-x,1/2-y'\n  '1/2+z,1/2-x,-y'\n  '-y,z,x'\n  '-y,1/2+z,1/2+x'\n  '1/2-y,z,1/2+x'\n  '1/2-y,1/2+z,x'\n  'x,-y,-z'\n  'x,1/2-y,1/2-z'\n  '1/2+x,-y,1/2-z'\n  '1/2+x,1/2-y,-z'\n  '-x,z,-y'\n  '-x,1/2+z,1/2-y'\n  '1/2-x,z,1/2-y'\n  '1/2-x,1/2+z,-y'\n  'z,-y,x'\n  'z,1/2-y,1/2+x'\n  '1/2+z,-y,1/2+x'\n  '1/2+z,1/2-y,x'\n  '-y,x,-z'\n  '-y,1/2+x,1/2-z'\n  '1/2-y,x,1/2-z'\n  '1/2-y,1/2+x,-z'\n  'x,-z,y'\n  'x,1/2-z,1/2+y'\n  '1/2+x,-z,1/2+y'\n  '1/2+x,1/2-z,y'\n  '-z,y,-x'\n  '-z,1/2+y,1/2-x'\n  '1/2-z,y,1/2-x'\n  '1/2-z,1/2+y,-x'\n  'y,-x,z'\n  'y,1/2-x,1/2+z'\n  '1/2+y,-x,1/2+z'\n  '1/2+y,1/2-x,z'\n  '-x,-z,y'\n  '-x,1/2-z,1/2+y'\n  '1/2-x,-z,1/2+y'\n  '1/2-x,1/2-z,y'\n  'z,y,-x'\n  'z,1/2+y,1/2-x'\n  '1/2+z,y,1/2-x'\n  '1/2+z,1/2+y,-x'\n  '-y,-x,z'\n  '-y,1/2-x,1/2+z'\n  '1/2-y,-x,1/2+z'\n  '1/2-y,1/2-x,z'\n  'x,z,-y'\n  'x,1/2+z,1/2-y'\n  '1/2+x,z,1/2-y'\n  '1/2+x,1/2+z,-y'\n  '-z,-y,x'\n  '-z,1/2-y,1/2+x'\n  '1/2-z,-y,1/2+x'\n  '1/2-z,1/2-y,x'\n  'y,x,-z'\n  'y,1/2+x,1/2-z'\n  '1/2+y,x,1/2-z'\n  '1/2+y,1/2+x,-z'\n  '-z,-x,-y'\n  '-z,1/2-x,1/2-y'\n  '1/2-z,-x,1/2-y'\n  '1/2-z,1/2-x,-y'\n  'y,z,x'\n  'y,1/2+z,1/2+x'\n  '1/2+y,z,1/2+x'\n  '1/2+y,1/2+z,x'\n  '-x,-y,-z'\n  '-x,1/2-y,1/2-z'\n  '1/2-x,-y,1/2-z'\n  '1/2-x,1/2-y,-z'\n  'z,x,y'\n  'z,1/2+x,1/2+y'\n  '1/2+z,x,1/2+y'\n  '1/2+z,1/2+x,y'\n  '-y,-z,-x'\n  '-y,1/2-z,1/2-x'\n  '1/2-y,-z,1/2-x'\n  '1/2-y,1/2-z,-x'\nloop_\n_atom_site_label\n_atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\nNi   0.0  0.0  0.0\nO   0.5  0.5  0.5\n\n",
+    "feff_input": "* FEFF8 input file generated 2026-10-18 15:59:45\n*   larixite  2026.1.0\n*   pymatgetn 2026.8.30\n\nTITLE Formula: NiO\nTITLE SpaceGroup: Fm-3m\nTITLE AMCSD structure 11371\n\n*\n* crystallographic sites:\n*    To change the absorber site, re-run using `absorber_site`\n*    with the corresponding site index (counting from 1)\n* site    X       Y       Z     Wyckoff  species\n*   1   0.00000 0.00000 0.00000     4a   Ni   <- absorber\n*   2   0.50000 0.50000 0.50000     4b   O \n*\n\n*  <central> <edge> edge energy = <eedge> eV\nEDGE      K\nS02       1.0\n\n*         pot    xsph   fms    paths  genfmt ff2chi\nCONTROL   1      1      1      1      1      1\nPRINT     1      0      0      0      0      3\n\n** Exchange: energy-dependent exchange correlation potential\n** ixc = 0 means to use Hedin-Lundqvist, 1 to use Dirac-Hara\n** vr = added (real) energy shift\n** vi = added imaginary energy shift (broadening)\n*         ixc   vr  vi\nEXCHANGE  0     0.0  0.0\n\nRPATH     4.000\nEXAFS     20\nNLEG      4\n\n*  POLARIZATION  0 0 0\n\n** SCF: self-consisent field for atomic potentials\n** r_scf = radius for self-consistent pots (2 shells is a good choice)\n** l_scf = 0 for a solid, 1 for a molecule\n** n_scf = max number of iterations to run. 0 for non-SCF, usually 10 is sufficient\n** ca = convergence factor (between 0 and 1). 1 is unstable, 0.2 is typical, lower values are more stable.\n**         r_scf  [ l_scf   n_scf   ca ]\n*SCF       5.0\n\n** LDOS: local density of electronic states\n** emin, emax = energy range for DOS calculation, relative  to Ethreshold\n** eimag = imaginary energy for broadening\n*LDOS      -30   20     0.1\n\n** XANES: calculate XANES\n** kmax = upper limit of XANES calculation\n** delta_k = step in k [Ang^-1] to use\n** delta_e = step in energy [eV] to use.\n**         kmax   [ delta_k  delta_e ]\n* XANES     4.0\n\n** FMS: full multiple scattering\n** r_fms = radius for full multiple scattering\n** l_fms = 0 for a solid, 1 for a molecule\n**        r_fms  l_fms\n* FMS     4.0     0\n\nPOTENTIALS\n** l_scf - max l (ang momentum number) for SCF calculation, -1 for 'auto'\n** l_fms - max l (ang momentum number) for FMS calculation, -1 for 'auto'\n** stoichiometry = number of atoms with this ipot in unit cell (use 0.01 for ipot 0)\n**  ipot    z    tag    l_scf  l_fms   stoichiometry\n  0  28  Ni  -1  -1  0.01\n  1  8  O  -1  -1  1\n  2  28  Ni  -1  -1  1\n\nATOMS\n*     x          y          z     ipot tag   distance site_info  index\n    0.00000    0.00000    0.00000  0   Ni    0.00000  * Ni_1        0\n   -2.08420    0.00000   -0.00000  1   O     2.08420  * O_2         1\n    0.00000   -2.08420   -0.00000  1   O     2.08420  * O_2         2\n    0.00000    0.00000   -2.08420  1   O     2.08420  * O_2         3\n    0.00000    0.00000    2.08420  1   O     2.08420  * O_2         4\n    2.08420    0.00000    0.00000  1   O     2.08420  * O_2         5\n   -0.00000    2.08420    0.00000  1   O     2.08420  * O_2         6\n   -2.08420   -2.08420   -0.00000  2   Ni    2.94750  * Ni_1        7\n   -2.08420    0.00000   -2.08420  2   Ni    2.94750  * Ni_1        8\n   -2.08420    2.08420    0.00000  2   Ni    2.94750  * Ni_1        9\n   -2.08420    0.00000    2.08420  2   Ni    2.94750  * Ni_1       10\n    0.00000   -2.08420   -2.08420  2   Ni    2.94750  * Ni_1       11\n    2.08420   -2.08420    0.00000  2   Ni    2.94750  * Ni_1       12\n    0.00000   -2.08420    2.08420  2   Ni    2.94750  * Ni_1       13\n    2.08420    0.00000   -2.08420  2   Ni    2.94750  * Ni_1       14\n   -0.00000    2.08420   -2.08420  2   Ni    2.94750  * Ni_1       15\n    2.08420    2.08420    0.00000  2   Ni    2.94750  * Ni_1       16\n    2.08420    0.00000    2.08420  2   Ni    2.94750  * Ni_1       17\n   -0.00000    2.08420    2.08420  2   Ni    2.94750  * Ni_1       18\n   -2.08420   -2.08420    2.08420  1   O     3.60994  * O_2        19\n    2.08420    2.08420   -2.08420  1   O     3.60994  * O_2        20\n   -2.08420   -2.08420   -2.08420  1   O     3.60994  * O_2        21\n   -2.08420    2.08420   -2.08420  1   O     3.60994  * O_2        22\n   -2.08420    2.08420    2.08420  1   O     3.60994  * O_2        23\n    2.08420   -2.08420   -2.08420  1   O     3.60994  * O_2        24\n    2.08420   -2.08420    2.08420  1   O     3.60994  * O_2        25\n    2.08420    2.08420    2.08420  1   O     3.60994  * O_2        26\n   -4.16840    0.00000   -0.00000  2   Ni    4.16840  * Ni_1       27\n    0.00000   -4.16840   -0.00000  2   Ni    4.16840  * Ni_1       28\n    0.00000    0.00000   -4.16840  2   Ni    4.16840  * Ni_1       29\n    4.16840    0.00000    0.00000  2   Ni    4.16840  * Ni_1       30\n   -0.00000    4.16840    0.00000  2   Ni    4.16840  * Ni_1       31\n    0.00000    0.00000    4.16840  2   Ni    4.16840  * Ni_1       32\n   -2.08420   -4.16840   -0.00000  1   O     4.66041  * O_2        33\n   -4.16840   -2.08420   -0.00000  1   O     4.66041  * O_2        34\n   -4.16840    0.00000   -2.08420  1   O     4.66041  * O_2        35\n   -2.08420    0.00000   -4.16840  1   O     4.66041  * O_2        36\n   -2.08420    4.16840    0.00000  1   O     4.66041  * O_2        37\n   -2.08420    0.00000    4.16840  1   O     4.66041  * O_2        38\n   -4.16840    0.00000    2.08420  1   O     4.66041  * O_2        39\n   -4.16840    2.08420   -0.00000  1   O     4.66041  * O_2        40\n    0.00000   -4.16840   -2.08420  1   O     4.66041  * O_2        41\n    0.00000   -2.08420   -4.16840  1   O     4.66041  * O_2        42\n    0.00000   -4.16840    2.08420  1   O     4.66041  * O_2        43\n    4.16840   -2.08420    0.00000  1   O     4.66041  * O_2        44\n    2.08420   -4.16840   -0.00000  1   O     4.66041  * O_2        45\n    0.00000   -2.08420    4.16840  1   O     4.66041  * O_2        46\n    4.16840    0.00000   -2.08420  1   O     4.66041  * O_2        47\n   -0.00000    4.16840   -2.08420  1   O     4.66041  * O_2        48\n    2.08420    0.00000   -4.16840  1   O     4.66041  * O_2        49\n   -0.00000    2.08420   -4.16840  1   O     4.66041  * O_2        50\n    4.16840    0.00000    2.08420  1   O     4.66041  * O_2        51\n   -0.00000    4.16840    2.08420  1   O     4.66041  * O_2        52\n    2.08420    4.16840    0.00000  1   O     4.66041  * O_2        53\n    2.08420    0.00000    4.16840  1   O     4.66041  * O_2        54\n    4.16840    2.08420    0.00000  1   O     4.66041  * O_2        55\n   -0.00000    2.08420    4.16840  1   O     4.66041  * O_2        56\n   -2.08420   -2.08420   -4.16840  2   Ni    5.10523  * Ni_1       57\n   -2.08420   -4.16840   -2.08420  2   Ni    5.10523  * Ni_1       58\n   -4.16840   -2.08420   -2.08420  2   Ni    5.10523  * Ni_1       59\n   -2.08420   -2.08420    4.16840  2   Ni    5.10523  * Ni_1       60\n   -2.08420   -4.16840    2.08420  2   Ni    5.10523  * Ni_1       61\n   -4.16840   -2.08420    2.08420  2   Ni    5.10523  * Ni_1       62\n   -2.08420    4.16840   -2.08420  2   Ni    5.10523  * Ni_1       63\n   -2.08420    2.08420   -4.16840  2   Ni    5.10523  * Ni_1       64\n   -4.16840    2.08420   -2.08420  2   Ni    5.10523  * Ni_1       65\n   -2.08420    4.16840    2.08420  2   Ni    5.10523  * Ni_1       66\n   -2.08420    2.08420    4.16840  2   Ni    5.10523  * Ni_1       67\n   -4.16840    2.08420    2.08420  2   Ni    5.10523  * Ni_1       68\n    2.08420   -2.08420   -4.16840  2   Ni    5.10523  * Ni_1       69\n    2.08420   -4.16840   -2.08420  2   Ni    5.10523  * Ni_1       70\n    4.16840   -2.08420   -2.08420  2   Ni    5.10523  * Ni_1       71\n    2.08420   -2.08420    4.16840  2   Ni    5.10523  * Ni_1       72\n    2.08420   -4.16840    2.08420  2   Ni    5.10523  * Ni_1       73\n    4.16840   -2.08420    2.08420  2   Ni    5.10523  * Ni_1       74\n    2.08420    4.16840   -2.08420  2   Ni    5.10523  * Ni_1       75\n    2.08420    2.08420   -4.16840  2   Ni    5.10523  * Ni_1       76\n    4.16840    2.08420   -2.08420  2   Ni    5.10523  * Ni_1       77\n    2.08420    4.16840    2.08420  2   Ni    5.10523  * Ni_1       78\n    2.08420    2.08420    4.16840  2   Ni    5.10523  * Ni_1       79\n    4.16840    2.08420    2.08420  2   Ni    5.10523  * Ni_1       80\n   -4.16840   -4.16840   -0.00000  2   Ni    5.89501  * Ni_1       81\n   -4.16840    0.00000   -4.16840  2   Ni    5.89501  * Ni_1       82\n   -4.16840    4.16840    0.00000  2   Ni    5.89501  * Ni_1       83\n   -4.16840    0.00000    4.16840  2   Ni    5.89501  * Ni_1       84\n    0.00000   -4.16840   -4.16840  2   Ni    5.89501  * Ni_1       85\n    4.16840   -4.16840    0.00000  2   Ni    5.89501  * Ni_1       86\n    0.00000   -4.16840    4.16840  2   Ni    5.89501  * Ni_1       87\n    4.16840    0.00000   -4.16840  2   Ni    5.89501  * Ni_1       88\n   -0.00000    4.16840   -4.16840  2   Ni    5.89501  * Ni_1       89\n    4.16840    4.16840    0.00000  2   Ni    5.89501  * Ni_1       90\n    4.16840    0.00000    4.16840  2   Ni    5.89501  * Ni_1       91\n   -0.00000    4.16840    4.16840  2   Ni    5.89501  * Ni_1       92\n\n* END\n",
+    "structure": {
+      "id": 11371,
+      "mineral": "Bunsenite",
+      "formula": "Ni O",
+      "space_group": "F m 3 m",
+      "year": 1963,
+      "journal": "Crystal Structures",
+      "title": " Second edition. Interscience Publishers, New York, New York\n rocksalt structure",
+      "authors": "Wyckoff R W G",
+      "source": "Bundled curated AMCSD database (larixite amcsd_cif1.db; not the full online archive)",
+      "elements": [
+        "Ni",
+        "O"
+      ],
+      "ordered": true,
+      "supported": true
+    },
+    "converter": "larixite 2026.1.0",
+    "engine": "FEFF8L",
+    "input_generator": "xascraft-feff-input/v2",
+    "executable_sha256": {
+      "rdinp": "d60daee213c226fadd112e32955b4e8a9b938c75583ae9969171127079e8be32",
+      "pot": "95d2f868e35e21810a2eb1cd1bb763c5a340dbb9ec96c81a8cf31e4e894ebb92",
+      "xsph": "9d30609301aa92165c1952b288129ed4906a52a9628a966827db610dd4e54fd5",
+      "pathfinder": "8bc48a9daa20c328b887ef31dae3e087f4c7c7db84adad87d5311a0f92e8eb5e",
+      "genfmt": "21ed031e411c196ba351b0abf46f301f4d946ce001a3b12e8a7dab7ca217ab2b",
+      "ff2x": "d1bcf7d2a220f675cfcaefe43be34af5e3918e95822b6bdd5c1a6eba724d1393"
+    },
+    "s02": 1.0,
+    "with_h": false,
+    "source": "Bundled curated AMCSD database (larixite amcsd_cif1.db; not the full online archive)",
+    "input_sha256": "d207620273a3df84c1980dea71cbd5b0b09ab8a0c57c1fc6e78d94a768ec38be",
+    "stoichiometry_source": "symmetry-expanded CIF cell; hydrogen omitted",
+    "potentials": [
+      {
+        "ipot": 0,
+        "z": 28,
+        "stoichiometry": 0.01
+      },
+      {
+        "ipot": 1,
+        "z": 8,
+        "stoichiometry": 1.0
+      },
+      {
+        "ipot": 2,
+        "z": 28,
+        "stoichiometry": 1.0
+      }
+    ],
+    "atom_count": 93,
+    "actual_cluster_radius": 5.895008,
+    "requested_path_radius": 4.0,
+    "source_cif_sha256": "6d33c9bae6fe9486caa28614c46e71f7cf25219eb4bc03e3b5991b8470aa49d6"
+  },
+  "warnings": [
+    "FEFF path degeneracies are retained; the absorber site's crystallographic multiplicity is not an additional amplitude multiplier.",
+    "FEFF reported a path-radius warning. ATOMS reaches 5.89501 Å; requested RPATH is 4 Å. The native diagnostic disagrees with the input geometry; retain the log for review."
+  ],
+  "diagnostics": [
+    {
+      "code": "feff_path_radius",
+      "severity": "warning",
+      "message": "FEFF reported a path-radius warning. ATOMS reaches 5.89501 Å; requested RPATH is 4 Å. The native diagnostic disagrees with the input geometry; retain the log for review.",
+      "raw": "WARNING:  rmax > distance to most distant atom.\n             Some paths may be missing.\n             rmax, ratx   4.00000E+00  0.00000E+00"
+    },
+    {
+      "code": "feff_floating_point",
+      "severity": "info",
+      "message": "Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL",
+      "raw": "Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL"
+    }
+  ],
+  "total_paths": 5,
+  "truncated": false
+}

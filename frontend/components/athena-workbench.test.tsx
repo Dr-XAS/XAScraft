@@ -4,13 +4,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { athenaApi, type Analysis, type AthenaGroup, type AthenaProject, type Parameters, type E0Method } from "@/lib/athena"
-import type { ArtemisExample } from "@/lib/artemis"
+import type { ArtemisExample, ArtemisFitResult, ArtemisModelDraft } from "@/lib/artemis"
 import { ApiRequestError } from "@/lib/backend-client"
 import type { AthenaSelectionUpdate } from "@/lib/athena-selection"
 import type { InspectionResponse, ScanInspectionResponse } from "@/lib/contracts"
 import { AthenaPlot } from "./artefact-viewers/athena-plot"
 import { AthenaWavelet } from "./artefact-viewers/athena-wavelet"
 import { ArtemisFittingPanel, type ArtemisModelActions } from "./artemis-fitting"
+import { ArtemisFitResultViewer } from "./artefact-viewers/artemis-fit-result-viewer"
 import { downloadLarixSession } from "@/lib/artemis-export"
 import { AthenaProjectImport } from "./athena-project-import"
 import { AthenaImportPreview } from "./athena-import-preview"
@@ -57,7 +58,7 @@ vi.mock("./artemis-fitting", () => ({
   ArtemisFittingPanel: vi.fn(() => <div data-testid="artemis-panel" />),
 }))
 vi.mock("@/lib/artemis-export", () => ({ downloadLarixSession: vi.fn().mockResolvedValue([]) }))
-vi.mock("./artefact-viewers/artemis-fit-result-viewer", () => ({ ArtemisFitResultViewer: () => <div data-testid="artemis-results" /> }))
+vi.mock("./artefact-viewers/artemis-fit-result-viewer", () => ({ ArtemisFitResultViewer: vi.fn(() => <div data-testid="artemis-results" />) }))
 vi.mock("./athena-difference-plot", () => ({ AthenaDifferencePlot: () => <div data-testid="difference-preview-plot" /> }))
 // Live arithmetic and stale-response behavior have dedicated preview tests.
 vi.mock("./athena-import-preview", () => ({ AthenaImportPreview: vi.fn(() => <div data-testid="column-preview" />) }))
@@ -349,6 +350,65 @@ function copperExampleProject(project: AthenaProject): AthenaProject {
         journal: "", title: "Cuprite structure", cif: "data_Cuprite\n_cell_length_a 4.27", elements: ["Cu", "O"], sites: [],
         cell: { a: 4.27, b: 4.27, c: 4.27, alpha: 90, beta: 90, gamma: 90 }, ordered: true, supported: true, warnings: [] } }],
     last_operation: { action: "example", skipped_group_ids: [], artemis_example: { group_id: added[3].id, attachment_id: "example-cuprite-cif", example } },
+  }
+}
+
+function curatedDemoProject(project: AthenaProject, includeFit = false): AthenaProject {
+  // Synthetic state fixtures only; measured demo assets stay outside component tests.
+  const added = [
+    group("demo-ni-trans", "NiO · transmission", true),
+    group("demo-ni-fluo", "NiO · fluorescence", true),
+    group("demo-cu", "CuO · transmission"),
+    group("demo-fe", "FeO · transmission"),
+  ]
+  const folders = [
+    { id: "demo-folder-ni", name: "Ni · acquisition modes", group_ids: added.slice(0, 2).map(item => item.id) },
+    { id: "demo-folder-cu", name: "Cu · reference compounds", group_ids: [added[2].id] },
+    { id: "demo-folder-fe", name: "Fe · oxidation states", group_ids: [added[3].id] },
+  ]
+  const nioCif = { id: "demo-nio-cif", amcsd_id: 42, attached_at: "2026-10-18T00:00:00Z", sha256: "b".repeat(64),
+    structure: { id: 42, mineral: "NiO demo fixture", formula: "Ni O", space_group: "F m -3 m", authors: "", year: 2026,
+      journal: "", title: "Synthetic NiO structure fixture", cif: "data_synthetic_NiO\n_cell_length_a 4.2", elements: ["Ni", "O"], sites: [],
+      cell: { a: 4.2, b: 4.2, c: 4.2, alpha: 90, beta: 90, gamma: 90 }, ordered: true, supported: true, warnings: [] } }
+  const model: ArtemisModelDraft = {
+    revision: 0,
+    parameters: [{ id: "nio-amp", name: "amp", kind: "guess", value: "0.9", expression: "", min: "0", max: "2" }],
+    paths: [{ id: "nio-path", filename: "feff0001.dat", content: "synthetic Ni-O path fixture", label: "NiO · Ni–O", enabled: true,
+      s02: "amp", e0: "0", deltar: "0", sigma2: "0.003",
+      metadata: { reff: 2.1, degen: 6, nleg: 2, absorber: "Ni", edge: "K", geometry: [], kmin: 0, kmax: 20,
+        sourceCif: { sha256: nioCif.sha256, label: "NiO demo fixture", siteIndex: 1, attachmentId: nioCif.id } } }],
+    transform: { fitspace: "r", kmin: "3", kmax: "12", kweight: [2], dk: "1", window: "hanning", rmin: "1", rmax: "3", dr: "0" },
+  }
+  added[0].artemis = { schema_version: 1, model, history: [], current_input_sha256: null }
+  if (includeFit) {
+    const result: ArtemisFitResult = {
+      project_id: "source-demo", group_id: "source-ni", group_label: "Synthetic NiO", version: 1,
+      success: true, message: "Fixture fit completed", report: "Synthetic saved fit report",
+      warnings: ["Demo review: synthetic residual warning."],
+      statistics: { n_varys: 1, n_independent: 9, n_data: 20, nfev: 5, chi_square: 12, reduced_chi_square: 1.5,
+        r_factor: 0.02, aic: 1, bic: 2, errorbars: true, epsilon_k: 0.001 },
+      parameters: [{ name: "amp", kind: "guess", value: 1.05, initial: 0.9, expression: "", min: 0, max: 2, stderr: 0.08 }],
+      correlations: [], paths: [{ id: model.paths[0].id, label: model.paths[0].label, filename: model.paths[0].filename, metadata: model.paths[0].metadata }],
+      k: { x: [3, 6, 9], data: [1, -1, 0.5], model: [0.9, -0.9, 0.4], residual: [0.1, -0.1, 0.1], weight: 2 },
+      r: { x: [1, 2, 3], data_mag: [0.2, 1, 0.2], model_mag: [0.2, 0.9, 0.2], residual_mag: [0, 0.1, 0],
+        data_re: [0.2, 1, 0.2], model_re: [0.2, 0.9, 0.2], residual_re: [0, 0.1, 0],
+        data_im: [0, 0, 0], model_im: [0, 0, 0], residual_im: [0, 0, 0] },
+      transform: { fitspace: "r", kmin: 3, kmax: 12, kweight: [2], dk: 1, window: "hanning", rmin: 1, rmax: 3, dr: 0 },
+    }
+    added[0].artemis.current_input_sha256 = "c".repeat(64)
+    added[0].artemis.history = [{ id: "demo-nio-fit", created: "2026-10-18T00:00:00Z", input_sha256: "c".repeat(64),
+      imported: true, origin: { project_id: result.project_id, group_id: result.group_id, project_version: 1, larch_version: "fixture" }, model, result }]
+  }
+  return {
+    ...project, version: project.version + 1, groups: [...project.groups, ...added],
+    group_folders: [...(project.group_folders ?? []), ...folders], undo: ["Before curated demo"],
+    artemis_structures: [...(project.artemis_structures ?? []), nioCif],
+    last_operation: {
+      action: "example", skipped_group_ids: [],
+      curated_demo: { id: "curated-three-elements", name: "Ni, Cu and Fe demo cases",
+        folder_ids: folders.map(folder => folder.id), group_ids: added.map(item => item.id),
+        fitting_models: [{ group_id: added[0].id, attachment_id: nioCif.id, ...(includeFit ? { fit_id: "demo-nio-fit" } : {}) }] },
+    },
   }
 }
 
@@ -1502,6 +1562,133 @@ describe("AthenaWorkbench data group sorting", () => {
 })
 
 describe("AthenaWorkbench data group folders", () => {
+  it("loads the three-element demo into three folders and opens the first Ni spectrum for normalized energy processing", async () => {
+    const project = await openSaved()
+    fireEvent.click(screen.getByRole("tab", { name: "EXAFS fitting" }))
+    fireEvent.click(singleViewer().getByRole("tab", { name: /Fourier/ }))
+    fireEvent.click(multipleViewer().getByRole("tab", { name: /EXAFS/ }))
+    fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "existing search" } })
+    const button = screen.getByRole("button", { name: "Load demo cases" })
+    const copperButton = screen.getByRole("button", { name: "Load copper examples" })
+    expect(button.compareDocumentPosition(copperButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(button).toHaveAccessibleDescription("Ni · Cu · Fe — three folders, transmission + fluorescence")
+
+    const loaded = curatedDemoProject(project)
+    const response = deferred<AthenaProject>()
+    api.mockReturnValueOnce(response.promise)
+    const requestCount = api.mock.calls.length
+    fireEvent.click(button)
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(copperButton).toBeDisabled()
+    await act(async () => response.resolve(loaded))
+
+    await waitForCommand(project.id, {
+      version: project.version, action: "example", group_ids: [], options: { dataset: "curated-three-elements" },
+    })
+    expect(plotProps("current")).toMatchObject({ active: { id: "demo-ni-trans" }, space: "E", energyMode: "norm" })
+    expect(plotProps()).toMatchObject({ space: "E", energyMode: "norm" })
+    expect(screen.getByRole("tab", { name: "Processing" })).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("demo-nio-cif")
+    expect(screen.getByText("NiO transmission: saved EXAFS fit included")).toBeVisible()
+    expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].group?.artemis?.model.paths[0].metadata.absorber).toBe("Ni")
+    expect(screen.getByRole("textbox", { name: "Search data" })).toHaveValue("")
+    for (const folder of loaded.group_folders!) {
+      const visibleFolder = screen.getByRole("group", { name: `${folder.name} data group` })
+      expect(visibleFolder).toBeVisible()
+      expect(listedGroupIds(visibleFolder)).toEqual(folder.group_ids)
+    }
+    expect(listedGroupIds()).toEqual(loaded.groups.map(item => item.id))
+    expect(api).toHaveBeenCalledTimes(requestCount + 1)
+    expect(button).toBeEnabled()
+    expect(copperButton).toBeEnabled()
+  })
+
+  it("opens the saved NiO fit, its CIF, and the fit viewer directly without running a fit or changing saved layout preferences", async () => {
+    const project = await openSaved()
+    const preference = JSON.stringify({ sort: "custom", order: ["wavelet", "single", "multiple", "cif", "feff", "fit"] })
+    localStorage.setItem("athena.viewer-order.v1", preference)
+    fireEvent.click(within(screen.getByRole("group", { name: "Choose viewers" })).getByRole("button", { name: "EXAFS fit viewer" }))
+    const loaded = curatedDemoProject(project, true)
+    api.mockResolvedValueOnce(loaded)
+    const requests = api.mock.calls.length
+    fireEvent.click(screen.getByRole("button", { name: "Load demo cases" }))
+
+    await waitFor(() => expect(screen.getByRole("tab", { name: "EXAFS fitting" })).toHaveAttribute("aria-selected", "true"))
+    expect(plotProps("current").active?.id).toBe("demo-ni-trans")
+    expect(document.querySelector('.ath-viewer-stack > [data-viewer-id]')).toHaveAttribute("data-viewer-id", "fit")
+    expect(document.querySelector('[data-viewer-id="fit"]')).not.toHaveAttribute("hidden")
+    expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("demo-nio-cif")
+    const panel = vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)![0]
+    const saved = panel.group!.artemis!.history[0]
+    expect(panel.group!.artemis!.model.parameters[0].value).toBe("0.9")
+    // The real panel hydrates this archive; test the workbench's result handoff separately.
+    const restored: ArtemisFitResult = { ...saved.result, project_id: loaded.id, group_id: panel.group!.id,
+      archive: { id: saved.id, created: saved.created, imported: saved.imported, stale: false, modelChanged: false, origin: saved.origin } }
+    act(() => panel.onFitResult?.(restored))
+    expect(vi.mocked(ArtemisFitResultViewer).mock.calls.at(-1)?.[0].result).toBe(restored)
+    expect(restored.parameters[0].value).toBe(1.05)
+    expect(restored.warnings).toEqual(["Demo review: synthetic residual warning."])
+    expect(localStorage.getItem("athena.viewer-order.v1")).toBe(preference)
+    expect(api).toHaveBeenCalledTimes(requests + 1)
+  })
+
+  it("keeps an integrated demo in Processing without advertising or opening a saved fit", async () => {
+    const project = projectFixture({ id: "integrated-project" })
+    api.mockResolvedValueOnce(project)
+    render(<AthenaWorkbench session={{ ...integrationSession, allowedOperations: ["read_project", "example"] }} />)
+    await waitForIntegratedProject()
+    api.mockResolvedValueOnce(curatedDemoProject(project, true))
+    fireEvent.click(screen.getByRole("button", { name: "Load demo cases" }))
+    await waitFor(() => expect(screen.getByRole("button", { name: "Load demo cases" })).toBeEnabled())
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "example", group_ids: [], options: { dataset: "curated-three-elements" },
+    })
+    expect(screen.queryByRole("tab", { name: "EXAFS fitting" })).not.toBeInTheDocument()
+    expect(screen.queryByText("NiO transmission: saved EXAFS fit included")).not.toBeInTheDocument()
+    expect(document.querySelector('[data-viewer-id="fit"]')).not.toBeInTheDocument()
+    expect(plotProps("current")).toMatchObject({ active: { id: "demo-ni-trans" }, space: "E", energyMode: "norm" })
+  })
+
+  it("restores the NiO model's CIF after reopening without relying on the demo operation or selecting Cuprite", async () => {
+    const loaded = curatedDemoProject(copperExampleProject(projectFixture()))
+    loaded.last_operation = undefined
+    await openSaved(loaded)
+    selectGroup("NiO · transmission")
+    fireEvent.click(screen.getByRole("tab", { name: "EXAFS fitting" }))
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("demo-nio-cif"))
+    const panel = vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)![0]
+    expect(panel.group?.id).toBe("demo-ni-trans")
+    expect(panel.group?.artemis?.model.paths[0].metadata.sourceCif?.attachmentId).toBe("demo-nio-cif")
+    expect(panel.exampleSetup).toBeUndefined()
+
+    // Viewing another CIF is presentation state; model hydration must not undo that choice.
+    fireEvent.change(screen.getByRole("combobox", { name: "Viewed CIF structure" }), { target: { value: "example-cuprite-cif" } })
+    fireEvent.click(screen.getByRole("tab", { name: "Processing" }))
+    expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("example-cuprite-cif")
+    selectGroup("NiO · fluorescence")
+    expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].group?.artemis).toBeUndefined()
+    selectGroup("NiO · transmission")
+    expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("demo-nio-cif")
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it("surfaces a failed curated demo load while preserving the current spectrum and project", async () => {
+    const project = await openSaved()
+    selectGroup("Sample scan")
+    api.mockRejectedValueOnce(new Error("The curated demo manifest is missing or invalid."))
+    fireEvent.click(screen.getByRole("button", { name: "Load demo cases" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The curated demo manifest is missing or invalid.")
+    expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: "example", group_ids: [], options: { dataset: "curated-three-elements" },
+    })
+    expect(plotProps("current").active?.id).toBe("sample")
+    expect(listedGroupIds()).toEqual(project.groups.map(item => item.id))
+    expect(screen.queryByRole("group", { name: "Ni · acquisition modes data group" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Load demo cases" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "Load copper examples" })).toBeEnabled()
+  })
+
   it("keeps the example loader at the top and opens the prepared Cu₂O demo in one step", async () => {
     const project = await openSaved()
     fireEvent.click(within(screen.getByRole("group", { name: "Choose viewers" })).getByRole("button", { name: "Wavelet plotter" }))

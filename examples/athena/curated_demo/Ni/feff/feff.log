@@ -1,0 +1,83 @@
+
+=== FEFF8L rdinp ===
+ Feff8L (EXAFS)      release  0.1
+ Formula: NiO
+ SpaceGroup: Fm-3m
+ AMCSD structure 11371
+
+=== FEFF8L pot ===
+ Calculating potentials ...
+    free atom potential and density for atom type    0
+    free atom potential and density for atom type    1
+    free atom potential and density for atom type    2
+    initial state energy
+    overlapped potential and density for unique potential    0
+    overlapped potential and density for unique potential    1
+    overlapped potential and density for unique potential    2
+    muffin tin radii and interstitial parameters
+    : ipot, Norman radius, Muffin tin radius, Overlap
+         0  1.37489E+00  1.31523E+00  1.11838E+00
+         1  1.06178E+00  1.01489E+00  1.12083E+00
+         2  1.38358E+00  1.32227E+00  1.12130E+00
+    : mu_old=    -2.998
+ Done with module 1: potentials.
+
+=== FEFF8L xsph ===
+ Calculating cross-section and phases...
+    absorption cross section
+    phase shifts for unique potential    0
+    phase shifts for unique potential    1
+    phase shifts for unique potential    2
+ Done with module 2: cross-section and phases...
+
+=== FEFF8L pathfinder ===
+ Preparing plane wave scattering amplitudes...
+ Searching for paths...
+   WARNING:  rmax > distance to most distant atom.
+             Some paths may be missing.
+             rmax, ratx   4.00000E+00  0.00000E+00
+    Rmax  4.0000  keep and heap limits   0.0000000   0.0000000
+    Preparing neighbor table
+    Paths found       98   (maxheap, maxscatt      24   3)
+ Eliminating path degeneracies...
+    Plane wave chi amplitude filter   2.50%
+    Unique paths      5,  total paths      98
+ Done with module 4: pathfinder.
+
+=== FEFF8L genfmt ===
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+ Calculating EXAFS parameters...
+    Curved wave chi amplitude ratio   4.00%
+    Discard feff.dat for paths with cw ratio <   2.67%
+    path  cw ratio     deg    nleg  reff
+      1   100.000     6.000     2   2.0842
+      2    94.068    12.000     2   2.9475
+      3    13.622    24.000     3   3.5580
+      4    18.939    48.000     3   3.5580
+      5    35.721     8.000     2   3.6099
+    5 paths kept,    5 examined.
+ Done with module 5: F_eff.
+
+=== FEFF8L ff2x ===
+ Calculating chi...
+ feffdt, feff.pad to feff.dat conversion: Feff8L (EXAFS)      release  0.1
+ Formula: NiO                                   Feff8L (EXAFS)       0.1
+ SpaceGroup: Fm-3m
+ AMCSD structure 11371
+ POT  Non-SCF, core-hole, AFOLP (folp(0)= 1.150)
+ Abs   Z=28 Rmt= 1.315 Rnm= 1.375 K  shell
+ Pot 1 Z= 8 Rmt= 1.015 Rnm= 1.062
+ Pot 2 Z=28 Rmt= 1.322 Rnm= 1.384
+ Gam_ch=1.576E+00 H-L exch
+ Mu=-2.998E+00 kf=2.246E+00 Vint=-2.222E+01 Rs_int= 1.615
+ PATH  Rmax= 4.000,  Keep_limit= 0.00, Heap_limit 0.00  Pwcrit= 2.50%
+       5 paths to process
+    path     filename
+       1     feff0001.dat
+       2     feff0002.dat
+       3     feff0003.dat
+       4     feff0004.dat
+       5     feff0005.dat
+    Use all paths with cw amplitude ratio   4.00%
+    S02  1.000  Global sig2  0.00000
+ Done with module 6: DW + final sum over paths.

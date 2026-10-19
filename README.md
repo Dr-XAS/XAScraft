@@ -52,8 +52,19 @@ title in two lines, separated by a gray divider that fades into the background
 at both ends, independently of **Show instruction**.
 
 For standalone development, open [http://localhost:3004](http://localhost:3004)
-using the local commands below, then import spectra or load the measured copper
-examples: three temperature-series foils, a room-temperature Cu₂O reference,
+using the local commands below, then import spectra or choose **Load demo cases**.
+The measured examples open in three element folders: NiO transmission and
+fluorescence from the supplied APS 20-BM scan; LISA Cu₂O and CuO with their own
+measured Cu foil references; and LISA FeO, Fe₃O₄ and Fe₂O₃. The NiO pair is marked
+initially for a same-scan comparison. Original source files, native energy grids,
+channel mappings and checksums are retained in
+`examples/athena/curated_demo/`; see [demo provenance and use](docs/curated-demo-cases.md).
+NiO transmission also includes its Bunsenite CIF, five FEFF paths and an archived
+two-shell EXAFS fit. Loading opens its saved curves, fitted parameters and warnings
+directly, without running the optimizer. The editable model retains the original
+starting values, with the first Ni–O and Ni–Ni shells enabled.
+The smaller **Load copper examples** shortcut retains the earlier fitting tutorial:
+three temperature-series foils, a room-temperature Cu₂O reference,
 and a shared Cu foil reference. Data groups show each sample’s reference as
 an indented link; **Ref** assigns one foil to several selected spectra.
 See [shared reference foils](docs/athena-reference-links.md) for energy-shift

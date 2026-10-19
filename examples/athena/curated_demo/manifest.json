@@ -1,0 +1,648 @@
+{
+  "schema_version": 1,
+  "id": "curated-three-elements",
+  "name": "XAScraft demo · Ni, Cu and Fe",
+  "description": "Measured demo cases selected from the supplied NiO APS 20-BM scan and Dr.XAS Database LISA records. Original energy grids and extracted absorption arrays are preserved. Only NiO is marked initially for a same-element, same-scan mode comparison.",
+  "folders": [
+    {
+      "element": "Ni",
+      "name": "Ni · transmission + fluorescence",
+      "spectra": [
+        {
+          "id": "nio-transmission",
+          "label": "NiO · transmission",
+          "file": "Ni/nio-transmission.dat",
+          "sha256": "a07ccfd67c7224bd4223307e4777df520895a33c5f47366c5b2f6f3c3df9fed4",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -150,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 450,
+            "nnorm": 1,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 13.5,
+            "bkg_kweight": 1,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning",
+            "e0": 8331.49
+          },
+          "source": {
+            "source": "user attachment",
+            "filename": "20260211_NiO_CAS_1313-99-1.0001",
+            "mode": "transmission",
+            "raw_sha256": "5deb7048849dfda5592a77c92cafb351085a77f8e3eb77560a71e849cd05acde",
+            "beamline": "APS 20-BM",
+            "measurement_time_local": "2026-02-11 22:17:44",
+            "time_zone": null,
+            "processing": "ln(I0/It)",
+            "attachment_sha256": "5633908838d9e17e32d2e916a83267baf205051cd2ee448c6656eeecece115a6",
+            "original_file": "Ni/originals/20260211_NiO_CAS_1313-99-1.0001",
+            "citation": "User-supplied NiO package; APS 20-BM, scan header 2026-02-11 22:17:44 (timezone unspecified).",
+            "sample_url": "http://drxas.xray.aps.anl.gov:6767/samples/d49dcb8b-2905-44fb-8dfd-04f1e2e7a1e4",
+            "measurement_id": "measurement_27b86705-ee5f-4178-bcc5-aece53a1f53a",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu",
+              "energy_column": "column_0001",
+              "numerator": [
+                "column_0004"
+              ],
+              "denominator": "column_0005"
+            },
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "One or more EXAFS noise windows lack adequate native sampling.",
+                "XANES sampling contains gaps above this profile's target."
+              ]
+            }
+          },
+          "notes": "Same raw scan as the other NiO mode; shared header E0 8331.49 eV. No independent energy alignment. ln(I0/It); fixed amplifier gain offsets are retained.",
+          "marked": true,
+          "fitting_model": {
+            "file": "Ni/feff/nio-model.json",
+            "sha256": "f529d7520f6ffdcf6ed295663c762876e227a48ed20ebf1ae94d7305c2b89048"
+          }
+        },
+        {
+          "id": "nio-fluorescence",
+          "label": "NiO · fluorescence",
+          "file": "Ni/nio-fluorescence.dat",
+          "sha256": "6520c0922a77566980db1fc66765c94374f077b9c58e6d054967c2e7cf194349",
+          "edge": "K",
+          "mode": "fluorescence",
+          "parameters": {
+            "pre1": -150,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 450,
+            "nnorm": 1,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 13.5,
+            "bkg_kweight": 1,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning",
+            "e0": 8331.49
+          },
+          "source": {
+            "source": "user attachment",
+            "filename": "20260211_NiO_CAS_1313-99-1.0001",
+            "mode": "fluorescence",
+            "raw_sha256": "5deb7048849dfda5592a77c92cafb351085a77f8e3eb77560a71e849cd05acde",
+            "beamline": "APS 20-BM",
+            "measurement_time_local": "2026-02-11 22:17:44",
+            "time_zone": null,
+            "processing": "XMAP12B:NiKa_Sum / I0; no additional dead-time or self-absorption correction",
+            "attachment_sha256": "5633908838d9e17e32d2e916a83267baf205051cd2ee448c6656eeecece115a6",
+            "original_file": "Ni/originals/20260211_NiO_CAS_1313-99-1.0001",
+            "citation": "User-supplied NiO package; APS 20-BM, scan header 2026-02-11 22:17:44 (timezone unspecified).",
+            "sample_url": "http://drxas.xray.aps.anl.gov:6767/samples/d49dcb8b-2905-44fb-8dfd-04f1e2e7a1e4",
+            "measurement_id": "measurement_27b86705-ee5f-4178-bcc5-aece53a1f53a",
+            "mapping": {
+              "mode": "fluorescence",
+              "units": "eV",
+              "data_type": "mu",
+              "energy_column": "column_0001",
+              "numerator": [
+                "column_0009"
+              ],
+              "denominator": "column_0004"
+            },
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "One or more EXAFS noise windows lack adequate native sampling.",
+                "XANES sampling contains gaps above this profile's target."
+              ]
+            },
+            "warnings": [
+              "No additional dead-time or self-absorption correction was applied to fluorescence ROI/I0."
+            ]
+          },
+          "notes": "Same raw scan as the other NiO mode; shared header E0 8331.49 eV. No independent energy alignment. XMAP12B:NiKa_Sum/I0. No additional dead-time or self-absorption correction; mode differences are not uncertainty bands.",
+          "marked": true
+        }
+      ]
+    },
+    {
+      "element": "Cu",
+      "name": "Cu · oxides + measured foils",
+      "spectra": [
+        {
+          "id": "cu2o",
+          "label": "Cu₂O · 300 K",
+          "file": "Cu/cu2o.dat",
+          "sha256": "4f4513469be128f895c897d19e5a3afb33e8553c0fdd3e29366d4297166daf62",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -150,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12.0,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "Cu2O_111.xdi",
+            "citation": "LISA XAS database, ESRF BM08-LISA, 2023-01-17T17:51:02, 300 K, Si(111); Dr.XAS Database record 10578.",
+            "original_file": "Cu/originals/Cu2O_111.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/Cu2O_111.xdi",
+            "original_sha256": "89034dd76011ad5947b34fc18778e41b89e947c286495c6344524e4ace6a3111",
+            "database_record_id": 10578,
+            "measurement_id": "89034dd76011ad5947b34fc18778e41b89e947c286495c6344524e4ace6a3111",
+            "source_headers": {
+              "Beamline.name": "BM08-LISA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Column.3": "murefer",
+              "Element.edge": "K",
+              "Element.symbol": "Cu",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "3.134692",
+              "Mono.name": "Si(111)",
+              "Mono.notes": "LNT cooled",
+              "Sample.formula": "Cu2O",
+              "Sample.name": "Copper(I) oxide, Cuprous oxide",
+              "Sample.reference": "Cu metal foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2023-01-17T17:51:02"
+            },
+            "source_column": "mutrans",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu"
+            },
+            "processing": "Native source mutrans and murefer copied exactly; no smoothing, rebinning, energy calibration, or shift applied.",
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "Insufficient native pre-edge sampling for the residual noise estimate."
+              ]
+            },
+            "warnings": [
+              "A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained."
+            ]
+          },
+          "notes": "Measured oxide with its own same-scan foil reference. Original source axis; no calibration shift applied. A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained.",
+          "marked": false,
+          "reference_id": "cu2o-foil"
+        },
+        {
+          "id": "cu2o-foil",
+          "label": "Cu foil · with Cu₂O",
+          "file": "Cu/cu2o-foil.dat",
+          "sha256": "a555ddd45471d169d21b04cc77874bf29b28a6bbe437587dfa06ca62120763d3",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -140,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12.0,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "Cu2O_111.xdi",
+            "citation": "LISA XAS database, ESRF BM08-LISA, 2023-01-17T17:51:02, 300 K, Si(111); Dr.XAS Database record 10578.",
+            "original_file": "Cu/originals/Cu2O_111.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/Cu2O_111.xdi",
+            "original_sha256": "89034dd76011ad5947b34fc18778e41b89e947c286495c6344524e4ace6a3111",
+            "database_record_id": 10578,
+            "measurement_id": "89034dd76011ad5947b34fc18778e41b89e947c286495c6344524e4ace6a3111",
+            "source_headers": {
+              "Beamline.name": "BM08-LISA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Column.3": "murefer",
+              "Element.edge": "K",
+              "Element.symbol": "Cu",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "3.134692",
+              "Mono.name": "Si(111)",
+              "Mono.notes": "LNT cooled",
+              "Sample.formula": "Cu2O",
+              "Sample.name": "Copper(I) oxide, Cuprous oxide",
+              "Sample.reference": "Cu metal foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2023-01-17T17:51:02"
+            },
+            "source_column": "murefer",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu",
+              "is_reference": true
+            },
+            "processing": "Native source mutrans and murefer copied exactly; no smoothing, rebinning, energy calibration, or shift applied.",
+            "warnings": [
+              "A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained."
+            ],
+            "reference_evidence": {
+              "element": "Cu",
+              "foil_mu_sha256": "ecfeb6adea66ef13337b618814a10e9275bddd17832924438a2a6c3ba3d7463e",
+              "kind": "same_scan_xdi_murefer",
+              "raw_filename": "Cu2O_111.xdi",
+              "raw_sha256": "89034dd76011ad5947b34fc18778e41b89e947c286495c6344524e4ace6a3111",
+              "reference_column": "murefer",
+              "reference_label": "Cu metal foil",
+              "sample_column": "mutrans",
+              "sample_energy_sha256": "df1e9b0738d877ef9ef50c73478b0107d414d1eae9f09e3adafa8d0590f9078e",
+              "sample_mu_sha256": "cac79f22ed9d64fb9537f351593e6e3ce02da2c8af116250dad29acc70dffbff",
+              "source_database": "LISA",
+              "source_edge": "K",
+              "source_url": "https://lisa.iom.cnr.it/xasdb/./data/Cu2O_111.xdi"
+            }
+          },
+          "notes": "Measured murefer column from the same original XDI as Cu2O. This is a separate reference measurement, not a reused demonstration copy. A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained.",
+          "marked": false
+        },
+        {
+          "id": "cuo",
+          "label": "CuO · 300 K",
+          "file": "Cu/cuo.dat",
+          "sha256": "022e2f82a59a5a4cad0d0e31a3bdc0bdbe57b39c8167a685445b3ba1db10f94f",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -150,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12.0,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "CuO_111.xdi",
+            "citation": "LISA XAS database, ESRF BM08-LISA, 2023-01-17T20:09:17, 300 K, Si(111); Dr.XAS Database record 10566.",
+            "original_file": "Cu/originals/CuO_111.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/CuO_111.xdi",
+            "original_sha256": "bd12465f45198e453dd88207f909ad7f2bd030d8dadec87c2ebf9e8de6f3f7fe",
+            "database_record_id": 10566,
+            "measurement_id": "bd12465f45198e453dd88207f909ad7f2bd030d8dadec87c2ebf9e8de6f3f7fe",
+            "source_headers": {
+              "Beamline.name": "BM08-LISA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Column.3": "murefer",
+              "Element.edge": "K",
+              "Element.symbol": "Cu",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "3.134692",
+              "Mono.name": "Si(111)",
+              "Mono.notes": "LNT cooled",
+              "Sample.formula": "CuO",
+              "Sample.name": "Copper(II) oxide, cupric oxide",
+              "Sample.reference": "Cu metal foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2023-01-17T20:09:17"
+            },
+            "source_column": "mutrans",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu"
+            },
+            "processing": "Native source mutrans and murefer copied exactly; no smoothing, rebinning, energy calibration, or shift applied.",
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "Insufficient native pre-edge sampling for the residual noise estimate."
+              ]
+            },
+            "warnings": [
+              "A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained."
+            ]
+          },
+          "notes": "Measured oxide with its own same-scan foil reference. Original source axis; no calibration shift applied. A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained.",
+          "marked": false,
+          "reference_id": "cuo-foil"
+        },
+        {
+          "id": "cuo-foil",
+          "label": "Cu foil · with CuO",
+          "file": "Cu/cuo-foil.dat",
+          "sha256": "0f260808d8ef897c6d15137d9715e3b47408c69163e4a6cb35ace239329410e6",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -140,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12.0,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "CuO_111.xdi",
+            "citation": "LISA XAS database, ESRF BM08-LISA, 2023-01-17T20:09:17, 300 K, Si(111); Dr.XAS Database record 10566.",
+            "original_file": "Cu/originals/CuO_111.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/CuO_111.xdi",
+            "original_sha256": "bd12465f45198e453dd88207f909ad7f2bd030d8dadec87c2ebf9e8de6f3f7fe",
+            "database_record_id": 10566,
+            "measurement_id": "bd12465f45198e453dd88207f909ad7f2bd030d8dadec87c2ebf9e8de6f3f7fe",
+            "source_headers": {
+              "Beamline.name": "BM08-LISA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Column.3": "murefer",
+              "Element.edge": "K",
+              "Element.symbol": "Cu",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "3.134692",
+              "Mono.name": "Si(111)",
+              "Mono.notes": "LNT cooled",
+              "Sample.formula": "CuO",
+              "Sample.name": "Copper(II) oxide, cupric oxide",
+              "Sample.reference": "Cu metal foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2023-01-17T20:09:17"
+            },
+            "source_column": "murefer",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu",
+              "is_reference": true
+            },
+            "processing": "Native source mutrans and murefer copied exactly; no smoothing, rebinning, energy calibration, or shift applied.",
+            "warnings": [
+              "A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained."
+            ],
+            "reference_evidence": {
+              "element": "Cu",
+              "foil_mu_sha256": "9db095dc808da47b0be5924df2e9781d17e11cd9a8e3041eb22c2dc1229f38f9",
+              "kind": "same_scan_xdi_murefer",
+              "raw_filename": "CuO_111.xdi",
+              "raw_sha256": "bd12465f45198e453dd88207f909ad7f2bd030d8dadec87c2ebf9e8de6f3f7fe",
+              "reference_column": "murefer",
+              "reference_label": "Cu metal foil",
+              "sample_column": "mutrans",
+              "sample_energy_sha256": "d71b11208446bef4c996bde84b393aa0bac9282a53d6d48b24b15c50b98ebb08",
+              "sample_mu_sha256": "5a5c22411abad4ca879136f7fe80f1f7c3172068324aee757df2022185ed468c",
+              "source_database": "LISA",
+              "source_edge": "K",
+              "source_url": "https://lisa.iom.cnr.it/xasdb/./data/CuO_111.xdi"
+            }
+          },
+          "notes": "Measured murefer column from the same original XDI as CuO. This is a separate reference measurement, not a reused demonstration copy. A shared narrow feature near k≈12.1 Å⁻¹ is visible in the source previews. Initial FT kmax=11.5 Å⁻¹; native data beyond it are retained.",
+          "marked": false
+        }
+      ]
+    },
+    {
+      "element": "Fe",
+      "name": "Fe · oxide series",
+      "spectra": [
+        {
+          "id": "feo",
+          "label": "FeO · 300 K",
+          "file": "Fe/feo.dat",
+          "sha256": "c11179fef16393ae741a063f17b96dafe986d76d6ab8f296af152691f053cb05",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -180,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "FeO_311.xdi",
+            "citation": "LISA XAS database, ESRF BM08-GILDA, 2008-08-25T12:01:00, 300 K, Si(311); Dr.XAS Database record 10588.",
+            "original_file": "Fe/originals/FeO_311.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/FeO_311.xdi",
+            "original_sha256": "66468352571de83f02786328543a8a92807c39a52ee80b7e0ec76c88c807f287",
+            "database_record_id": 10588,
+            "source_headers": {
+              "Beamline.name": "BM08-GILDA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Element.edge": "K",
+              "Element.symbol": "Fe",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "1.637514297",
+              "Mono.name": "Si(311)",
+              "Mono.notes": "water cooled, sagittal focus",
+              "Sample.formula": "FeO",
+              "Sample.name": "Iron(II) oxide",
+              "Sample.reference": "Fe foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2008-08-25T12:01:00"
+            },
+            "source_column": "mutrans",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu"
+            },
+            "processing": "Native source mu(E), copied without smoothing, interpolation, normalization, alignment or truncation. XDI exporter Athena/0.9.26; earlier acquisition processing not fully recorded.",
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "Insufficient native pre-edge sampling for the residual noise estimate."
+              ]
+            }
+          },
+          "notes": "Measured oxide series for XANES/EXAFS comparison. Acquired on different dates: exact edge shifts are not a calibrated oxidation-state scale. Original murefer column is retained in the bundled XDI, but no extra reference spectrum is loaded for this folder.",
+          "marked": false
+        },
+        {
+          "id": "fe3o4",
+          "label": "Fe₃O₄ · 300 K",
+          "file": "Fe/fe3o4.dat",
+          "sha256": "ee6c4150561b23117481001bb7625ac84e61b44499a980768160cea7eec437a8",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -180,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "Fe3O4_311.xdi",
+            "citation": "LISA XAS database, ESRF BM08-GILDA, 2008-08-25T12:01:00, 300 K, Si(311); Dr.XAS Database record 10595.",
+            "original_file": "Fe/originals/Fe3O4_311.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/Fe3O4_311.xdi",
+            "original_sha256": "45dc9154b276d22af9f6e3fff944aac446b47677ab20f444200af9b2e04627b6",
+            "database_record_id": 10595,
+            "source_headers": {
+              "Beamline.name": "BM08-GILDA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Element.edge": "K",
+              "Element.symbol": "Fe",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "1.637514297",
+              "Mono.name": "Si(311)",
+              "Mono.notes": "water cooled, sagittal focus",
+              "Sample.formula": "Fe3O4",
+              "Sample.name": "Iron(II,III) oxide",
+              "Sample.reference": "Fe foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2008-08-25T12:01:00"
+            },
+            "source_column": "mutrans",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu"
+            },
+            "processing": "Native source mu(E), copied without smoothing, interpolation, normalization, alignment or truncation. XDI exporter Athena/0.9.26; earlier acquisition processing not fully recorded.",
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "Insufficient native pre-edge sampling for the residual noise estimate."
+              ]
+            }
+          },
+          "notes": "Measured oxide series for XANES/EXAFS comparison. Acquired on different dates: exact edge shifts are not a calibrated oxidation-state scale. Original murefer column is retained in the bundled XDI, but no extra reference spectrum is loaded for this folder.",
+          "marked": false
+        },
+        {
+          "id": "fe2o3",
+          "label": "Fe₂O₃ · 300 K",
+          "file": "Fe/fe2o3.dat",
+          "sha256": "fdd6941bfaa20971d5e3e542695582af15375f444ed3436e2168c93bf34331f4",
+          "edge": "K",
+          "mode": "transmission",
+          "parameters": {
+            "pre1": -180,
+            "pre2": -30,
+            "norm1": 150,
+            "norm2": 700,
+            "nnorm": 2,
+            "rbkg": 1,
+            "bkg_kmin": 0,
+            "bkg_kmax": 12,
+            "bkg_kweight": 2,
+            "kmin": 2,
+            "kmax": 11.5,
+            "kweight": 2,
+            "dk": 1,
+            "window": "hanning"
+          },
+          "source": {
+            "filename": "Fe2O3_311_XANES.xdi",
+            "citation": "LISA XAS database, ESRF BM08-GILDA, 2004-09-11T05:55:00, 300 K, Si(311); Dr.XAS Database record 10600.",
+            "original_file": "Fe/originals/Fe2O3_311_XANES.xdi",
+            "original_url": "https://lisa.iom.cnr.it/xasdb/./data/Fe2O3_311_XANES.xdi",
+            "original_sha256": "fa5033d905a3de34a0ed248d3b2ad19f824707126f18ba36d546a709583fd849",
+            "database_record_id": 10600,
+            "source_headers": {
+              "Beamline.name": "BM08-GILDA",
+              "Column.1": "energy eV",
+              "Column.2": "mutrans",
+              "Element.edge": "K",
+              "Element.symbol": "Fe",
+              "Facility.name": "ESRF",
+              "Facility.xray_source": "Bending magnet",
+              "Mono.d_spacing": "1.637514297",
+              "Mono.name": "Si(311)",
+              "Mono.notes": "water cooled, sagittal focus",
+              "Sample.formula": "Fe2O3",
+              "Sample.name": "Iron(III) oxide",
+              "Sample.reference": "Fe foil",
+              "Sample.temperature": "300 K",
+              "Scan.start_time": "2004-09-11T05:55:00"
+            },
+            "source_column": "mutrans",
+            "mapping": {
+              "mode": "transmission",
+              "units": "eV",
+              "data_type": "mu"
+            },
+            "processing": "Native source mu(E), copied without smoothing, interpolation, normalization, alignment or truncation. XDI exporter Athena/0.9.26; earlier acquisition processing not fully recorded.",
+            "quality_screening": {
+              "method": "hard-xray-screening-v3",
+              "status": "not_assessed",
+              "reasons": [
+                "Insufficient native pre-edge sampling for the residual noise estimate."
+              ]
+            }
+          },
+          "notes": "Measured oxide series for XANES/EXAFS comparison. Acquired on different dates: exact edge shifts are not a calibrated oxidation-state scale. Original murefer column is retained in the bundled XDI, but no extra reference spectrum is loaded for this folder.",
+          "marked": false
+        }
+      ]
+    }
+  ]
+}

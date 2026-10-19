@@ -455,6 +455,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   const [chosenParameterTab, setParameterTab] = useState<ParameterTab>("processing")
   const parameterTab: ParameterTab = integrated ? "processing" : chosenParameterTab
   const [artemisResult, setArtemisResult] = useState<ArtemisFitResult | null>(null)
+  const [fitViewerKey, setFitViewerKey] = useState("")
   const [artemisActions, setArtemisActions] = useState<ArtemisModelActions | null>(null)
   const [larixExportWarnings, setLarixExportWarnings] = useState<string[]>([])
   const artemisActionsRef = useRef(artemisActions)
@@ -472,6 +473,15 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   const [feffPathState, setFeffPathState] = useState<{ projectId: string; groupId: string; paths: FeffPathSummary[]; model: ArtemisPreviewRequest | null } | null>(null)
   const [cifSelection, setCifSelection] = useState<{ projectId?: string; attachmentId: string; siteIndex?: number } | null>(null)
   const [shownViewers, setShownViewers] = useState<Set<ViewerId>>(() => new Set(viewerIds))
+  const active = project?.groups.find(g => g.id === activeId) ?? project?.groups[0]
+  const activeModelCif = active?.artemis?.model.paths.map(path => path.metadata.sourceCif).find(source =>
+    source?.attachmentId && project?.artemis_structures?.some(attachment =>
+      attachment.id === source.attachmentId && attachment.sha256 === source.sha256))
+  useEffect(() => {
+    if (activeModelCif?.attachmentId) setCifSelection({
+      projectId: project?.id, attachmentId: activeModelCif.attachmentId, siteIndex: activeModelCif.siteIndex,
+    })
+  }, [project?.id, active?.id, activeModelCif?.attachmentId, activeModelCif?.siteIndex, activeModelCif?.sha256])
   const marked = useMemo(() => project?.groups.filter(g => g.marked) ?? [], [project?.groups])
   const hasMultipleMarked = marked.length > 1
   const visibleViewers = useMemo(() => new Set([...shownViewers].filter(id => id !== "multiple" || hasMultipleMarked)), [shownViewers, hasMultipleMarked])
@@ -547,11 +557,39 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   useEffect(() => {
     if (menu === "Help") helpInputRef.current?.focus()
   }, [menu])
-  const active = project?.groups.find(g => g.id === activeId) ?? project?.groups[0]
   const readyCupriteExample = !integrated && cupriteExample?.projectId === project?.id &&
     project?.groups.some(group => group.id === cupriteExample?.groupId) &&
     project.artemis_structures?.some(item => item.id === cupriteExample?.attachmentId && item.sha256 === cupriteExample.example.cif_sha256)
     ? cupriteExample : undefined
+  async function loadDemoCases() {
+    if (parameterActionBlocked()) return
+    await task("Loading Ni, Cu and Fe demo cases", async () => {
+      const next = await command("example", [], { dataset: "curated-three-elements" })
+      const demo = next.last_operation?.curated_demo
+      if (!demo) return
+      resetViewerLayout()
+      setSearch("")
+      setMoveSelection(new Set())
+      setCollapsedGroupFolders(current => new Set([...current].filter(id => !demo.folder_ids.includes(id))))
+      const fitted = !integrated ? demo.fitting_models?.find(item => item.fit_id &&
+        demo.group_ids.includes(item.group_id) && next.groups.some(group =>
+          group.id === item.group_id && group.artemis?.history.some(fit => fit.id === item.fit_id))) : undefined
+      setActiveId(fitted?.group_id ?? demo.group_ids[0] ?? "")
+      if (fitted) {
+        setCifSelection({ projectId: next.id, attachmentId: fitted.attachment_id })
+        // Show the archived result immediately without changing the saved viewer-order preference.
+        setCustomViewerOrder(["fit", ...viewerIds.filter(id => id !== "fit")])
+        setViewerSort("custom")
+        setFitViewerKey(`${next.id}:${fitted.group_id}:${fitted.fit_id}`)
+        openFittingFromResults()
+      } else setParameterTab("processing")
+      setAnalysisVisible(false)
+      singleSpectrum.setSpace("E")
+      singleSpectrum.setEnergyMode("norm")
+      multipleSpectra.setSpace("E")
+      multipleSpectra.setEnergyMode("norm")
+    })
+  }
   async function loadCopperExamples() {
     if (parameterActionBlocked()) return
     const previousIds = new Set(projectRef.current?.groups.map(group => group.id) ?? [])
@@ -2571,7 +2609,10 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     <nav className="ath-mobile-workspace-nav" aria-label="Workspace sections"><a href="#athena-data-groups">Data</a><a href="#athena-processing-parameters">Parameters</a><a href="#athena-spectrum-viewer">Results</a></nav>
     <ResizableAthenaWorkspace
       groups={<aside id="athena-data-groups" className="ath-groups"><div className="ath-panel-heading"><h2><ContextLabel label="current data" open={event => showContext(event, { kind: "group" })}>Data <span>{project?.groups.length ?? 0}</span></ContextLabel><SectionHelp label="Selecting and moving data" id="ath-group-multiselect-help">⌘/Ctrl-click to select · Shift-click for a range · Right-click selected spectra to group them · Drag into a group</SectionHelp></h2><button aria-label="Import spectra" disabled={!project || !!busy} onClick={() => setModal("import")}><Plus size={17} /></button></div>
-        <div className="ath-sidebar-example"><button disabled={!!busy || parameterUpdatePending || !project || !canCommand("example")} aria-describedby={!integrated ? "ath-copper-example-hint" : undefined} onClick={() => { void loadCopperExamples() }}><Activity size={16} />Load copper examples</button>
+        <div className="ath-sidebar-example"><button disabled={!!busy || parameterUpdatePending || !project || !canCommand("example")} aria-describedby="ath-demo-cases-hint" onClick={() => { void loadDemoCases() }}><Activity size={16} />Load demo cases</button>
+          <div className="ath-example-details"><small id="ath-demo-cases-hint">Ni · Cu · Fe — three folders, transmission + fluorescence</small></div>
+          {!integrated && <div className="ath-example-details"><small>NiO transmission: saved EXAFS fit included</small></div>}
+          <div className="ath-example-tutorial"><button disabled={!!busy || parameterUpdatePending || !project || !canCommand("example")} aria-describedby={!integrated ? "ath-copper-example-hint" : undefined} onClick={() => { void loadCopperExamples() }}>Load copper examples</button></div>
           {!integrated && <div className="ath-example-details"><small id="ath-copper-example-hint">{readyCupriteExample ? "Cu₂O EXAFS example added" : "Includes shared foil + Cu₂O EXAFS"}</small>
           </div>}
         </div>
@@ -2608,7 +2649,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
           selectedSite={cifSelection?.projectId === project?.id ? cifSelection?.siteIndex : undefined}
           onSelect={(attachmentId, siteIndex) => setCifSelection({ projectId: project?.id, attachmentId, siteIndex })} />
           : viewer === "feff" ? <FeffPathViewer paths={currentFeffPaths} model={currentFeff?.model ?? null} groupLabel={active?.label} onOpenModel={openFittingFromResults} attachments={project?.artemis_structures} />
-          : <ArtemisFitResultViewer projectId={can("plot") ? project?.id : undefined} version={project?.version} group={active} pending={!!busy || !!dirty || parameterUpdatePending} result={currentFitResult} />}
+          : <ArtemisFitResultViewer key={fitViewerKey} projectId={can("plot") ? project?.id : undefined} version={project?.version} group={active} pending={!!busy || !!dirty || parameterUpdatePending} result={currentFitResult} />}
         </div>)}</div>
       </section>}
       processing={<aside id="athena-processing-parameters" className="ath-parameters"><AthenaParameterTabs tab={parameterTab} select={tab => { cancelPick(); setParameterTab(tab) }} onProcessingContextMenu={event => showContext(event, { kind: "processing" })} processing={<>{!active ? <div className="ath-param-empty"><Settings2 size={30} strokeWidth={1} /><p>No current data.<SectionHelp label="Processing parameters">Parameters follow the selected data. Import a spectrum to begin normalization and background removal.</SectionHelp></p></div> : <><div className="ath-param-current"><span className="ath-green-dot" /><strong><ContextLabel label="Data parameters" open={event => showContext(event, { kind: "section", section: "group" })}>{active.label}</ContextLabel></strong><button aria-label="Spectrum processing settings" title="Processing settings" disabled={!!busy} onClick={() => openTool('datatype')}><Settings2 size={14} />Processing</button>{active.frozen && <span className="ath-frozen-status" role="note" tabIndex={0} aria-label="Data frozen" aria-describedby="ath-frozen-hint"><LockKeyhole size={12} aria-hidden="true" />Frozen<span id="ath-frozen-hint" role="tooltip">Unfreeze from the data context menu to edit parameters.</span></span>}</div><fieldset disabled={(!!busy && !automaticParameterProcessing) || !can("parameters")} className="ath-param-fields" data-frozen={active.frozen || undefined}>

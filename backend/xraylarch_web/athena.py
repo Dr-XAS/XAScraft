@@ -1534,6 +1534,17 @@ class AthenaStore:
         g["result"] = process_spectrum(g["energy"], g["mu"], recipe,
                                        data_type=g["data_type"], background_standard=standard,
                                        is_normalized=normalized)
+        # Curated source caveats describe the measurement itself, so keep them
+        # visible when a user changes processing parameters. Other import
+        # paths retain their existing warning handling.
+        curated = g["source"].get("curated_demo")
+        source_warnings = g["source"].get("warnings", [])
+        if (isinstance(curated, dict) and curated.get("id") == "curated-three-elements"
+                and isinstance(source_warnings, list)
+                and all(isinstance(warning, str) for warning in source_warnings)):
+            g["result"]["warnings"] = list(dict.fromkeys([
+                *g["result"].get("warnings", []), *source_warnings,
+            ]))
         # Attribute the cached arrays to the version that computed them: an
         # integration export must not credit them to a later upgrade.
         g["result"]["larch_version"] = larch_version
@@ -3573,7 +3584,12 @@ class AthenaStore:
                     p["group_folders"] = _group_folders(
                         options["group_folders"], (group["id"] for group in p["groups"])
                     )
+            elif action == "example" and options.get("dataset") == "curated-three-elements":
+                from .athena_curated_demo import append_curated_demo
+                operation_details["curated_demo"] = append_curated_demo(self, p)
             elif action == "example":
+                if options.get("dataset", "copper") != "copper":
+                    fail("Choose the copper or curated-three-elements example dataset.")
                 artemis_example = None
                 if p.get("integration") is not True:
                     # Validate and attach the matching CIF before creating any

@@ -1,0 +1,2 @@
+# Preserve measured sources and checksum-addressed assets byte for byte.
+* -text !eol

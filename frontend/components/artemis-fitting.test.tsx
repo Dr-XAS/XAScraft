@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest"
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useState, type ReactNode } from "react"
 import { athenaApi, type AthenaGroup, type AthenaProject, type Parameters } from "@/lib/athena"
@@ -984,6 +984,90 @@ function persistedGroup(value = "0.8"): AthenaGroup {
 }
 
 describe("project-owned Artemis models", () => {
+  it("shows a bundled NiO archive's curves, fitted values and warnings after switching and reopening without fitting", () => {
+    const base = persistedGroup()
+    const model: ArtemisModelDraft = { ...base.artemis!.model, paths: base.artemis!.model.paths.slice(0, 2).map((item, index) => ({
+      ...item, label: index ? "Ni–Ni fixture" : "Ni–O fixture", metadata: { ...item.metadata, absorber: "Ni" },
+    })) }
+    const result = resultWithPaths()
+    result.group_id = "source-ni"
+    result.group_label = "Synthetic NiO"
+    result.parameters[0].value = 1.05
+    result.warnings = ["Native FEFF synthetic radius warning.", "Demo review: synthetic residual warning."]
+    result.paths = result.paths.map((item, index) => ({ ...item, id: model.paths[index].id,
+      label: model.paths[index].label, metadata: model.paths[index].metadata }))
+    const ni: AthenaGroup = { ...base, id: "nio-transmission", label: "NiO · transmission", artemis: {
+      ...base.artemis!, model, history: [{ ...base.artemis!.history[0], model, result, imported: true }],
+    } }
+    function DemoFit({ source }: { source: AthenaGroup }) {
+      const [fit, setFit] = useState<ArtemisFitResult | null>(null)
+      return <><ArtemisFittingPanel projectId="demo" version={9} group={source} onFitResult={setFit} onProjectChange={acceptProject} />
+        <ArtemisFitResultViewer group={source} result={fit} /></>
+    }
+    const assertSavedResult = () => {
+      expect(screen.getByLabelText("Saved fit history")).toHaveValue("fit-one")
+      expect(screen.getByLabelText("Parameter 1 value")).toHaveValue("0.8")
+      expect(within(screen.getByRole("table", { name: "Fitted parameters" })).getByRole("row", { name: /amp/ })).toHaveTextContent("1.05")
+      expect(screen.getByText("Native FEFF synthetic radius warning.")).toBeVisible()
+      expect(screen.getByText("Demo review: synthetic residual warning.")).toBeVisible()
+      expect(screen.getByText("Imported fit · unverified", { exact: true })).toBeVisible()
+      const plotted = plot.mock.calls.at(-1)![0]
+      expect(plotted.layout.xaxis.title.text).toMatch(/^R /)
+      expect(plotted.data.find(trace => trace.name === "Data")?.y).toEqual(result.r.data_mag)
+      expect(plotted.data.find(trace => trace.name === "Model")?.y).toEqual(result.r.model_mag)
+    }
+    const view = render(<DemoFit source={ni} />)
+    assertSavedResult()
+    expect(screen.queryByText("Outdated input", { exact: true })).not.toBeInTheDocument()
+    view.rerender(<DemoFit source={group("nio-fluorescence")} />)
+    expect(screen.getByText("No fit result")).toBeVisible()
+    expect(screen.queryByText("Demo review: synthetic residual warning.")).not.toBeInTheDocument()
+    view.rerender(<DemoFit source={ni} />)
+    assertSavedResult()
+    view.unmount()
+    const reopened = structuredClone(ni)
+    reopened.artemis!.current_input_sha256 = "c".repeat(64)
+    render(<DemoFit source={reopened} />)
+    assertSavedResult()
+    expect(screen.getByText("Outdated input", { exact: true })).toBeVisible()
+    expect(api.mock.calls.filter(([url]) => url !== "/fast-fit/status")).toEqual([])
+  })
+
+  it("hydrates a persisted NiO starter model without a fit, rewrite, or Cuprite paths", () => {
+    const saved = persistedGroup()
+    const ni: AthenaGroup = { ...group("nio-transmission"), label: "NiO · transmission",
+      artemis: { ...saved.artemis!, history: [], model: {
+        ...saved.artemis!.model,
+        paths: saved.artemis!.model.paths.slice(0, 2).map((item, index) => ({ ...item, id: `nio-path-${index}`,
+          label: index === 0 ? "NiO · Ni–O" : "NiO · Ni–Ni", content: `synthetic NiO path ${index}`,
+          metadata: { ...item.metadata, absorber: "Ni", sourceCif: { attachmentId: "nio-cif", sha256: "b".repeat(64), label: "NiO fixture", siteIndex: 1 } } })),
+      } } }
+    const preview = vi.fn()
+    const result = vi.fn()
+    const view = render(<ArtemisFittingPanel projectId="p" version={4} group={group("nio-transmission")}
+      exampleSetup={exampleSetup()} onPathsChange={preview} onFitResult={result} onProjectChange={acceptProject} />)
+    expect(screen.queryByLabelText("Path 1 label")).not.toBeInTheDocument()
+    view.rerender(<ArtemisFittingPanel projectId="p" version={5} group={ni}
+      exampleSetup={exampleSetup()} onPathsChange={preview} onFitResult={result} onProjectChange={acceptProject} />)
+
+    expect(screen.getByLabelText("Path 1 label")).toHaveValue("NiO · Ni–O")
+    expect(screen.getByLabelText("Path 2 label")).toHaveValue("NiO · Ni–Ni")
+    expect(screen.queryByLabelText("Path 3 label")).not.toBeInTheDocument()
+    expect(preview.mock.calls.at(-1)?.[0].map((item: ArtemisInspectedPath) => item.metadata.absorber)).toEqual(["Ni", "Ni"])
+    expect(result.mock.calls.at(-1)?.[0]).toBeNull()
+    expect(screen.getByRole("button", { name: "Run EXAFS fit" })).toBeEnabled()
+    // The optional engine's read-only availability check is allowed; no model save or fit is requested.
+    expect(api.mock.calls.filter(([url]) => url !== "/fast-fit/status")).toEqual([])
+
+    view.rerender(<ArtemisFittingPanel projectId="p" version={5} group={group("nio-fluorescence")}
+      exampleSetup={exampleSetup()} onProjectChange={acceptProject} />)
+    expect(screen.queryByLabelText("Path 1 label")).not.toBeInTheDocument()
+    view.rerender(<ArtemisFittingPanel projectId="p" version={5} group={ni}
+      exampleSetup={exampleSetup()} onProjectChange={acceptProject} />)
+    expect(screen.getByLabelText("Path 1 label")).toHaveValue("NiO · Ni–O")
+    expect(api.mock.calls.filter(([url]) => url !== "/fast-fit/status")).toEqual([])
+  })
+
   it("restores a saved history without refitting and labels scientific staleness and imported results", () => {
     const source = persistedGroup()
     const receive = vi.fn()

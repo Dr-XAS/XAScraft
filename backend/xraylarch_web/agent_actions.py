@@ -203,9 +203,11 @@ ACTIONS: dict[str, Action] = {
         note="Metadata only. It does not move E0; use set_e0 for that.",
     ),
     "example": Action(
-        "Load the bundled three-temperature copper foil series.",
+        "Load a bundled measured example collection.",
         "none", creates=True,
-        note="Useful as a fixture: it gives a project real EXAFS with no upload.",
+        options={"dataset": "'copper' (default) | 'curated-three-elements' — the measured example collection."},
+        note="The default copper collection retains the regression fixture and Cu2O fit starter. "
+             "The curated collection adds three element folders, with NiO transmission and fluorescence.",
     ),
     "merge": Action(
         "Average the selected groups into one new group.",

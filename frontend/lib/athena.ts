@@ -137,7 +137,7 @@ export interface AthenaProject {
   group_added_orders?: Record<string, number>
   updated: string; undo: string[]; redo: string[]; history: { time: string; message: string }[]
   analyses?: Analysis[]
-  last_operation?: { action: string; warnings?: string[]; skipped_group_ids: string[]; skipped_reasons?: Record<string, string>; e0_results?: E0SelectionResult[]; difference_results?: DifferenceSavedResult[]; rebin_results?: Omit<DifferenceSavedResult, 'area'>[]; datatype_results?: { group_id: string; label: string; previous_type: string; data_type: string; is_normalized: boolean }[]; processing_errors?: Record<string, string>; idempotent_replay?: { action: string; version_after: number | null; group_ids?: string[]; note: string }; simulation?: { group_id: string }; artemis_example?: { group_id: string; attachment_id: string; example: ArtemisExample } }
+  last_operation?: { action: string; warnings?: string[]; skipped_group_ids: string[]; skipped_reasons?: Record<string, string>; e0_results?: E0SelectionResult[]; difference_results?: DifferenceSavedResult[]; rebin_results?: Omit<DifferenceSavedResult, 'area'>[]; datatype_results?: { group_id: string; label: string; previous_type: string; data_type: string; is_normalized: boolean }[]; processing_errors?: Record<string, string>; idempotent_replay?: { action: string; version_after: number | null; group_ids?: string[]; note: string }; simulation?: { group_id: string }; curated_demo?: { id: string; name: string; folder_ids: string[]; group_ids: string[]; fitting_models?: { group_id: string; attachment_id: string; fit_id?: string }[] }; artemis_example?: { group_id: string; attachment_id: string; example: ArtemisExample } }
 }
 export interface Analysis {
   id?: string; created?: string
