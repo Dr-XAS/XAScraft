@@ -3,9 +3,13 @@
 The patched build is upstream xraylarch at the pin in ``larch-patches/PIN`` plus the patches
 in ``larch-patches/series/``; ``larch-patches/build.py`` builds it and names its version.
 """
-from importlib.util import module_from_spec, spec_from_file_location
+import ast
+from importlib.metadata import distributions
+from importlib.util import find_spec, module_from_spec, spec_from_file_location
 from io import StringIO
 from pathlib import Path
+import re
+import sys
 
 import numpy as np
 import pytest
@@ -27,6 +31,71 @@ def patched_build_version() -> str:
     pin = build.read_pin(PATCHES / "PIN")
     series = sorted((PATCHES / "series").glob("*.patch"))
     return build.make_identity(pin, series, series, False, pin["patched-larch-tree"])["version"]
+
+
+def canonical(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def pins(path: Path) -> dict[str, str]:
+    """``name==version`` lines of a requirements file, by canonical name."""
+    found = {}
+    for line in path.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if "==" in line:
+            name, _, version = line.partition("==")
+            found[canonical(name)] = version.strip()
+    return found
+
+
+def direct_imports() -> set[str]:
+    """Third-party modules ``xraylarch_web`` imports by absolute name."""
+    package = REPO / "backend" / "xraylarch_web"
+    own = {"xraylarch_web"} | {path.stem for path in package.glob("*.py")}
+    found = set()
+    for source in package.rglob("*.py"):
+        for node in ast.walk(ast.parse(source.read_text())):
+            if isinstance(node, ast.Import):
+                found.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                found.add(node.module)
+    return {name for name in found
+            if name.partition(".")[0] not in sys.stdlib_module_names | own}
+
+
+def owners() -> dict[Path, str]:
+    """Installed files, mapped to the distribution that ships them."""
+    return {Path(dist.locate_file(file)).resolve(): canonical(dist.metadata["Name"])
+            for dist in distributions() for file in dist.files or ()
+            if file.suffix == ".py"}
+
+
+def test_requirements_declare_every_direct_import_at_the_baseline_pin_and_no_larch():
+    requirements = REPO / "backend" / "requirements.txt"
+    lines = [line.split("#", 1)[0].strip() for line in requirements.read_text().splitlines()]
+    declared = pins(requirements)
+    # Larch comes from the patched build (larch-patches/install-dev.sh), never from this
+    # repository and never from PyPI.
+    assert not [line for line in lines if line.startswith(("-e", ".", "/"))]
+    assert "xraylarch" not in declared
+    assert len(declared) == len([line for line in lines if line])
+
+    # Exact pins, equal to the release constraints wherever those pin the package too
+    # (xlwt and xlrd are pinned only here).
+    baseline = pins(REPO / "deploy" / "python-release-constraints.txt")
+    assert {name: baseline.get(name, version) for name, version in declared.items()} == declared
+
+    # The optional engines are declared in requirements-engines.txt and may be absent.
+    optional = set(pins(REPO / "backend" / "requirements-engines.txt"))
+    shipped_by = owners()
+    needed = {}
+    for module in sorted(direct_imports()):
+        top = module.partition(".")[0]
+        if top == "larch" or canonical(top) in optional:
+            continue
+        origin = Path(find_spec(module).origin).resolve()
+        needed.setdefault(shipped_by.get(origin, f"? {origin}"), []).append(module)
+    assert {name: modules for name, modules in needed.items() if name not in declared} == {}
 
 
 @pytest.fixture
