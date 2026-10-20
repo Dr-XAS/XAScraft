@@ -113,3 +113,19 @@ def test_a_workflow_builds_the_patched_larch_and_runs_both_suites():
     for name in builders:
         assert "larch-patches/tests" in runs[name], f"{name}: no team regression tests"
         assert "larch-patches/run-upstream-tests.sh" in runs[name], f"{name}: no upstream suite"
+
+
+def test_the_docs_and_workflow_guards_run_on_every_push_and_pull_request():
+    # tests/ci checks docs, so a workflow whose path filter leaves out *.md never runs it
+    # for the change it guards.  Some workflow runs it on every push and pull request.
+    unfiltered = []
+    for path in WORKFLOWS:
+        workflow = load(path)
+        triggers = workflow["on"] if isinstance(workflow["on"], dict) else {}
+        if not {"push", "pull_request"} <= set(triggers):
+            continue
+        filtered = any((triggers[event] or {}).get(key) for event in ("push", "pull_request")
+                       for key in ("paths", "paths-ignore"))
+        if not filtered and any("tests/ci" in s.get("run", "") for s in steps(workflow)):
+            unfiltered.append(path.name)
+    assert unfiltered, "no workflow without a path filter runs tests/ci"

@@ -1,0 +1,30 @@
+name: Repository checks
+
+# The docs and workflow guards (tests/ci): docs name only paths that exist and describe the
+# patched-Larch setup, and the workflows parse and name existing files. They guard every
+# kind of change, docs included, so this workflow has no path filter. It needs only pytest
+# and PyYAML, at the release pins.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest and PyYAML at the release pins
+        run: python -m pip install --quiet --disable-pip-version-check -c deploy/python-release-constraints.txt pytest pyyaml
+      - name: Docs and workflow files
+        run: python -m pytest -p no:cacheprovider -q tests/ci
