@@ -12,7 +12,7 @@ as not building. For each variant:
 2. install its wheel into one scratch venv (WORK/venv, made like the release env: the
    release constraints as requirements and constraints, then backend/requirements.txt);
 3. capture the baseline-match scenarios against this tree's backend (WORK/capture-<variant>);
-4. run the team regression tests (`larch-patches/tests`, without test_series/test_build);
+4. run the team regression tests (`larch-patches/tests -m regression`);
 5. summarize the capture against the `full` capture into OUT/<variant>.json.
 
 `full` runs first, unless --reference names an existing `full` capture. Its capture is
@@ -125,7 +125,7 @@ def run_variant(variant, python, args, log):
     _run([python, HARNESS / "run.py", "--backend", REPO / "backend", "--out", capture], log, check=True, env=env)
     junit = args.out / f"{variant}-regression.xml"
     _run([python, "-m", "pytest", "-p", "no:cacheprovider", "-q", "larch-patches/tests",
-          "-k", "not test_series and not test_build", f"--junitxml={junit}"], log, env=env, cwd=REPO)
+          "-m", "regression", f"--junitxml={junit}"], log, env=env, cwd=REPO)
     shutil.rmtree(build, ignore_errors=True)
     return identity, capture, regression_outcome(junit)
 

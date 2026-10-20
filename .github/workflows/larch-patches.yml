@@ -50,7 +50,7 @@ jobs:
       - name: Patch series and build script
         run: pytest -p no:cacheprovider -q larch-patches/tests/test_series.py larch-patches/tests/test_build.py
       - name: Team regression tests
-        run: pytest -p no:cacheprovider -q larch-patches/tests -k "not test_series and not test_build"
+        run: pytest -p no:cacheprovider -q larch-patches/tests -m regression
       - name: Upstream test suite
         shell: bash
         run: bash larch-patches/run-upstream-tests.sh "$RUNNER_TEMP/larch/xraylarch-src" --python "$(command -v python)"

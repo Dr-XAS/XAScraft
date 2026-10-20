@@ -1,6 +1,30 @@
-"""Shows which Larch and which example data a run tests, so a run is never ambiguous."""
+"""Shows which Larch and which example data a run tests, so a run is never ambiguous.
+
+Also marks the team's Larch regression tests ``regression``: every test here except the
+queue's own checks (``QUEUE_CHECKS``), which build Larch or need git and upstream.  Callers
+select them with ``-m regression`` (and the queue checks with ``-m "not regression"``), so
+this file is the one place that knows which files are which.
+"""
+
+from pathlib import Path
 
 from examples_path import examples_dir
+
+HERE = Path(__file__).resolve().parent
+QUEUE_CHECKS = {"test_series.py", "test_build.py"}
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "regression: a Larch regression test, run against the installed Larch "
+                   "(larch-patches/tests/conftest.py)")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        path = Path(item.path).resolve()
+        if path.parent == HERE and path.name not in QUEUE_CHECKS:
+            item.add_marker("regression")
 
 
 def pytest_report_header(config):

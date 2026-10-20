@@ -72,8 +72,9 @@ while the installed Larch is not the current build.
 ## Running the tests
 
 ```sh
-# Regression tests, against the Larch installed in the active environment:
-pytest larch-patches/tests -k "not test_series and not test_build"
+# Regression tests, against the Larch installed in the active environment (tests/conftest.py
+# marks every file but the queue checks below `regression`):
+pytest larch-patches/tests -m regression
 
 # The series check. It needs git, this repository's history, and upstream:
 XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_series.py
