@@ -64,6 +64,23 @@ def test_a_timestamp_carried_in_the_data_rather_than_minted_by_the_run_is_kept()
         "xdi": {"Scan.start_time": "2001-06-26T22:27:31"}, "created": "<timestamp>"}
 
 
+def test_names_with_the_shape_of_an_id_outside_id_fields_are_kept():
+    document = {"effective": {"background_standard_kmin": 2.0},
+                "label": "CuHERFD_Chalcopyrite_001", "source": "CuHERFD_Chalcopyrite_001",
+                "standard_id": "as-k-kankite"}
+
+    assert normalize(document, larch_version=VERSION, run_dates={"2026-10-20"}) == document
+
+
+def test_ids_are_found_in_every_id_field_shape():
+    document = {"group_ids": [GROUP_A], "parents": [GROUP_B], "attachmentId": FIT,
+                "group_added_orders": {PROJECT: 0}, "label": f"merge of {GROUP_A}"}
+
+    assert normalize(document, larch_version=VERSION, run_dates={"2026-10-20"}) == {
+        "group_ids": ["ID#1"], "parents": ["ID#2"], "attachmentId": "ID#3",
+        "group_added_orders": {"ID#4": 0}, "label": "merge of ID#1"}
+
+
 def test_text_that_merely_looks_like_part_of_an_id_is_kept():
     document = {"label": "Cu foil 10 K", "note": "a1B2c3D4e5F6g7H8i9J0k_Lmn is 25 characters"}
 
