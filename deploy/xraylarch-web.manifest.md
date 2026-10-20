@@ -70,11 +70,20 @@ Node runtime in that existing conda environment; `drxas-node20` remains its
 historical name and does not indicate the supported Node version. The deployer
 checks the runtime before `npm ci` and refuses unsupported versions. This
 repository change does not update the host environment or restart running services.
-The shared backend installer also installs the web dependencies declared in
-`backend/requirements.txt` under the release constraints, preserving the built
-Larch wheel instead of installing the repository as an editable package. It
-imports the complete backend application and runs `pip check` before recording
-the installed packages. Release inputs and artifacts are made read-only after
+Larch is XAScraft's patched build, never the release checkout: the shared
+backend installer runs `larch-patches/build.py` with the release interpreter,
+which fetches upstream at `larch-patches/PIN` from GitHub (the host must reach
+it) and applies the series, then installs the wheel under the release
+constraints. `XASCRAFT_LARCH_UPSTREAM=<clone-or-url>` builds from a local clone
+or mirror instead; `XASCRAFT_LARCH_WHEEL=<absolute path>` installs a prebuilt
+`xraylarch-*.whl` from `build.py` and skips the build. Either way the installed
+Larch must report the version `build.py` gives this release's pin and series,
+from site-packages, or the candidate build stops. The installer then installs
+the web dependencies declared in `backend/requirements.txt` under the release
+constraints, imports the complete backend application and runs `pip check`
+before recording the installed packages. A new build of a SHA without
+`larch-patches/` fails before activation; rollback to an existing release does
+not rebuild and is unaffected. Release inputs and artifacts are made read-only after
 integrity metadata is written. The repository checkout is never used as a shared
 host clone.
 

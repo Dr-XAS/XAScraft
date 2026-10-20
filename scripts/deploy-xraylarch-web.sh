@@ -65,6 +65,13 @@ hexadecimal characters. --help performs no host write.
 Frontend builds require Node.js 22 or newer for Plotly 4. Update the runtime in
 the existing drxas-node20 conda environment before the next deployment; its name
 is retained for compatibility with the existing service configuration.
+
+Larch is XAScraft's patched build. By default the deployer runs
+larch-patches/build.py, which fetches upstream at larch-patches/PIN from GitHub.
+Environment, optional (not both):
+  XASCRAFT_LARCH_UPSTREAM=<clone-or-url>  build from a local xraylarch clone or mirror
+  XASCRAFT_LARCH_WHEEL=<absolute-path>    install this prebuilt xraylarch-*.whl from build.py
+Either way the installed version must equal the build of the release's pin and series.
 EOF
 }
 
