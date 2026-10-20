@@ -17,7 +17,7 @@ import zipfile
 from . import PROTOCOL
 from .common import REPOSITORY, RELEASE_PREFIX, SOURCE_ASSET, get_url, write_json
 
-ROOT_FILES = {"README.md", "LICENSE"}
+ROOT_FILES = {"README.md", "LICENSE", "NOTICE"}
 SOURCE_DIRS = ("backend/xraylarch_web", "frontend", "examples", "installers/local")
 # A checkout carries the Larch patch queue; a snapshot carries what it builds: the patched
 # Larch wheel and its IDENTITY (pin, patches, version), in LARCH_DIR.
