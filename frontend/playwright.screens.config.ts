@@ -31,7 +31,10 @@ const frontendRoot = fileURLToPath(new URL(".", import.meta.url))
 const appRoot = path.resolve(process.env.XRAYLARCH_SCREENS_APP_ROOT ?? path.resolve(frontendRoot, ".."))
 const appFrontend = path.join(appRoot, "frontend")
 const snapshotDir = path.resolve(process.env.XRAYLARCH_SCREENS_SNAPSHOT_DIR ?? path.join(frontendRoot, "test-results", "screens-snapshots"))
-const dataRoot = mkdtempSync(path.join(os.tmpdir(), "xraylarch-web-screens-"))
+// Every worker loads this file again and inherits the runner's environment, so the
+// scratch data root is made once, by the runner; global-teardown removes it.
+const dataRoot = process.env.XRAYLARCH_SCREENS_DATA_ROOT_INTERNAL ?? mkdtempSync(path.join(os.tmpdir(), "xraylarch-web-screens-"))
+process.env.XRAYLARCH_SCREENS_DATA_ROOT_INTERNAL = dataRoot
 process.env.XRAYLARCH_E2E_DATA_ROOT_INTERNAL = dataRoot
 
 const backendPort = process.env.XRAYLARCH_SCREENS_BACKEND_PORT ?? "18306"
