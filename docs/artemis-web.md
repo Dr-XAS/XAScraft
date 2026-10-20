@@ -2,8 +2,8 @@
 
 Artemis Web adds an **EXAFS fitting** tab to the middle parameter panel of the
 Athena workspace. It fits the current spectrum using imported FEFF scattering
-paths or paths calculated from an AMCSD or Materials Project structure, with the repository's Larch
-core. It is an initial web
+paths or paths calculated from an AMCSD or Materials Project structure, with the patched Larch
+build (see `larch-patches/README.md`). It is an initial web
 workflow, not a claim of full desktop Artemis compatibility.
 
 ## Model and workflow

@@ -542,7 +542,7 @@ K-alpha. Their normalized shapes agree because the fixture fixes its line
 ratio; their absolute counts are different observables. No absolute K-alpha
 yield-accuracy claim follows from this normalized recovery table.
 
-Run from `backend/` with each supported interpreter and `PYTHONPATH=..`:
+Run from `backend/` with each supported interpreter:
 
 ```sh
 python -m pytest -q -s tests/test_xrf_injection_recovery.py tests/test_athena_xrf_xas.py

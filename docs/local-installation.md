@@ -107,6 +107,15 @@ with the `xascraft-source.zip` asset and a GitHub SHA-256 asset digest. Upstream
 Larch releases, branches, prereleases, drafts and unverified assets are ignored.
 If none are published yet, the Manager says so; source installation still works.
 
+Sources and installations that ship the patched Larch wheel use installer protocol 2
+(`xascraft-release.json` records it). An installation made by an earlier, protocol 1
+installer cannot take a protocol 2 release through **Install update**: it stops with
+"Incomplete source distribution: missing larch" and keeps the installed version
+selected. Extract the new `xascraft-source.zip` and run its installer once with the
+same installation directory; it keeps the data, ports and earlier versions, and
+later updates work from the Manager again. The current installer refuses a protocol 1
+ZIP and asks for a current release.
+
 After stopping analysis, click **Install update**. The installer prepares a new
 version alongside the old one, verifies the backend, frontend proxy, bundled
 spectra and native FEFF using temporary data, backs up your stopped application

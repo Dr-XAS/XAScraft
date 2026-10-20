@@ -304,14 +304,15 @@ the digest first: it usually answers what the arrays were wanted for.
 
 ## Running the tests (for changing the code)
 
-- Backend: `cd backend && .venv/bin/python -m pytest -q tests` (the venv holds
-  the patched Larch build from `larch-patches/install-dev.sh`; see
-  `larch-patches/README.md`). The whole suite, HTTP tests included, takes
-  several minutes.
-- While the root `larch/` folder exists, never put the repository root on
-  `sys.path` (`PYTHONPATH=..`, or `python -m`/`-c` run from the root): the
-  folder would shadow the installed build. Larch changes go through
-  `larch-patches/`, then `install-dev.sh`.
+- Setup: `README.md` "Run locally" gives the commands. The backend venv holds
+  the release pins and the patched Larch wheel that `larch-patches/install-dev.sh`
+  builds from upstream at `larch-patches/PIN` plus `larch-patches/series/`. The
+  repository has no Larch source of its own.
+- Backend: `cd backend && .venv/bin/python -m pytest -q tests`. The whole suite,
+  HTTP tests included, takes several minutes. `tests/test_larch_dependency.py`
+  fails while the installed Larch is not the current build; rerun
+  `larch-patches/install-dev.sh` after the pin or a patch changes.
+- Larch changes go through `larch-patches/`; its README says how to add a patch.
 - Frontend: `cd frontend && npx vitest run`; browser walks:
   `cd frontend && npx playwright test tests/e2e/<spec> --reporter=line` (the
   config starts the backend and Next.js itself).
