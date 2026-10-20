@@ -52,8 +52,8 @@ nothing, into `--out` (which must be absent or empty):
 
 ## Installing for development
 
-The backend's environment gets Larch from this build, never from the repository's `larch/`
-folder (`backend/requirements.txt` does not install Larch). From the repository root:
+The backend's environment gets Larch from this build; the repository holds no Larch source,
+and `backend/requirements.txt` does not install Larch. From the repository root:
 
 ```sh
 python3.12 -m venv backend/.venv
@@ -68,10 +68,6 @@ included), and checks that `import larch` gives IDENTITY's version from site-pac
 `--python PYTHON` installs into another environment; `--keep DIR` keeps the build output.
 Run it again after the pin or a patch changes: `backend/tests/test_larch_dependency.py` fails
 while the installed Larch is not the current build.
-
-Start Python from `backend/` (or any directory but the repository root) while the root `larch/`
-folder exists: `python -m` and `python -c` put the current directory first on `sys.path`, so at
-the root the folder would shadow the installed build.
 
 ## Running the tests
 
@@ -101,9 +97,7 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON
   180 passed, 1 skipped (`test_plot_rixsdata_import.py` needs `wx`), 11 deselected.
 - The CI workflow `.github/workflows/larch-patches.yml` runs all of the above: build from
   GitHub, the series and build tests, the regression tests and the upstream suite.
-- Use the `pytest` command, not `python -m pytest` from the repository root. While the root
-  `larch/` folder still exists, `python -m` puts it on `sys.path` ahead of the installed Larch.
-  The session header names the Larch that was tested.
+- The pytest session header names the Larch that was tested.
 - `XASCRAFT_LARCH_UPSTREAM` takes a local clone path or a URL. Unset, the test fetches the
   pinned commit from the URL in `PIN`. A local clone is only read (`git clone --shared`).
 - The FEFF tests read `examples/feffit/Feff_Cu` from this repository's `examples/` folder.
