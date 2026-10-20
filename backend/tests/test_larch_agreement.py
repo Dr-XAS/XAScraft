@@ -90,7 +90,7 @@ AUTOBK_CASES = [
     pytest.param(dict(rbkg=1.4, bkg_kmin=0.5, bkg_kmax=12), id="rbkg-and-range"),
     pytest.param(dict(rbkg=0.01), id="rbkg-below-the-r-grid"),
     pytest.param(dict(nknots=12), id="nknots", marks=pytest.mark.xfail(strict=True, reason=(
-        "athena_science.py:625 sizes the spline from rbkg alone; Larch's autobk.py:164 "
+        "athena_science.py:621-622 sizes the spline from rbkg alone; Larch's autobk.py:164 "
         "replaces it with nknots when nknots is given, so the residual check uses the wrong count."))),
 ]
 
@@ -269,7 +269,7 @@ def copper_dataset(copper_path):
 
 def test_private_finde0_takes_an_explicit_step(bundled_groups):
     """Site 1: backend/xraylarch_web/athena_science.py:21 imports larch.xafs.pre_edge._finde0,
-    called at :222-224 as _finde0(x, y, estep=..., use_smooth=...)[0] for 50-99 point scans."""
+    called at :221-223 as _finde0(x, y, estep=..., use_smooth=...)[0] for 50-99 point scans."""
     import inspect
 
     from larch.xafs.pre_edge import _finde0
@@ -323,7 +323,7 @@ def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
 
 def test_internal_sigma2_models_used_for_disorder(copper_path):
     """Site 5: backend/xraylarch_web/artemis_disorder.py:9 imports EINS_FACTOR and
-    sigma2_correldebye_py from larch.xafs.sigma2_models; :34-37 copies Larch's Einstein formula."""
+    sigma2_correldebye_py from larch.xafs.sigma2_models; :33-37 copies Larch's Einstein formula."""
     import inspect
 
     from larch.xafs.sigma2_models import EINS_FACTOR, sigma2_correldebye_py, sigma2_eins
@@ -416,7 +416,7 @@ def test_xrf_model_internals_read_and_written():
 
 
 def test_autobk_resid_subtracts_the_standard_before_dividing_by_edge_step():
-    """Site 10: backend/xraylarch_web/athena_science.py:431-433 (_standard_arguments) scales
+    """Site 10: backend/xraylarch_web/athena_science.py:430-436 (_standard_arguments) scales
     chi_std by edge_step because larch.xafs.autobk._resid subtracts chi_std before
     dividing by edge_step."""
     import importlib
