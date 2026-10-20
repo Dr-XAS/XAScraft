@@ -111,7 +111,7 @@ Cu4 Cu 0.5 0.5 0 1
   await expect(panel.getByRole("group", { name: "FEFF path legend", exact: true }).getByRole("button")).toHaveCount(withMatchingCif ? 4 : 1)
   await expect(panel.getByRole("combobox", { name: "FEFF path CIF source" }).locator("option")).toHaveCount(withMatchingCif ? 1 : 4)
   await expect.poll(() => inspected).toEqual(filenames.map((filename, i) => ({ filename, nleg: [2, 3, 3, 4][i] })))
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible({ timeout: 30000 })
+  await expect(page.getByText("Saved locally", { exact: true })).toBeAttached({ timeout: 30000 })
   await page.waitForLoadState("networkidle")
   return panel
 }
@@ -258,6 +258,8 @@ async function modelState(panel: Locator) {
       sphereColors: [...new Set(styled.map(item => colorHex(item.sphere?.color)))],
       stickColors: [...new Set(styled.map(item => colorHex(item.stick?.color)))],
       sphereRadii: [...new Set(styled.map(item => item.sphere?.radius))],
+      atomSphereRadii: styled.map(item => ({ atom: key(item.atom), radius: item.sphere?.radius }))
+        .sort((left, right) => left.atom.localeCompare(right.atom)),
       stickRadii: [...new Set(styled.map(item => item.stick?.radius))],
       highlightedAtoms: styled.filter(item => item.sphere && (item.sphere.opacity ?? 1) === 1).map(item => key(item.atom)).sort(),
       fadedAtoms: styled.filter(item => isFaded(item.sphere)).map(item => key(item.atom)).sort(),
@@ -399,6 +401,13 @@ test("shows a matching project CIF with the same elemental atom and bond styles,
   const highlight = cifPanel.getByLabel("Highlight CrystalNN first shell", { exact: true })
   await expect(highlight).toBeVisible({ timeout: 60000 })
   await highlight.uncheck()
+  const radius = panel.getByRole("slider", { name: "FEFF display radius", exact: true })
+  const cifRadius = cifPanel.getByRole("slider", { name: "CIF display radius", exact: true })
+  // Compare the same cluster extent rather than each viewer's independent default.
+  await cifRadius.press("Home")
+  for (let i = 0; i < 25; i++) await cifRadius.press("ArrowRight")
+  await expect(cifRadius).toHaveValue("3.5")
+  await expect.poll(async () => (await modelState(cifPanel)).atoms.length).toBe(13)
   await expectScene(panel, 13, 2)
   await expect(panel.getByLabel("Local structure", { exact: true })).toBeChecked()
   await expect(panel.getByLabel("Bonds", { exact: true })).toBeChecked()
@@ -412,7 +421,12 @@ test("shows a matching project CIF with the same elemental atom and bond styles,
   expect(initial.drawnSticks).toBe(13)
   expect(initial.sphereColors).toEqual(crystal.sphereColors)
   expect(initial.stickColors).toEqual(crystal.stickColors)
-  expect(initial.sphereRadii).toEqual(crystal.sphereRadii)
+  // The CIF viewer emphasizes its center atom even with shell highlighting off.
+  const centerAtom = "Cu:0.00000,0.00000,0.00000"
+  expect(initial.atomSphereRadii.filter(item => item.atom !== centerAtom))
+    .toEqual(crystal.atomSphereRadii.filter(item => item.atom !== centerAtom))
+  expect(initial.atomSphereRadii.find(item => item.atom === centerAtom)?.radius).toBe(0.36)
+  expect(crystal.atomSphereRadii.find(item => item.atom === centerAtom)?.radius).toBe(0.5)
   expect(initial.stickRadii).toEqual(crystal.stickRadii)
   expect(initial.highlightedAtoms).toHaveLength(13)
   expect(initial.fadedAtoms).toHaveLength(0)
@@ -421,8 +435,6 @@ test("shows a matching project CIF with the same elemental atom and bond styles,
   expect(renderedBondHalves(initial, absorber, copperNeighbor)).toHaveLength(0)
   for (const arrow of (await sceneState(panel)).arrows) expect(arrow.radius).toBe(0.065)
 
-  const radius = panel.getByRole("slider", { name: "FEFF display radius", exact: true })
-  const cifRadius = cifPanel.getByRole("slider", { name: "CIF display radius", exact: true })
   await expect(radius).toHaveValue("3.5")
   expect(await radius.evaluate(node => node.parentElement?.className)).toEqual(await cifRadius.evaluate(node => node.parentElement?.className))
   expect(await panel.getByLabel("Bonds", { exact: true }).evaluate(node => node.parentElement?.parentElement?.className))

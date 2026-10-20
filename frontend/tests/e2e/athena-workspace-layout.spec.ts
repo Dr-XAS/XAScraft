@@ -90,12 +90,13 @@ test("selects and orders result viewers after loading copper examples", async ({
 
   await expect(controls.getByRole("button", { name: "All viewers" })).toHaveAttribute("aria-pressed", "true")
   expect(await viewerOrder()).toEqual(defaultOrder)
-  await controls.getByRole("button", { name: "Wavelet plotter" }).click()
+  await controls.getByRole("button", { name: "Wavelet plotter", exact: true }).click()
   await expect(stack.locator('[data-viewer-id="wavelet"]')).toBeHidden()
   await controls.getByRole("button", { name: "All viewers" }).click()
   await expect(stack.locator('[data-viewer-id="wavelet"]')).toBeVisible()
   await page.getByRole("combobox", { name: "Sort viewers" }).selectOption("process")
-  await expect(page.getByText(/Single and multiple spectra stay first; saved CIF attachment/)).toBeVisible()
+  await expect(page.getByRole("combobox", { name: "Sort viewers" })).toHaveValue("process")
+  expect(await viewerOrder()).toEqual(defaultOrder)
 
   await loadCopperExamples(page)
   await expect(page.getByRole("combobox", { name: "Sort viewers" })).toHaveValue("default")
@@ -110,7 +111,7 @@ test("selects and orders result viewers after loading copper examples", async ({
   await expect(feff.getByRole("group", { name: "FEFF path legend" }).getByRole("button", { name: /^Show feff/ })).toHaveCount(4)
   await expect(page.getByRole("region", { name: "CIF structure viewer" }).getByRole("img", { name: "Interactive 3D crystal structure of Cuprite" })).toBeVisible()
   await feff.getByText("Coordinates and scattering angles", { exact: true }).click()
-  await expect(feff.getByRole("table")).toContainText("Cu")
+  await expect(feff.getByRole("table", { name: /^Scattering path geometry/ })).toContainText("Cu")
   await page.locator("#athena-spectrum-viewer").screenshot({ path: info.outputPath("result-viewers.png") })
 })
 
@@ -207,9 +208,13 @@ test("keeps spectrum color ramps aligned at the right across plot spaces", async
   test.setTimeout(60000)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto("/", { waitUntil: "domcontentloaded" })
+  await loadCopperExamples(page)
+  await page.getByRole("checkbox", { name: "Show instruction", exact: true }).check()
 
   const single = page.getByRole("region", { name: "Single spectrum viewer", exact: true })
   const multiple = page.getByRole("region", { name: "Multiple spectra viewer", exact: true })
+  await expect(single).toBeVisible()
+  await expect(multiple).toBeVisible()
   const placement = (viewer: Locator) => viewer.locator(".ath-plot-controls").evaluate(controls => {
     const legend = controls.querySelector<HTMLElement>(".ath-color-legend")!
     const preview = legend.querySelector<HTMLElement>(".ath-color-preview")!
@@ -243,10 +248,12 @@ test("keeps spectrum color ramps aligned at the right across plot spaces", async
     }
     await single.getByRole("tab", { name: /^E(?: Energy)?$/ }).click()
     await single.getByRole("radio", { name: "μ(E) · normalized", exact: true }).check()
-    await expect(single.getByText("For pre-/post-edge lines, choose μ(E) · raw.")).toBeVisible()
+    await single.getByRole("button", { name: "About Pre-edge and post-edge lines", exact: true }).focus()
+    await expect(page.getByRole("tooltip")).toContainText("For pre-/post-edge lines, choose μ(E) · raw.")
     const withHint = await placement(single)
     expect(Math.abs(withHint.legendRight - reference.legendRight), `${viewport.width}px E hint: legend right edge`).toBeLessThanOrEqual(2)
     expect(Math.abs(withHint.rampRight - reference.rampRight), `${viewport.width}px E hint: ramp right edge`).toBeLessThanOrEqual(2)
+    await page.keyboard.press("Escape")
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   }
 })
