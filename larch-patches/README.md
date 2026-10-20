@@ -6,7 +6,7 @@ plus the patches in this folder. Nothing else in the repository changes Larch.
 | Path | What it is |
 | --- | --- |
 | `PIN` | The upstream URL and commit, the upstream version string at that commit, and the `larch/` tree and `pyproject.toml` blob that applying the series must give. |
-| `series/NNNN-*.patch` | `git format-patch` files, applied in order with `git am`. Each keeps the original author, date and message, and carries an `XAScraft-commit: <sha>` trailer naming the XAScraft commit it came from. |
+| `series/NNNN-*.patch` | `git format-patch` files, applied in order with `git am`. Each keeps its author, date and message. The team patches come first; each carries an `XAScraft-commit: <sha>` trailer naming the XAScraft commit it came from. The [temporary patches](#patches) after them come from no XAScraft commit and carry no trailer. |
 | `build.py` | Builds the patched Larch: source tree, wheel, sdist and `IDENTITY`. See [Building](#building). |
 | `installed.py` | Checks that the Larch an interpreter imports is the patched build (version, distribution, site-packages); `install-dev.sh`, the deploy script and the backend tests use it. |
 | `run-upstream-tests.sh` | Runs upstream's own test suite, from a built source tree, against the installed Larch. See [Running the tests](#running-the-tests). |
@@ -32,7 +32,7 @@ nothing, into `--out` (which must be absent or empty):
 | --- | --- |
 | `xraylarch-src/` | The patched upstream tree, without `.git` and without a generated `larch/_version.py`. Installing from it needs `SETUPTOOLS_SCM_PRETEND_VERSION_FOR_XRAYLARCH` set to the version in `IDENTITY`. |
 | `dist/` | `xraylarch-<version>-py3-none-any.whl` and `xraylarch-<version>.tar.gz`. |
-| `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
+| `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`: the patch's trailer, or `null` for a temporary patch), `excluded`, `larch_tree`. |
 
 - **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`. The patch-set id is the
   first 12 hex digits of the sha256 of the applied patch files' bytes, in order
@@ -149,11 +149,12 @@ The patches also carry the team's changes to upstream test files: `tests/test_xa
 The subjects of 0001 to 0004 describe mostly app work, because those commits also changed the app.
 Their messages are kept as written; this ledger says what each patch does to Larch.
 
-0001 to 0007 come from the team's commits. Later patches are **temporary**: written while
-tracking upstream, they undo an upstream regression, or keep an app result that upstream changed
-on purpose until the owner decides (decisions record, "Tracking upstream"),
-come from no XAScraft commit (so no `XAScraft-commit` trailer), change only `larch/`, and keep
-their regression tests in `larch-patches/tests/` alone.
+0001 to 0007 come from the team's commits. Every later patch is **temporary**. It is written
+while tracking upstream, and either undoes an upstream bug or regression, or keeps an app result
+that upstream changed on purpose until the owner decides whether to adopt the change. A
+temporary patch comes from no XAScraft commit, so it has no `XAScraft-commit` trailer; its
+subject starts with `Temporary:`; it changes only `larch/`; and its regression tests are in
+`larch-patches/tests/` only. `tests/test_series.py` checks all of this.
 
 ## Ledger
 
