@@ -27,6 +27,8 @@ class _Field:
         self.max_rel_rms = None
         self.other = 0
         self.example = None
+        self.new_errors = 0
+        self.first_error = None
 
     def number(self, a, b):
         self.values += 1
@@ -45,6 +47,12 @@ class _Field:
         self.other += 1
         if self.example is None:
             self.example = description if len(description) <= _SHOWN else description[:_SHOWN] + "…"
+
+    def new_error(self, message):
+        """An error message (e.g. `processing_error`) the reference does not have."""
+        self.new_errors += 1
+        if self.first_error is None:
+            self.first_error = message if len(message) <= _SHOWN else message[:_SHOWN] + "…"
 
     def record(self):
         return {"field": self.name, "values": self.values, "max_abs": self.max_abs,
@@ -72,9 +80,16 @@ def _numbers_in_text(a, b):
     return [(float(x), float(y)) for x, y in zip(pa[1::2], pb[1::2]) if x != y]
 
 
+def _is_error_key(key):
+    """Where the app reports a failure inside a successful response, e.g. `processing_error`."""
+    return isinstance(key, str) and key.lower().endswith("error")
+
+
 def _walk(a, b, path, field_for):
     if isinstance(a, dict) and isinstance(b, dict):
         for key in sorted(a.keys() | b.keys()):
+            if _is_error_key(key) and isinstance(b.get(key), str) and b[key] and not a.get(key):
+                field_for(f"{path}.{key}").new_error(b[key])
             if key not in b:
                 field_for(path).change(f"key {_show(key)} only in the reference")
             elif key not in a:
@@ -129,6 +144,7 @@ def summarize_documents(reference, variant):
                 failures.append(f"{step}: {transition} {_show(var_step.get('body'))[:_SHOWN]}")
         for key in sorted(ref_step.keys() & var_step.keys() - {"step", "status"}):
             _walk(ref_step[key], var_step[key], f".{key}", field_for)
+    failures += [f"{f.name} x{f.new_errors}: {f.first_error}" for f in fields.values() if f.new_errors]
     if len(ref_steps) != len(var_steps):
         fields.setdefault("(steps)", _Field("(steps)")).change(f"{len(ref_steps)} steps -> {len(var_steps)}")
     if variant.get("error") != reference.get("error"):

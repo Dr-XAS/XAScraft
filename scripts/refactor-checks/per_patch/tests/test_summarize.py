@@ -102,6 +102,22 @@ def test_a_step_that_fails_only_in_the_variant_makes_the_scenario_fail(tmp_path)
                                   "stopped: StepFailed: fit: HTTP 422")
 
 
+def test_an_error_field_that_appears_only_in_the_variant_makes_the_scenario_fail(tmp_path):
+    # The app reports Larch failures inside a 200 response, per group.
+    message = "Larch processing failed (invalid window name bessel)"
+    a = capture(tmp_path / "a", fit=fit(groups=[{"processing_error": None, "chi": [1.0, 2.0]}] * 3,
+                                        preview={"x": [1.0]}))
+    b = capture(tmp_path / "b", fit=fit(groups=[{"processing_error": message, "chi": [1.0, 2.0]}] * 2
+                                        + [{"processing_error": None, "chi": [1.0, 2.0]}],
+                                        preview={"x": [], "processing_error": message}))
+
+    summary = summarize_dirs(a, b)["fit"]
+
+    assert summary["status"] == "fails"
+    assert summary["failure"] == (f"fit: body.groups[*].processing_error x2: {message}; "
+                                  f"fit: body.preview.processing_error x1: {message}")
+
+
 def test_a_scenario_missing_from_one_capture_is_reported(tmp_path):
     a = capture(tmp_path / "a", fit=fit(amp=0.8), merge=fit())
     b = capture(tmp_path / "b", fit=fit(amp=0.8))
