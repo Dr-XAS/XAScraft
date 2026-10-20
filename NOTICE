@@ -1,0 +1,20 @@
+XAScraft
+========
+
+XAScraft is a web application built on xraylarch (Larch), the X-ray absorption and
+fluorescence analysis library by Matthew Newville and the xraylarch contributors:
+https://github.com/xraypy/xraylarch. Larch is not included in this repository; it is
+installed from the upstream commit pinned in larch-patches/PIN.
+
+The following parts of this repository come from xraylarch and are distributed under
+its MIT license (see LICENSE):
+
+- examples/: the example data and scripts, taken unchanged from xraylarch at commit
+  8d6cd41c2b2a19260dbc80519c3c95211331d4fc, except the files the XAScraft team added
+  after that commit:
+    examples/athena/curated_demo/  (the whole folder; data sources are recorded in its
+                                    manifest.json and README.md)
+    examples/xafsdata/Cu2O_standard.0001
+
+- larch-patches/series/: changes to xraylarch source files, made by the XAScraft team on
+  top of the pinned upstream commit. Each patch modifies files that come from xraylarch.
