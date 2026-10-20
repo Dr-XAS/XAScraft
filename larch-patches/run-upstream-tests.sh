@@ -34,8 +34,8 @@ FILES=(
   test_interpreter.py test_jsonutils.py test_larch_interpreter.py test_larchexamples_basic.py
   test_larchexamples_xafs.py test_larchexamples_xray.py test_math_deglitch.py test_math_utils.py
   test_plot_rixsdata_import.py test_read_beamlinedata.py test_read_xafsdata.py
-  test_symbol_callbacks.py test_xas_data_source.py test_xrf_roi.py test_xafs_defects.py
-  test_xrf_model.py
+  test_symbol_callbacks.py test_xafs_rebin.py test_xas_data_source.py test_xrf_roi.py
+  test_xafs_defects.py test_xrf_model.py
 )
 
 # Known pre-existing failures. These example scripts call wx plotting commands (plot_bkg,

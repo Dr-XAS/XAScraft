@@ -105,8 +105,8 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 ```
 
 - The upstream suite runs the files upstream's `tests/run_tests.sh` names at the pin, plus
-  `test_xrf_model.py`. Expected: 180 passed, 1 skipped (`test_plot_rixsdata_import.py` needs
-  `wx`), 11 deselected.
+  `test_xrf_model.py`. Expected: 201 passed, 2 skipped (`test_plot_rixsdata_import.py` needs
+  `wx`; `test_xafs_rebin.py`'s benchmark runs only with `LARCH_REBIN_TIMING=1`), 11 deselected.
 - **Known pre-existing failures.** The 11 deselected tests are `test_larchexamples_xafs.py`
   scripts that call wx plotting commands (`plot_bkg`, `plot_chifit`, ...), which do not exist
   without wxPython; they fail the same way on plain upstream, and XAScraft's environments have

@@ -46,6 +46,19 @@ def test_the_main_run_leaves_out_exactly_the_known_failures_and_passes(tree):
     assert f" {len(KNOWN)} deselected" in result.stdout.splitlines()[-1]
 
 
+def test_the_runner_names_the_files_upstreams_run_tests_sh_names_at_the_pin(tree):
+    """The patched tree's tests/run_tests.sh (upstream's list at the pin, plus 0007's
+    test_xafs_defects.py), and test_xrf_model.py, which patch 0004 changed.  Files with
+    nothing to collect without wx print no progress line, so the runner's own list is read."""
+    script = (tree / "tests" / "run_tests.sh").read_text().split()
+    named = [word for word in script if word.startswith("test_") and word.endswith(".py")]
+    runner = RUNNER.read_text()
+    files = runner[runner.index("\nFILES=(") + 8:].split(")", 1)[0].split()
+
+    assert "test_xafs_defects.py" in named
+    assert sorted(files) == sorted({*named, "test_xrf_model.py"})
+
+
 def test_the_known_failures_are_run_and_named_and_do_not_fail_the_step(tree):
     result = known_failures(tree)
 
