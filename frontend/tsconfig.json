@@ -57,7 +57,9 @@
     ".next-cif-center/types/**/*.ts",
     ".next-cif-center/dev/types/**/*.ts",
     ".next-validation-simulation/types/**/*.ts",
-    ".next-validation-simulation/dev/types/**/*.ts"
+    ".next-validation-simulation/dev/types/**/*.ts",
+    ".next-e2e-reference-checkbox/types/**/*.ts",
+    ".next-e2e-reference-checkbox/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
