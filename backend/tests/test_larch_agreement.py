@@ -327,23 +327,14 @@ def test_private_feffdat_carries_the_arrays_and_geometry_read_from_it(copper_pat
     assert native.filename == "artemis/feff0000.dat"
 
 
-def _calc_chi_at(path, k, **values):
-    """The call shape of backend/xraylarch_web/artemis.py _path_chi: the resolved values are
-    set on the path, its path parameters rebuilt in fresh Parameters, then _calc_chi(k=k)."""
-    from lmfit import Parameters
-
-    for name, value in values.items():
-        setattr(path, name, value)
-    path.create_path_params(params=Parameters())
-    path._calc_chi(k=k)
-
-
 def test_private_calc_chi_takes_resolved_path_values(copper_path):
     """Site 3: backend/xraylarch_web/artemis.py preview_paths sets s02, e0, deltar, sigma2 on
     the path, calls path.create_path_params(params=Parameters()) and path._calc_chi(k=k).
     Keyword values to _calc_chi are dropped since upstream c18a4ed63 ('expected 7, got 3')."""
+    from xraylarch_web.artemis import _path_chi
+
     k = np.arange(241) * 0.05
-    _calc_chi_at(copper_path, k, s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
+    _path_chi(copper_path, k, dict(s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008))
     assert np.asarray(copper_path.chi).shape == k.shape
     assert np.isfinite(copper_path.chi).all() and np.ptp(copper_path.chi) > 0
 
@@ -353,8 +344,10 @@ def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
     transform._xafsft(chi, group=, rmax_out=10), per path and for the sum."""
     from larch.xafs import feffit_transform
 
+    from xraylarch_web.artemis import _path_chi
+
     k = np.arange(241) * 0.05
-    _calc_chi_at(copper_path, k, s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
+    _path_chi(copper_path, k, dict(s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008))
     transform = feffit_transform(kmin=3, kmax=12, kweight=2, dk=1, rmin=1.4, rmax=3,
                                  kstep=0.05, nfft=2048, rwindow="hanning")
     out = Group()
