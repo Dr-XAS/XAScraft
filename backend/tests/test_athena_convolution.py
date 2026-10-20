@@ -15,6 +15,7 @@ from xraylarch_web.athena import AthenaStore, Command
 from xraylarch_web.athena_convolution import ConvolutionOptions, broaden, add_noise
 from xraylarch_web.config import Settings
 from xraylarch_web.main import create_app
+from tests.larch_source import source_path
 
 FIX = Path(__file__).parent/'fixtures'
 NATIVE = json.loads(gzip.decompress((FIX/'athena-convolution-native.json.gz').read_bytes()))
@@ -171,6 +172,6 @@ def test_pinned_reference_manifest():
     root=Path(__file__).resolve().parents[2];manifest=json.loads((FIX/'athena-convolution-fixtures.json').read_text())
     assert manifest['source_sha256']==NATIVE['sources']
     assert manifest['case_count']==len(NATIVE['rows'])==25
-    for name,sha in manifest['sha256'].items():assert hashlib.sha256((root/name).read_bytes()).hexdigest()==sha
+    for name,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,name).read_bytes()).hexdigest()==sha
     catalog={r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
     for name,sha in NATIVE['sources'].items():assert catalog['demeter-'+manifest['demeter_revision']+'/'+name]==sha

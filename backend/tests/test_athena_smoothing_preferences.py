@@ -20,6 +20,7 @@ from reference.native_larch_replay import replay_smoothing
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
+from tests.larch_source import source_path
 
 FIXTURES = Path(__file__).parent/'fixtures'
 NATIVE = json.loads(gzip.decompress((FIXTURES/'athena-smoothing-preferences-native.json.gz').read_bytes()))
@@ -155,7 +156,7 @@ def test_native_manifest_and_sources():
     manifest = json.loads((FIXTURES/'athena-smoothing-preferences-fixtures.json').read_text())
     catalog = {r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
     assert manifest['source_sha256'] == NATIVE['sources']
-    for path,sha in manifest['sha256'].items():assert hashlib.sha256((root/path).read_bytes()).hexdigest() == sha
+    for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest() == sha
     for path,sha in NATIVE['sources'].items():assert catalog['demeter-'+manifest['demeter_revision']+'/'+path] == sha
     assert manifest['native_modules'] == NATIVE['modules']
     assert manifest['case_count'] == len(NATIVE['rows']) == 13

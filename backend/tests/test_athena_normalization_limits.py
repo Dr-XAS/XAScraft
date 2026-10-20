@@ -11,6 +11,7 @@ import pytest
 from xraylarch_web.athena import AthenaStore, Command
 from xraylarch_web.athena_science import process_spectrum
 from xraylarch_web.config import Settings
+from tests.larch_source import source_path
 
 FIX=Path(__file__).parent/'fixtures'
 ORACLE=json.loads(gzip.decompress((FIX/'athena-normalization-limits-native.json.gz').read_bytes()))
@@ -37,7 +38,7 @@ def test_native_limit_reference_sources_inputs_and_harness_hashes():
     manifest=json.loads((FIX/'athena-normalization-limits-fixtures.json').read_text());root=FIX.parents[2]
     catalog={r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
     assert len(ORACLE['rows'])==manifest['cases']==54 and sum(len(r['phases']) for r in ORACLE['rows'])==108
-    for path,sha in manifest['sha256'].items():assert hashlib.sha256((root/path).read_bytes()).hexdigest()==sha
+    for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest()==sha
     for path,sha in ORACLE['sources'].items():assert catalog['demeter-'+ORACLE['demeter_revision']+'/'+path]==sha
 
 

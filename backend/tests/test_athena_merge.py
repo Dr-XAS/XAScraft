@@ -15,6 +15,7 @@ from xraylarch_web.athena_science import AthenaParameters
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
+from tests.larch_source import source_path
 
 FIX=Path(__file__).parent/'fixtures'
 NATIVE=json.loads(gzip.decompress((FIX/'athena-merge-native.json.gz').read_bytes()))
@@ -136,5 +137,5 @@ def test_http_preview_preferences_validation_stale_revision_and_native_scatter_c
 
 def test_native_merge_hash_manifest():
     root=FIX.parents[2];manifest=json.loads((FIX/'athena-merge-fixtures.json').read_text())
-    for path,sha in manifest['sha256'].items():assert hashlib.sha256((root/path).read_bytes()).hexdigest()==sha
+    for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest()==sha
     assert manifest['case_count']==len(NATIVE['rows'])==30
