@@ -29,10 +29,10 @@ TEAM_COMMITS = [
     "aee4bb5e6",
 ]
 
-# Every patch after the team patches is temporary: written while tracking upstream, it undoes
-# an upstream regression, or keeps an app result that upstream changed on purpose until the
-# owner decides (README.md, "Patches"). It comes from no XAScraft commit, so it carries no
-# trailer, and its subject starts with this prefix.
+# A temporary patch's subject starts with this. Written while tracking upstream, it undoes an
+# upstream bug or regression, or keeps an app result that upstream changed on purpose until the
+# owner decides (README.md, "Patches"). Every patch after the team commits' patches, temporary
+# or not, comes from no XAScraft commit, so it carries no trailer.
 TEMPORARY_SUBJECT_PREFIX = "Temporary: "
 
 COMMITTER = {
@@ -108,8 +108,13 @@ def applied_commits(cwd: Path) -> list[str]:
     return applied
 
 
+def subject(sha: str, cwd: Path) -> str:
+    return git("log", "-1", "--format=%s", sha, cwd=cwd).strip()
+
+
 def temporary_commits(cwd: Path) -> list[str]:
-    return applied_commits(cwd)[len(TEAM_COMMITS):]
+    return [sha for sha in applied_commits(cwd)
+            if subject(sha, cwd).startswith(TEMPORARY_SUBJECT_PREFIX)]
 
 
 def test_series_reproduces_the_pinned_larch_tree(patched):
@@ -159,21 +164,53 @@ def test_each_applied_commit_makes_the_change_its_xascraft_commit_made(patched):
         assert patch_id(new, patched) == patch_id(sha, REPO_ROOT), sha
 
 
-def test_temporary_patches_change_only_larch_and_carry_no_xascraft_commit(patched):
+def test_temporary_patches_come_after_the_team_commits_and_change_only_larch(patched):
     """A temporary patch changes larch/ only; its regression tests live in larch-patches/tests,
     not in upstream's tests/."""
-    for sha in temporary_commits(patched):
+    temporary = temporary_commits(patched)
+    assert set(temporary) <= set(applied_commits(patched)[len(TEAM_COMMITS):])
+    for sha in temporary:
         changed = git("show", "--format=", "--name-only", sha, cwd=patched).split()
         assert changed and all(name.startswith("larch/") for name in changed), changed
+
+
+def test_patches_after_the_team_commits_carry_no_xascraft_commit(patched):
+    for sha in applied_commits(patched)[len(TEAM_COMMITS):]:
         trailer = git("log", "-1", "--format=%(trailers:key=XAScraft-commit,valueonly)", sha,
                       cwd=patched)
         assert trailer.strip() == "", sha
 
 
-def test_temporary_patches_say_so_in_their_subject(patched):
-    for sha in temporary_commits(patched):
-        subject = git("log", "-1", "--format=%s", sha, cwd=patched)
-        assert subject.startswith(TEMPORARY_SUBJECT_PREFIX), subject
+def readme_patch_rows() -> dict[str, list[str]]:
+    """README.md's Patches table: patch number -> its cells."""
+    text = (PATCHES_DIR / "README.md").read_text()
+    table = text[text.index("\n## Patches\n"):].split("\n\n")[1]
+    rows = [[cell.strip() for cell in line.strip("|").split("|")]
+            for line in table.splitlines()[2:]]
+    return {row[0]: row for row in rows}
+
+
+def test_readme_patch_table_describes_every_patch(patched):
+    """One row per patch: its XAScraft commit (or "none (temporary)" exactly for the temporary
+    patches), its author and date, and the Larch files it changes."""
+    rows = readme_patch_rows()
+    applied = applied_commits(patched)
+    assert list(rows) == [p.name[:4] for p in series()]
+    temporary = set(temporary_commits(patched))
+    for (number, row), sha in zip(rows.items(), applied):
+        _, commit, author_date, files, _ledger = row
+        if sha in temporary:
+            assert commit == "none (temporary)", number
+        else:
+            assert commit != "none (temporary)", number
+        if commit.startswith("`"):
+            assert TEAM_COMMITS.index(commit.strip("`")) == int(number) - 1, number
+        assert author_date == git("log", "-1", "--format=%an, %ad", "--date=short", sha,
+                                  cwd=patched).strip(), number
+        changed = git("show", "--format=", "--name-only", sha, "--", "larch", "pyproject.toml",
+                      cwd=patched).split()
+        assert sorted(files.replace("`", "").split(", ")) == sorted(
+            name.removeprefix("larch/") for name in changed), number
 
 
 def test_patches_are_dated_in_series_order(patched):
