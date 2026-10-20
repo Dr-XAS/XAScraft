@@ -376,7 +376,7 @@ by Larch's desktop CIF browser. FEFF8L then calculates the scattering paths.
 These stages match the structure-to-path workflow described in the official
 [Larix overview](https://xraypy.github.io/xraylarch/larix/overview.html#exafs-modeling-with-feff)
 and [Larixite documentation](https://xraypy.github.io/larixite/). The local desktop
-reference is [`cif_browser.py`](../larch/wxlib/cif_browser.py).
+reference is [`cif_browser.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/wxlib/cif_browser.py).
 
 The atomic cluster radius and path cutoff have different roles: the cluster
 radius limits atoms available to the calculation; the path cutoff limits the
@@ -593,7 +593,7 @@ and fits its real and imaginary components within the selected R range. A plot
 of the Fourier magnitude is a visualization; fitting does not minimize a
 magnitude-only difference. Plotted R is not phase corrected and should not be
 read directly as a bond length. The local implementation is
-[`FeffitDataSet._residual`](../larch/xafs/feffit.py).
+[`FeffitDataSet._residual`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffit.py).
 
 The k range chooses the measured EXAFS interval and its Fourier window.
 `dk` controls the window taper. The R range selects the region of the transformed
@@ -672,9 +672,9 @@ drawn at.
 Supplying ε(k) by hand, as some published reference fits do, does **not** give
 the same χ² as letting Larch estimate it. Larch converts between ε(k) and the
 ε(R) its residual divides by with two different factors:
-[`estimate_noise`](../larch/xafs/feffit.py) uses
+[`estimate_noise`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffit.py) uses
 `scale = sqrt(2·pi·w / (kstep·(kmax^w - kmin^w)))`, while
-[`set_epsilon_k`](../larch/xafs/feffit.py) uses
+[`set_epsilon_k`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffit.py) uses
 `scale = 2·sqrt(pi·w / (kstep·(kmax^w - kmin^w)))`. Those differ by exactly √2,
 so handing Larch back the very ε(k) it just estimated divides ε(R) by √2: the
 R-space residual grows by √2 at fixed parameters, and χ² doubles.
@@ -832,9 +832,9 @@ The fit operates on a snapshot and does not modify the saved Athena processing
 parameters or spectrum. The snapshot is resampled onto Larch's 0.05 Å⁻¹ k grid,
 with `nfft = 2048`. Output R arrays extend to 10 Å.
 The numerical references are the checked-out
-[`feffit.py`](../larch/xafs/feffit.py),
-[`feffdat.py`](../larch/xafs/feffdat.py), and
-[`xafs_feffit.rst`](../doc/xafs_feffit.rst), alongside the published
+[`feffit.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffit.py),
+[`feffdat.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffdat.py), and
+[`xafs_feffit.rst`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/doc/xafs_feffit.rst), alongside the published
 [Larch fitting](https://xraypy.github.io/xraylarch/xafs_feffit.html) and
 [FEFF-path documentation](https://xraypy.github.io/xraylarch/xafs_feffpaths.html).
 

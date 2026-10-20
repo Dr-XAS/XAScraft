@@ -56,7 +56,7 @@ the final group order. These four browser tests pass.
   polynomial degree convention. A Demeter header mentioning its Larch backend
   retains the native term-count convention. See
   [normalization exchange](athena-native-normalization-reference.md) and
-  [local Larch's project writer](../larch/io/athena_project.py).
+  [local Larch's project writer](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/io/athena_project.py).
 - Native normalization outer endpoints are now resolved during processing,
   preserving requested pre1/norm2 values in the recipe as well as the original
   arguments. See the executed [boundary reference](athena-normalization-limits-reference.md).
