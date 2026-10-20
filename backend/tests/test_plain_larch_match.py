@@ -276,3 +276,43 @@ def test_feffit_ex5_feo_in_k_space_matches_plain_larch(client):
                                     rmin=1.0, rmax=3.2))
 
     assert_same_feffit(app, reference, dset, FEO_NAMES)
+
+
+# --- feffit Ex6: ZnSe, one fit per scatterer (examples/feffit/doc_feffit6.py) ------------
+# The script sets degen=4.0 on every path; the app's files carry it in their headers.
+# Its phase-corrected transform and plots are drawing only and are left out.
+
+ZNSE_SCATTERERS = ("Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb")
+
+
+def znse_chi():
+    dat = read_ascii(str(XAFSDATA / "znse_zn_xafs.001"), labels="energy dwelltime i0 i1")
+    dat.mu = -np.log(dat.i1 / dat.i0)
+    autobk(dat, e0=9665.0, rbkg=1.21, kweight=2)
+    return dat
+
+
+@pytest.mark.parametrize("scatterer", ZNSE_SCATTERERS)
+def test_feffit_ex6_znse_one_scatterer_matches_plain_larch(client, scatterer):
+    znse_data = znse_chi()
+    filename = f"Feff_ZnSe/feff_zn{scatterer.lower()}.dat"
+    path = feffpath(str(FEFFIT / filename), degen=4.0, s02="amp", e0="del_e0", sigma2="sig2", deltar="del_r")
+    trans = feffit_transform(rmin=1.5, rmax=3.0, kmin=3, kmax=13, kw=2, dk=4, window="kaiser", **APP_TRANSFORM)
+    dset = feffit_dataset(data=chi_data(znse_data), paths={scatterer: path}, transform=trans)
+    pars = Group(amp=guess(1.0), del_e0=guess(0.1, min=-20, max=20),
+                 sig2=param(0.006, vary=True, min=0), del_r=guess(0.))
+    reference = feffit(pars, dset)
+
+    project, group = import_columns(client, "znse_zn_xafs.chi", znse_data.k, znse_data.chi, "chi")
+    app = app_feffit(client, project, group,
+                     parameters=[dict(name="amp", kind="guess", value=1.0),
+                                 dict(name="del_e0", kind="guess", value=0.1, min=-20, max=20),
+                                 dict(name="sig2", kind="guess", value=0.006, min=0),
+                                 dict(name="del_r", kind="guess", value=0.)],
+                     paths=[dict(id=scatterer, filename=filename.split("/")[-1],
+                                 content=feff_text(filename, degen=4.0),
+                                 s02="amp", e0="del_e0", sigma2="sig2", deltar="del_r")],
+                     transform=dict(fitspace="r", kmin=3, kmax=13, kweight=[2], dk=4, window="kaiser",
+                                    rmin=1.5, rmax=3.0))
+
+    assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
