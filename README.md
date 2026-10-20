@@ -539,16 +539,17 @@ Plots and image exports share the lazy-loaded Plotly 4 bundle through
 dependency) and `plotly.js-dist-min` pinned to the same version. Rendering uses
 `react-plotly.js/factory`, so its default, separate Plotly bundle is not loaded.
 
-Create the backend environment from `backend/requirements.txt` before starting
-the services. From the repository root, start the backend in one terminal:
+Create the backend environment as `larch-patches/README.md` ("Installing for
+development") describes: the release constraints, the patched Larch build from
+`larch-patches/install-dev.sh`, then `backend/requirements.txt`. Start the
+backend in one terminal, from `backend/`, where the web backend package lives
+(at the repository root, its `larch/` folder would shadow the installed build):
 
 ```bash
-PYTHONPATH=backend backend/.venv/bin/python -m uvicorn xraylarch_web.main:app --reload --reload-dir backend/xraylarch_web --port 8006
+cd backend && .venv/bin/python -m uvicorn xraylarch_web.main:app --reload --reload-dir xraylarch_web --port 8006
 ```
 
-`PYTHONPATH=backend` is required for the current source-tree layout because the
-web backend package lives beneath `backend/`. Reload watches application code
-only, so editing tests does not restart the local service. Start the frontend in a second
+Reload watches application code only, so editing tests does not restart the local service. Start the frontend in a second
 terminal:
 
 ```bash

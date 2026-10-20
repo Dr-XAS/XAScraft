@@ -49,6 +49,29 @@ nothing, into `--out` (which must be absent or empty):
   setuptools does not make the sdist reproducible by itself (build-time stamps on the generated
   files, the builder's uid and gid, the gzip time), so `build.py` rewrites it with those fixed.
 
+## Installing for development
+
+The backend's environment gets Larch from this build, never from the repository's `larch/`
+folder (`backend/requirements.txt` does not install Larch). From the repository root:
+
+```sh
+python3.12 -m venv backend/.venv
+backend/.venv/bin/pip install -r deploy/python-release-constraints.txt -c deploy/python-release-constraints.txt
+larch-patches/install-dev.sh --upstream ~/xraylarch       # omit --upstream to fetch the pin from GitHub
+(cd backend && .venv/bin/pip install -r requirements.txt -c ../deploy/python-release-constraints.txt)
+```
+
+`install-dev.sh` runs `build.py` with the venv's interpreter as the build backend, installs the
+wheel under the release constraints (replacing any Larch already installed, an editable one
+included), and checks that `import larch` gives IDENTITY's version from site-packages.
+`--python PYTHON` installs into another environment; `--keep DIR` keeps the build output.
+Run it again after the pin or a patch changes: `backend/tests/test_larch_dependency.py` fails
+while the installed Larch is not the current build.
+
+Start Python from `backend/` (or any directory but the repository root) while the root `larch/`
+folder exists: `python -m` and `python -c` put the current directory first on `sys.path`, so at
+the root the folder would shadow the installed build.
+
 ## Running the tests
 
 ```sh
