@@ -35,7 +35,7 @@ nothing, into `--out` (which must be absent or empty):
 | `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
 
 - **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`, today
-  `2026.3.1.post78+g247278cef.xascraft.f9e424031132`. The patch-set id is the first 12 hex digits
+  `2026.3.1.post78+g247278cef.xascraft.90a871b3d1d8`. The patch-set id is the first 12 hex digits
   of the sha256 of the applied patch files' bytes, in order (`cat series/*.patch | sha256sum`).
   It changes only when the pin or a patch file changes; a reworded message counts.
 - **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
@@ -125,8 +125,8 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
   pinned commit from the URL in `PIN`. A local clone is only read (`git clone --shared`).
 - The FEFF tests read `examples/feffit/Feff_Cu` from this repository's `examples/` folder.
   `XASCRAFT_EXAMPLES_DIR` points them at another `examples/` copy.
-- On the patched build at this pin, all 12 regression items pass. On plain upstream
-  `247278cef`, all 12 fail.
+- On the patched build at this pin, all 15 regression items pass. On plain upstream
+  `247278cef`, all 15 fail.
 
 ## Patches
 
@@ -139,12 +139,18 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 | 0005 | `b334e57f8` | Xiangyu Yin, 2026-10-12 | `xafs/autobk.py`, `xafs/estimate_noise.py`, `xafs/feffdat.py` | [AUTOBK](#2-autobk), [Noise estimate](#6-noise-estimate), [FEFF path data](#7-feff-path-data) |
 | 0006 | `8d37ac358` | Xiangyu Yin, 2026-10-12 | `xafs/autobk.py`, `xafs/feffdat.py` | [AUTOBK](#2-autobk), [FEFF path data](#7-feff-path-data) |
 | 0007 | `aee4bb5e6` | Xiangyu Yin, 2026-10-12 | `xafs/feffdat.py` | [FEFF path data](#7-feff-path-data) |
+| 0008 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/feffdat.py` | [FEFF path parameters (temporary)](#9-feff-path-parameters-temporary) |
 
 The patches also carry the team's changes to upstream test files: `tests/test_xafs_defects.py`
 (0005 to 0007), `tests/test_xrf_model.py` and the APS 12-BM test in `tests/test_read_beamlinedata.py`
 (0004), and the `tests/run_tests.sh` line that runs `test_xafs_defects.py` (0007).
 The subjects of 0001 to 0004 describe mostly app work, because those commits also changed the app.
 Their messages are kept as written; this ledger says what each patch does to Larch.
+
+0001 to 0007 come from the team's commits. Later patches are **temporary**: written while
+tracking upstream, they undo an upstream regression (decisions record, "Tracking upstream"),
+come from no XAScraft commit (so no `XAScraft-commit` trailer), change only `larch/`, and keep
+their regression tests in `larch-patches/tests/` alone.
 
 ## Ledger
 
@@ -257,12 +263,39 @@ below).
 - **Covering test:** all of `test_xrf_model.py` (6 items).
 - **App needs it:** no; the app has its own version.
 
+### 9. FEFF path parameters (temporary)
+
+- **Patch:** 0008 (`larch/xafs/feffdat.py`), temporary.
+- **Why:** upstream `c18a4ed63` (2026-10-11, "move hashkey to FeffDatFile, several cleanups")
+  changed three `FeffPathGroup` behaviors. The patch restores those of `8d6cd41c2`, one hunk each:
+  - `FeffPathGroup.hashkey` came from the Feff.dat content alone (`FeffDatFile.hashkey`). Two
+    paths with identical content, such as a split shell or one file added twice, got the same
+    parameter names (`sigma2_<dataset>_<hashkey>`), and the last path's values overwrote the
+    others'. The hashkey is again made from the filename, degeneracy, shell, geometry and reff
+    (`__geom2label`). `FeffDatFile.hashkey` stays as upstream has it.
+  - `path2chi(path, params=<lmfit Parameters>)` set up the path parameters but did not calculate
+    chi: the `_calc_chi` call was indented into the `else` branch.
+  - Without an explicit `k`, `_calc_chi` clamped `kmax` to the Feff.dat k grid only when `kmax`
+    was None (indentation), so a given `kmax` past the grid extrapolated.
+- **Numeric effect:** with the patch, everything is as at `8d6cd41c2`. Without it, in the app,
+  an Artemis fit with two enabled paths of identical content keeps correct fitted parameters
+  and statistics, but reports wrong per-path values and per-path χ(k) (four
+  `test_artemis.py::test_distinct_fitted_path_contributions_match_native_final_parameters`
+  cases fail). The app never calls `path2chi` with lmfit Parameters or `_calc_chi` without `k`;
+  plain Larch scripts in the same environment get chi = None and a k grid up to the given
+  `kmax`. Default path labels follow the hashkey, so they also return to the `8d6cd41c2` values;
+  the app sets its own labels, so none of its outputs carry them.
+- **Covering test:** `test_feffdat_regressions.py` (3 items).
+- **Exit condition:** upstream fixes the three regressions (offer each upstream as an issue,
+  submitted by a person).
+- **App needs it:** yes, for fits whose paths share FEFF content.
+
 ### Packaging: no `mkl_fft`
 
 - **Patch:** 0002 (`pyproject.toml`).
 - **Why:** removes the `mkl_fft ; platform_system != 'Darwin'` dependency, which the app's
   release environments do not install. This is a packaging change, not a Larch behavior, so it is
-  not one of the eight entries above.
+  not one of the numbered entries above.
 - **Numeric effect:** none at the baseline, whose release constraints do not include `mkl_fft`.
   Where `mkl_fft` is missing, `larch/xafs/xafsft.py` uses `scipy.fftpack` instead.
 - **Covering test:** `test_series.py` checks the patched `pyproject.toml` blob.
