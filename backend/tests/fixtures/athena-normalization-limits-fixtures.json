@@ -11,7 +11,7 @@
     "backend/tests/fixtures/athena-normalization-limits-native.json.gz": "e0a43018ef8b056363c54f4ae061006493e79ce67743fcd44942792db9b71f7c",
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
     "backend/tests/fixtures/xdi-official-fe2o3_rt.xdi": "4a1c4cec3e00d62734406a872d8a114ebd7d7c1b66050a61ec4017b03abd2a5a",
-    "larch/xafs/pre_edge.py": "0a49d5cfb4b465580cb3ba17079df97e36d40c994d7e4b02cf2b8ec9a437e02d"
+    "larch/xafs/pre_edge.py": "b2a6c033e83e998fa921357e0997548a15b1874253dd42a1fb6d9c5c196825aa"
   },
   "basis": "Original OnCalibrate and process/larch/normalize.tmpl, with explicit Data/App/widget accessors and real Larch pre_edge; no web normalization/range functions in the reference driver. Not a full Demeter GUI/AUTOBK/flatten-fit replay."
 }
