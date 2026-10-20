@@ -127,10 +127,10 @@ def identity(out: Path) -> dict:
 def test_identity_names_the_pin_the_patch_set_and_the_version(full):
     ident = identity(full)
     patch_set = series_id(PATCHES_DIR)
-    assert ident["pin"] == PIN["upstream-commit"] == "8d6cd41c2b2a19260dbc80519c3c95211331d4fc"
-    assert ident["upstream_version"] == "2026.3.1.post35+g8d6cd41c2"
+    assert ident["pin"] == PIN["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
+    assert ident["upstream_version"] == "2026.3.1.post78+g247278cef"
     assert ident["patch_set_id"] == patch_set
-    assert ident["version"] == f"2026.3.1.post35+g8d6cd41c2.xascraft.{patch_set}"
+    assert ident["version"] == f"2026.3.1.post78+g247278cef.xascraft.{patch_set}"
     assert ident["excluded"] == []
     assert ident["pure_upstream"] is False
     assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)
@@ -166,7 +166,7 @@ def installed_versions(wheel: Path, target: Path) -> list[str]:
 
 
 def test_installed_wheel_reports_the_version(full, tmp_path):
-    version = f"2026.3.1.post35+g8d6cd41c2.xascraft.{series_id(PATCHES_DIR)}"
+    version = f"2026.3.1.post78+g247278cef.xascraft.{series_id(PATCHES_DIR)}"
     wheel = the_wheel(full)
     assert wheel.name == f"xraylarch-{version}-py3-none-any.whl"
     assert installed_versions(wheel, tmp_path / "site") == [version, version]
@@ -264,8 +264,8 @@ def test_a_corrupted_patch_stops_the_build_and_writes_nothing(tmp_path):
     assert not out.exists()
 
 
-# git rev-parse 8d6cd41c2b2a19260dbc80519c3c95211331d4fc:larch in the upstream clone.
-UPSTREAM_LARCH_TREE = "244732f073d99905e9414fc12379b58de769c220"
+# git rev-parse 247278cefbb16eda04c91f79fc1b43df000fa498:larch in the upstream clone.
+UPSTREAM_LARCH_TREE = "379dbb76c9bd3dcc315b403176deb2960ef27b6e"
 
 
 @pytest.fixture(scope="module")
@@ -280,7 +280,7 @@ def test_pure_upstream_build_is_upstream_at_the_pin(pure, tmp_path):
     assert ident["patch_set_id"] is None
     assert ident["patches"] == []
     assert ident["excluded"] == list(XASCRAFT_COMMITS)
-    assert ident["version"] == "2026.3.1.post35+g8d6cd41c2"
+    assert ident["version"] == "2026.3.1.post78+g247278cef"
     assert installed_versions(the_wheel(pure), tmp_path / "site") == [ident["version"]] * 2
 
 
@@ -289,7 +289,7 @@ def test_exclude_leaves_one_patch_out_and_says_so(full, pure, tmp_path):
     ident = identity(out)
     patch_set = series_id(PATCHES_DIR, skip=("0001",))
     assert ident["patch_set_id"] == patch_set != identity(full)["patch_set_id"]
-    assert ident["version"] == f"2026.3.1.post35+g8d6cd41c2.xascraft.{patch_set}.without0001"
+    assert ident["version"] == f"2026.3.1.post78+g247278cef.xascraft.{patch_set}.without0001"
     assert ident["excluded"] == ["0001"]
     assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)[1:]
     assert the_wheel(out).name == f"xraylarch-{ident['version']}-py3-none-any.whl"

@@ -1,4 +1,4 @@
-From b334e57f8057cc25bef21d91968101c28195337a Mon Sep 17 00:00:00 2001
+From 9e0c7e24e64644cb1faf55a7381a5ece747b0a3a Mon Sep 17 00:00:00 2001
 From: Xiangyu Yin <xyin@anl.gov>
 Date: Mon, 12 Oct 2026 14:22:03 -0500
 Subject: [PATCH] Fix three EXAFS defects: Debye sigma2 read the wrong path
@@ -89,10 +89,10 @@ index 86b3280b063f561cdecea6c7419ca6720b6c2486..69e5da42295321ec5d57baf4476d0f9b
  
      chir  = tmpgroup.chir
 diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
-index 9762a7192833d2b06dfbbd6f03ec8c2b73f65ca1..aef38ebd0bfe27fd4f21ac06a74691d019baf33d 100644
+index 5b623bf578ef8be3865d6fbbf0a10a51e89d604d..8c7c2f2a930d43dd81333d8fddfbeff2fa9dde1c 100644
 --- a/larch/xafs/feffdat.py
 +++ b/larch/xafs/feffdat.py
-@@ -491,7 +491,14 @@ class FeffPathGroup(Group):
+@@ -501,7 +501,14 @@ class FeffPathGroup(Group):
              isinstance(self.params, dict)):
              self.params = dict2params(self.params)
  

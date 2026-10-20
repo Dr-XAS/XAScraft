@@ -1,4 +1,4 @@
-From cc099c125537e919eae5af4f9e3c86f671c3a1bd Mon Sep 17 00:00:00 2001
+From a25874067c63f2d6b20a198b3f4f687b338f59e9 Mon Sep 17 00:00:00 2001
 From: Xiangyu Yin <xyin@anl.gov>
 Date: Tue, 6 Oct 2026 08:44:53 -0500
 Subject: [PATCH] Add fluorescence XAS from XRF fitting, project import and

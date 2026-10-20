@@ -1,9 +1,9 @@
 # Upstream xraylarch commit the series in series/ applies to, and what applying it must give.
 # Format: key = value. Update all lines together when re-pinning (see README.md).
 upstream-url = https://github.com/xraypy/xraylarch.git
-upstream-commit = 8d6cd41c2b2a19260dbc80519c3c95211331d4fc
+upstream-commit = 247278cefbb16eda04c91f79fc1b43df000fa498
 # setuptools_scm version of upstream at upstream-commit (git describe --tags --long --match '*[0-9]*').
-upstream-version = 2026.3.1.post35+g8d6cd41c2
+upstream-version = 2026.3.1.post78+g247278cef
 # git tree of larch/ and blob of pyproject.toml after `git am series/*.patch` on upstream-commit.
-patched-larch-tree = 72b7101ea9da8e7e4801c94a4d17ef289ec1517b
-patched-pyproject-blob = c6445f212e24366c12e681baca7778a05eec38c2
+patched-larch-tree = deec1766f1376f7b84df2f112d6222b1dcc2341b
+patched-pyproject-blob = 14ccc10ed6f759cda9059d331e3c9139cfe7a8d2

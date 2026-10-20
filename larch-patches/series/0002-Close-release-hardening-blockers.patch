@@ -1,4 +1,4 @@
-From 3ca0a9716aceb571c201183250177d56d8709826 Mon Sep 17 00:00:00 2001
+From 8c29f5960c4288077f3a6455118a849314684ccc Mon Sep 17 00:00:00 2001
 From: jhuang165 <jeffreyhuang165@gmail.com>
 Date: Tue, 18 Aug 2026 13:13:12 -0500
 Subject: [PATCH] Close release hardening blockers
@@ -10,7 +10,7 @@ XAScraft-commit: 3ca0a9716aceb571c201183250177d56d8709826
  1 file changed, 1 deletion(-)
 
 diff --git a/pyproject.toml b/pyproject.toml
-index c32a14e4a73bf9fe3fa3362298ab7f7c706b6dff..785e1069f1efd2e6c9b1fd1c7b49425d6b74d058 100644
+index d2c8d9638da6df0f723aeee54a3428c080525431..14ccc10ed6f759cda9059d331e3c9139cfe7a8d2 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -57,7 +57,6 @@ dependencies = ["numpy>=2.2.0",

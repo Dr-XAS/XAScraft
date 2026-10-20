@@ -1,10 +1,9 @@
-From e470151667bcabd59d2c4bb77bd284607601845d Mon Sep 17 00:00:00 2001
+From 7c8f7987acd3d1294f2e391b1b3293d59387e89e Mon Sep 17 00:00:00 2001
 From: jhuang165 <jeffreyhuang165@gmail.com>
 Date: Mon, 17 Aug 2026 17:26:38 -0500
 Subject: [PATCH] fix: harden V1 scientific workflow and dependencies
 
 XAScraft-commit: e470151667bcabd59d2c4bb77bd284607601845d
-
 ---
  larch/io/csvfiles.py | 38 +++++++++++++++++++-------------------
  1 file changed, 19 insertions(+), 19 deletions(-)

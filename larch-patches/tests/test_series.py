@@ -84,7 +84,7 @@ def patched(tmp_path_factory) -> Path:
 def test_pin_names_a_full_upstream_commit():
     pin = read_pin()
     assert len(pin["upstream-commit"]) == 40
-    assert pin["upstream-commit"].startswith("8d6cd41c2")
+    assert pin["upstream-commit"].startswith("247278cef")
     assert pin["upstream-url"] == "https://github.com/xraypy/xraylarch.git"
 
 
@@ -104,16 +104,13 @@ def test_series_reproduces_the_pinned_pyproject(patched):
     )
 
 
-def test_expected_hashes_in_pin_are_the_baseline_ones():
-    """Cross-check PIN against the baseline tag, while this checkout still has it."""
-    try:
-        larch = git("rev-parse", "refactor-baseline:larch", cwd=REPO_ROOT).strip()
-        pyproject = git("rev-parse", "refactor-baseline:pyproject.toml", cwd=REPO_ROOT).strip()
-    except subprocess.CalledProcessError:
-        pytest.skip("tag refactor-baseline is not in this checkout")
+def test_expected_hashes_in_pin_are_the_reviewed_ones():
+    """PIN's patched hashes, as computed when the series was rebased onto 247278cef
+    (ticket 18; notes/04 section 2 got the same).  At the previous pin 8d6cd41c2 they were
+    the baseline tag's own (larch 72b7101ea9da, pyproject c6445f212e24)."""
     pin = read_pin()
-    assert (pin["patched-larch-tree"], pin["patched-pyproject-blob"]) == (larch, pyproject)
-    assert larch == "72b7101ea9da8e7e4801c94a4d17ef289ec1517b"
+    assert pin["patched-larch-tree"] == "deec1766f1376f7b84df2f112d6222b1dcc2341b"
+    assert pin["patched-pyproject-blob"] == "14ccc10ed6f759cda9059d331e3c9139cfe7a8d2"
 
 
 # What the series carries (README "Maintaining the queue"), less tests/run_tests.sh, whose

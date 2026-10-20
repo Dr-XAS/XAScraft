@@ -1,4 +1,4 @@
-From aee4bb5e6253a6d33ce326891d5e68adbcf2236d Mon Sep 17 00:00:00 2001
+From df4b22e5b2e4380c09ab79b87ff26d54e9244d42 Mon Sep 17 00:00:00 2001
 From: Xiangyu Yin <xyin@anl.gov>
 Date: Mon, 12 Oct 2026 14:40:54 -0500
 Subject: [PATCH] Rebind procedures on every path evaluation and through
@@ -16,7 +16,7 @@ XAScraft-commit: aee4bb5e6253a6d33ce326891d5e68adbcf2236d
  3 files changed, 62 insertions(+), 18 deletions(-)
 
 diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
-index 98d5e9ac72272344aa7f71b0133388e11b2bef2a..17113e67ba365ab9927b609a984dc678b6a0a384 100644
+index ccb5b5f4911b3d9002214d05e9fff3663a0d05d2..ca4c511f894c0aa4c76c5b8229f1c2e7f8cf4a9d 100644
 --- a/larch/xafs/feffdat.py
 +++ b/larch/xafs/feffdat.py
 @@ -33,7 +33,6 @@ from larch.utils.strutils import b32hash
@@ -27,7 +27,7 @@ index 98d5e9ac72272344aa7f71b0133388e11b2bef2a..17113e67ba365ab9927b609a984dc678
  from asteval.astutils import Procedure
  
  SMALL_ENERGY = 1.e-6
-@@ -288,28 +287,48 @@ class FeffDatFile(Group):
+@@ -305,28 +304,48 @@ class FeffDatFile(Group):
          self.__rmass = None  # reduced mass of path
          self.__geometry = None  # path geometry list [atom, dist, angle]
  
@@ -93,13 +93,13 @@ index 98d5e9ac72272344aa7f71b0133388e11b2bef2a..17113e67ba365ab9927b609a984dc678
  
  class FeffPathGroup(Group):
 diff --git a/tests/run_tests.sh b/tests/run_tests.sh
-index 6c4931c1de5905c4514161065ea073af61671a30..8a7471bb0d458dc06d55fca3722a1fd43b4ee72c 100644
+index 0e01e5e99a624d970a618a4b32ec9eb17aca3b8e..b09f9ad474b8afcd4f00addad6f19cc8c1cac2e7 100644
 --- a/tests/run_tests.sh
 +++ b/tests/run_tests.sh
-@@ -5,4 +5,4 @@ pytest test_athena_addgroup.py test_basic_processing.py \
-  test_math_deglitch.py test_math_utils.py test_plot_rixsdata_import.py \
+@@ -6,4 +6,4 @@ pytest test_athena_addgroup.py test_basic_processing.py \
   test_read_beamlinedata.py \
-  test_read_xafsdata.py test_symbol_callbacks.py test_xas_data_source.py \
+  test_read_xafsdata.py test_symbol_callbacks.py test_xafs_rebin.py \
+  test_xas_data_source.py \
 - test_xrf_roi.py
 + test_xrf_roi.py test_xafs_defects.py
 diff --git a/tests/test_xafs_defects.py b/tests/test_xafs_defects.py

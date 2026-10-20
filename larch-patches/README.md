@@ -35,12 +35,12 @@ nothing, into `--out` (which must be absent or empty):
 | `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
 
 - **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`, today
-  `2026.3.1.post35+g8d6cd41c2.xascraft.9b231a511159`. The patch-set id is the first 12 hex digits
+  `2026.3.1.post78+g247278cef.xascraft.f9e424031132`. The patch-set id is the first 12 hex digits
   of the sha256 of the applied patch files' bytes, in order (`cat series/*.patch | sha256sum`).
   It changes only when the pin or a patch file changes; a reworded message counts.
 - **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
   and marks the version, e.g. `….xascraft.<id of the rest>.without0003`. `--pure-upstream` applies
-  nothing and gives upstream's own version, `2026.3.1.post35+g8d6cd41c2`.
+  nothing and gives upstream's own version, `2026.3.1.post78+g247278cef`.
 - **Stops** with a non-zero exit, and writes nothing, when a patch does not apply, when the full
   series gives another `larch/` tree than `patched-larch-tree` in `PIN`, or when setuptools would
   change the version string.
@@ -126,7 +126,7 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 - The FEFF tests read `examples/feffit/Feff_Cu` from this repository's `examples/` folder.
   `XASCRAFT_EXAMPLES_DIR` points them at another `examples/` copy.
 - On the patched build at this pin, all 12 regression items pass. On plain upstream
-  `8d6cd41c2`, all 12 fail.
+  `247278cef`, all 12 fail.
 
 ## Patches
 
@@ -325,13 +325,20 @@ Re-pin only when the owner asks.
 2. Regenerate every file from the new commits with the `format-patch` command above. Use the
    new commits' SHAs as `<commit>`, but keep the original `XAScraft-commit` trailers. The
    trailer line is already in each message, so do not add it a second time.
+   `git am --continue` after a conflict does not keep `--committer-date-is-author-date`, so
+   apply the regenerated files once more with the command above and regenerate from those
+   commits: then each file's `From <sha>` line is the commit that applying the series gives.
 3. Update `PIN`: `upstream-commit`; `upstream-version` from
-   `git describe --tags --long --match '*[0-9]*' <commit>` (`2026.3.1-35-g8d6cd41c2` becomes
-   `2026.3.1.post35+g8d6cd41c2`, with a 9-character short SHA); and the patched hashes.
-4. Run all tests here and the per-patch report. Retire patches that upstream made unnecessary.
+   `git describe --tags --long --match '*[0-9]*' <commit>` (`2026.3.1-78-g247278cef` becomes
+   `2026.3.1.post78+g247278cef`, with a 9-character short SHA); and the patched hashes.
+4. Update what encodes the pin in the tests: the commit prefix and the reviewed hashes in
+   `tests/test_series.py`, the pin, versions and `UPSTREAM_LARCH_TREE` in `tests/test_build.py`,
+   and `FILES` in `run-upstream-tests.sh` (upstream's `tests/run_tests.sh` list at the pin).
+5. Run all tests here and the per-patch report. Retire patches that upstream made unnecessary.
    Give every other difference from the previous pin a verdict, as the decisions record
    describes.
 
-Known for the next pin: at upstream `946eeeca0`, 0007 fails on `tests/run_tests.sh`, which upstream
-changed. The `larch/` part of 0007 still applies. The simplest fix is to drop the
-`run_tests.sh` hunk, since the new CI names test files explicitly.
+At `247278cef` (from `8d6cd41c2`), 0001 to 0006 applied with offsets only. 0007 failed on
+`tests/run_tests.sh`, whose last lines upstream rewrote (`34be3ef37`); its hunk was redone on
+upstream's file and still adds `test_xafs_defects.py` to the last line. Its `larch/` part
+applied unchanged. Upstream's list gained `test_xafs_rebin.py`.

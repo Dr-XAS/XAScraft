@@ -1,10 +1,9 @@
-From ab60c3776904a1f84b06652042894b762e7c55ff Mon Sep 17 00:00:00 2001
+From fe0fdeaa4c6ad40ae00594ae727d117e974f2344 Mon Sep 17 00:00:00 2001
 From: Juanjuan Huang <juanjuan.cathy@gmail.com>
 Date: Thu, 10 Sep 2026 00:11:52 -0500
 Subject: [PATCH] Improve Athena project compatibility
 
 XAScraft-commit: ab60c3776904a1f84b06652042894b762e7c55ff
-
 ---
  larch/xafs/autobk.py | 6 +++++-
  larch/xafs/xafsft.py | 3 ++-
