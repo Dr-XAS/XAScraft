@@ -100,3 +100,18 @@ def test_no_doc_describes_the_old_editable_install(name):
     found = [f"{name}:{number}: {line.strip()}" for number, line in lines(name)
              if OLD_INSTALL.search(line)]
     assert not found
+
+
+# "This checkout" was the repository with Larch inside it ("built on this checkout of
+# the `xraylarch` library", "this checkout's `larch/xafs/autobk.py`").  Larch is now an
+# installed build; the phrase may still name the repository itself.  The words may wrap.
+THIS_CHECKOUTS_LARCH = re.compile(
+    r"this\s+checkout(?:'s)?\s+(?:of\s+(?:the\s+)?)?`?(?:xraylarch|larch)\b", re.IGNORECASE)
+
+
+@pytest.mark.parametrize("name", DOCS)
+def test_no_doc_places_larch_in_this_checkout(name):
+    text = (REPO / name).read_text(encoding="utf-8")
+    found = [f"{name}:{text.count(chr(10), 0, match.start()) + 1}: {' '.join(match.group().split())}"
+             for match in THIS_CHECKOUTS_LARCH.finditer(text)]
+    assert not found

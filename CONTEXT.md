@@ -1,6 +1,6 @@
 # XAS spectrum processing (XAScraft)
 
-A browser implementation of desktop Athena's XAS workflows, built on this checkout of the `xraylarch` scientific library. It exists so that Athena's multi-spectrum processing can run as a web service and hand results back to Dr.XAS, without a wxPython desktop install.
+A browser implementation of desktop Athena's XAS workflows, built on the `xraylarch` scientific library (upstream at a pinned commit plus the patches in `larch-patches/`). It exists so that Athena's multi-spectrum processing can run as a web service and hand results back to Dr.XAS, without a wxPython desktop install.
 
 ## Language
 
