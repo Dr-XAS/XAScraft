@@ -125,6 +125,12 @@ build_call=$(larch_call larch_build)
   || fail_test "the built wheel must be installed under the release constraints: $(larch_call larch_install)"
 [[ ! -e "$larch_out" ]] || fail_test 'build.py output must be removed after installation'
 
+# An operator may point build.py at a local upstream clone or mirror.
+XASCRAFT_LARCH_UPSTREAM="$test_root/xraylarch clone" run_larch_install none \
+  || fail_test 'release backend install from a local upstream must succeed'
+[[ "$(larch_call larch_build)" == *"--build-python $larch_release/backend/.venv/bin/python --upstream $test_root/xraylarch clone" ]] \
+  || fail_test "XASCRAFT_LARCH_UPSTREAM must reach build.py: $(larch_call larch_build)"
+
 # Mounted builds must receive their public path at build time. Health qualification
 # must bind the backend response to the exact immutable release and contract.
 build_source=$(declare -f build_release)
