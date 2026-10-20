@@ -16,7 +16,6 @@ conda_constructor/*.exe
 conda_constructor/*.pkg
 __pycache__
 .deps
-doc/_build
 MANIFEST
 build
 dist
