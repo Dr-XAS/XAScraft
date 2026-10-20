@@ -17,6 +17,7 @@ Standard library only (Python 3.12+).  See README.md, "Building".
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import io
 import json
@@ -196,6 +197,28 @@ def build_dists(src: Path, work: Path, dist: Path, python: str, version: str,
         if built != version:
             raise BuildError(f"the {kind} {name} has version {built!r}, not {version!r} "
                              "(setuptools normalised it)")
+        if kind == "sdist":
+            normalise_sdist(dist / name, int(epoch))
+
+
+def normalise_sdist(path: Path, epoch: int) -> None:
+    """Make the sdist reproducible, which setuptools does not: the files it generates
+    (PKG-INFO, egg-info, _version.py) get the build time, the tar records the builder's
+    uid and gid, and the gzip header records the time of compression."""
+    with tarfile.open(path, "r:gz") as src:
+        members = [(m, src.extractfile(m).read() if m.isfile() else None)
+                   for m in src.getmembers()]
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w", format=tarfile.PAX_FORMAT) as dst:
+        for member, data in sorted(members, key=lambda item: item[0].name):
+            member.mtime = min(int(member.mtime), epoch)
+            member.uid = member.gid = 0
+            member.uname = member.gname = ""
+            member.pax_headers = {}
+            dst.addfile(member, io.BytesIO(data) if data is not None else None)
+    with open(path, "wb") as raw, gzip.GzipFile(
+            filename=path.name.removesuffix(".gz"), mode="wb", fileobj=raw, mtime=0) as gz:
+        gz.write(buffer.getvalue())
 
 
 def build(args: argparse.Namespace) -> Path:

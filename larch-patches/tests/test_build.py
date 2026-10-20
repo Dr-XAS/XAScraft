@@ -180,3 +180,11 @@ def test_wheel_carries_the_whole_patched_larch_tree(full):
 def test_dist_has_a_matching_sdist(full):
     sdists = sorted((full / "dist").glob("*.tar.gz"))
     assert [s.name for s in sdists] == [f"xraylarch-{identity(full)['version']}.tar.gz"]
+
+
+def test_two_builds_are_identical(full, tmp_path):
+    """Same inputs, same outputs: tree, IDENTITY, wheel and sdist, byte for byte."""
+    again = build_ok(tmp_path / "again")
+    assert files_under(again / "xraylarch-src") == files_under(full / "xraylarch-src")
+    assert (again / "IDENTITY").read_bytes() == (full / "IDENTITY").read_bytes()
+    assert files_under(again / "dist") == files_under(full / "dist")
