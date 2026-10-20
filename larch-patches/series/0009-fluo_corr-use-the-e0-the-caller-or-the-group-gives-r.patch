@@ -1,0 +1,72 @@
+From 69d62268cdaa36241ba932869c414cb72e204a78 Mon Sep 17 00:00:00 2001
+From: XAScraft refactor <refactor@xascraft.invalid>
+Date: Tue, 20 Oct 2026 12:00:00 -0500
+Subject: [PATCH] fluo_corr: use the e0 the caller or the group gives (revert
+ d6d27ccca)
+
+Revert upstream d6d27ccca ("fluo: force recalculation of e0"). It sets
+pre_opts['e0'] = None after the caller's keywords and the group's
+pre_edge_details are read, so fluo_corr() drops the e0 it is given and
+both pre_edge() calls find their own: norm_corr is then normalized
+around another e0 than the caller's norm, and mu_corr is computed from
+that other normalization. It also stopped forcing nvict to 0.
+
+After the revert an explicit e0 is used again, as pre_edge() uses it,
+a group's own e0 is used when none is passed (11448b7b3), and e0 is
+found by pre_edge() only when neither gives one. This is fluo.py as
+it was after 11448b7b3; its test_fluo_corr_uses_group_normalization
+still passes.
+
+Temporary XAScraft patch: it keeps the app's self-absorption numbers as
+they were at the previous pin until the project owner decides whether to
+adopt upstream's behavior.
+---
+ larch/xafs/fluo.py      |  6 +++---
+ tests/test_xafs_fluo.py | 12 ++++++++++++
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/larch/xafs/fluo.py b/larch/xafs/fluo.py
+index 5ae505caba39fd15d3d256b27e1f6e434ed5838f..76266e7ae4e0b7ae9ad9212c1b23c8c6d4e1b30f 100644
+--- a/larch/xafs/fluo.py
++++ b/larch/xafs/fluo.py
+@@ -40,8 +40,8 @@ def fluo_corr(energy, mu, formula, elem, group=None, edge='K', line='Ka', anginp
+                                          defaults=(mu,), group=group,
+                                          fcn_name='fluo_corr')
+     # gather pre-edge options
+-    pre_opts = {'nnorm': 1, 'nvict': 0,
+-                'pre1': None, 'pre2': -30.,
++    pre_opts = {'e0': None, 'nnorm': 1, 'nvict': 0,
++                'pre1': None, 'pre2': -30,
+                 'norm1': 100, 'norm2': None}
+     # use the ranges pre_edge() settled on for this group, so that
+     # norm_corr is normalized the same way as norm
+@@ -53,8 +53,8 @@ def fluo_corr(energy, mu, formula, elem, group=None, edge='K', line='Ka', anginp
+         if getattr(group, 'e0', None) is not None:
+             pre_opts['e0'] = group.e0
+     pre_opts.update(pre_kws)
+-    pre_opts['e0'] = None
+     pre_opts['step'] = None
++    pre_opts['nvict'] = 0
+ 
+     # generate normalized mu for correction
+     preinp   = preedge(energy, mu, **pre_opts)
+diff --git a/tests/test_xafs_fluo.py b/tests/test_xafs_fluo.py
+index 11537595b54bc6c34f9d0104625a680c5e52cbe0..6c3b897a813b8895309e4af683991354273dfc4a 100644
+--- a/tests/test_xafs_fluo.py
++++ b/tests/test_xafs_fluo.py
+@@ -27,3 +27,15 @@ def test_fluo_corr_uses_group_normalization(pre_edge_opts):
+     fluo_corr(dat.energy, dat.mu, 'Fe2O3', 'Fe', group=dat)
+     np.testing.assert_allclose(dat.mu_corr, explicit_mu)
+     np.testing.assert_allclose(dat.norm_corr, explicit_norm)
++
++
++def test_fluo_corr_normalizes_around_the_e0_it_is_given():
++    """An e0 the caller passes is used, as pre_edge() uses it: norm_corr is mu_corr
++    normalized with the caller's options.  fluo_corr dropped it and normalized around
++    its own find_e0 instead (here e0 is 7112 eV, the tabulated Fe K edge)."""
++    from larch.xafs.pre_edge import preedge
++    dat = read_ascii(Path(basedir, 'examples', 'xafsdata', 'fe2o3_rt1.xmu'))
++    opts = dict(e0=7112.0, pre1=-100, pre2=-30, norm1=50, norm2=300, nnorm=2)
++    fluo_corr(dat.energy, dat.mu, 'Fe2O3', 'Fe', group=dat, **opts)
++    expected = preedge(dat.energy, dat.mu_corr, **opts)['norm']
++    np.testing.assert_allclose(dat.norm_corr, expected, rtol=0, atol=1e-12)

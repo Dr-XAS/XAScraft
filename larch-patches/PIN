@@ -5,5 +5,5 @@ upstream-commit = 247278cefbb16eda04c91f79fc1b43df000fa498
 # setuptools_scm version of upstream at upstream-commit (git describe --tags --long --match '*[0-9]*').
 upstream-version = 2026.3.1.post78+g247278cef
 # git tree of larch/ and blob of pyproject.toml after `git am series/*.patch` on upstream-commit.
-patched-larch-tree = deec1766f1376f7b84df2f112d6222b1dcc2341b
+patched-larch-tree = 9872cd50079495052d333304b91965189ccdb067
 patched-pyproject-blob = 14ccc10ed6f759cda9059d331e3c9139cfe7a8d2

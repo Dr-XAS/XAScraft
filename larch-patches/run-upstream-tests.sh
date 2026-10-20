@@ -9,7 +9,8 @@
 #
 # The tests write files next to themselves and into examples/, so they run in a scratch copy
 # of SRC_TREE; SRC_TREE is not changed. The file list is upstream's tests/run_tests.sh at the
-# pin, plus test_xrf_model.py, which patch 0004 changed but run_tests.sh does not name.
+# pin, plus test_xrf_model.py and test_xafs_fluo.py, which patches 0004 and 0009 changed but
+# run_tests.sh does not name.
 # Plots go to matplotlib's Agg backend; wxPython is not installed (see KNOWN_FAILURES below).
 set -Eeuo pipefail
 
@@ -35,7 +36,7 @@ FILES=(
   test_larchexamples_xafs.py test_larchexamples_xray.py test_math_deglitch.py test_math_utils.py
   test_plot_rixsdata_import.py test_read_beamlinedata.py test_read_xafsdata.py
   test_symbol_callbacks.py test_xafs_rebin.py test_xas_data_source.py test_xrf_roi.py
-  test_xafs_defects.py test_xrf_model.py
+  test_xafs_defects.py test_xrf_model.py test_xafs_fluo.py
 )
 
 # Known pre-existing failures. These example scripts call wx plotting commands (plot_bkg,
