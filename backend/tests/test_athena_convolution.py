@@ -169,6 +169,9 @@ def test_http_stale_preview_save_and_noise_seed_capture(tmp_path):
 
 
 def test_pinned_reference_manifest():
+    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
+    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
+    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root=Path(__file__).resolve().parents[2];manifest=json.loads((FIX/'athena-convolution-fixtures.json').read_text())
     assert manifest['source_sha256']==NATIVE['sources']
     assert manifest['case_count']==len(NATIVE['rows'])==25

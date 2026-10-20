@@ -183,6 +183,9 @@ def test_api_healthy_preview_conflict_and_fixed_standard_dependency(store):
 
 
 def test_hashes_for_original_sources_inputs_driver_and_oracle():
+    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
+    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
+    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root=FIX.parents[2];manifest=json.loads((FIX/'athena-alignment-fixtures.json').read_text())
     catalog={r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
     for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest()==sha
