@@ -43,15 +43,16 @@ class BuildError(Exception):
     """A build step failed; the message says which and why."""
 
 
-def git(*args: str, cwd: Path, capture: bool = True, text: bool = True):
+def git(*args: str, cwd: Path, text: bool = True):
     env = {
-        **os.environ,
+        # No GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE etc. from a calling hook or shell.
+        **{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
         **COMMITTER,
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_TERMINAL_PROMPT": "0",
     }
-    result = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=capture, text=text)
+    result = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=text)
     if result.returncode != 0:
         err = result.stderr if text else result.stderr.decode(errors="replace")
         raise BuildError(f"git {' '.join(args[:2])} failed in {cwd}:\n{err.strip()}")

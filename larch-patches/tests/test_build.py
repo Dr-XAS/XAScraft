@@ -193,6 +193,17 @@ def test_two_builds_are_identical(full, tmp_path):
     assert files_under(again / "dist") == files_under(full / "dist")
 
 
+def test_a_url_gives_the_same_build_as_a_local_clone(full, tmp_path):
+    """The one-commit fetch path (a file:// URL to the same clone stands in for GitHub)."""
+    url = Path(UPSTREAM).resolve().as_uri() if Path(UPSTREAM).is_dir() else UPSTREAM
+    result = subprocess.run(
+        [sys.executable, str(BUILD), "--upstream", url, "--out", str(tmp_path / "out"),
+         "--build-python", sys.executable], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "out" / "IDENTITY").read_bytes() == (full / "IDENTITY").read_bytes()
+    assert files_under(tmp_path / "out" / "dist") == files_under(full / "dist")
+
+
 def copy_of_the_queue(dest: Path) -> Path:
     """A copy of build.py, PIN and series/ to change without touching the real queue."""
     import shutil
