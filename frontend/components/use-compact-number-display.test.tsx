@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest"
 import { useState } from "react"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { compactNumberDisplay, useCompactNumberDisplay } from "./use-compact-number-display"
 
@@ -77,6 +77,39 @@ describe("number display focus", () => {
     expect(changed).toHaveBeenCalledExactlyOnceWith(8980.987654321)
     fireEvent.click(screen.getByRole("button", { name: "Save" }))
     expect(submitted).toHaveBeenLastCalledWith(8980.987654321)
+  })
+
+  it("keeps a typed trailing zero while the parent holds the parsed number", () => {
+    function Host() {
+      const [value, setValue] = useState(10)
+      const display = useCompactNumberDisplay(value)
+      return <input aria-label="k max" type="number" step="any" {...display} onChange={event => setValue(Number(event.target.value))} />
+    }
+    render(<Host />)
+    const input = screen.getByRole("spinbutton", { name: "k max" }) as HTMLInputElement
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: "10.0" } })
+    expect(input.value).toBe("10.0")
+    fireEvent.change(input, { target: { value: "10.05" } })
+    expect(input.value).toBe("10.05")
+  })
+
+  it("selects the exact text it swaps in on focus so typing replaces it", () => {
+    const select = vi.spyOn(HTMLInputElement.prototype, "select")
+    function Host({ value }: { value: number }) {
+      const display = useCompactNumberDisplay(value)
+      return <input aria-label="k max" type="number" step="any" {...display} onChange={() => {}} />
+    }
+    const view = render(<Host value={11.902728727719536} />)
+    const input = screen.getByRole("spinbutton", { name: "k max" }) as HTMLInputElement
+    act(() => input.focus())
+    expect(input).toHaveValue(11.902728727719536)
+    expect(select).toHaveBeenCalledTimes(1)
+    act(() => input.blur())
+    view.rerender(<Host value={10} />)
+    act(() => input.focus())
+    expect(select).toHaveBeenCalledTimes(1)
+    select.mockRestore()
   })
 
   it("refreshes an automatic display without converting a null recipe into an override", () => {
