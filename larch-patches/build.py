@@ -234,7 +234,12 @@ def build(args: argparse.Namespace) -> Path:
         repo = work / "xraylarch"
         checkout_upstream(args.upstream, pin["upstream-commit"], repo)
         apply_series(patches, repo)
-        ident = make_identity(pin, patches, git("rev-parse", "HEAD:larch", cwd=repo).strip())
+        larch_tree = git("rev-parse", "HEAD:larch", cwd=repo).strip()
+        expected = pin.get("patched-larch-tree")
+        if expected and larch_tree != expected:
+            raise BuildError(f"the series gives larch/ tree {larch_tree}, but PIN records "
+                             f"patched-larch-tree = {expected}; update PIN (README.md)")
+        ident = make_identity(pin, patches, larch_tree)
         stage = work / "out"
         stage.mkdir()
         export_tree(repo, stage / "xraylarch-src")

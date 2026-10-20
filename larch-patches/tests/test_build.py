@@ -188,3 +188,56 @@ def test_two_builds_are_identical(full, tmp_path):
     assert files_under(again / "xraylarch-src") == files_under(full / "xraylarch-src")
     assert (again / "IDENTITY").read_bytes() == (full / "IDENTITY").read_bytes()
     assert files_under(again / "dist") == files_under(full / "dist")
+
+
+def copy_of_the_queue(dest: Path) -> Path:
+    """A copy of build.py, PIN and series/ to change without touching the real queue."""
+    import shutil
+
+    dest.mkdir()
+    shutil.copy2(BUILD, dest / "build.py")
+    shutil.copy2(PATCHES_DIR / "PIN", dest / "PIN")
+    shutil.copytree(PATCHES_DIR / "series", dest / "series")
+    return dest
+
+
+def test_changing_a_patch_changes_the_id(full, tmp_path):
+    """A message-only change: same Larch tree, different bytes, so a different id."""
+    queue = copy_of_the_queue(tmp_path / "queue")
+    patch = next((queue / "series").glob("0007-*.patch"))
+    patch.write_bytes(patch.read_bytes().replace(b"\nXAScraft-commit:",
+                                                 b"\nReworded: yes\nXAScraft-commit:", 1))
+    out = build_ok(tmp_path / "out", script=queue / "build.py")
+    changed = identity(out)
+    assert changed["patch_set_id"] == series_id(queue)
+    assert changed["patch_set_id"] != identity(full)["patch_set_id"]
+    assert changed["version"] == f"{PIN['upstream-version']}.xascraft.{series_id(queue)}"
+    assert changed["larch_tree"] == identity(full)["larch_tree"]
+
+
+def test_a_full_build_whose_larch_tree_differs_from_pin_stops(tmp_path):
+    """If the series gives another larch/ tree than PIN records, the build is refused, so
+    an unreviewed tree never ships under the queue's name."""
+    queue = copy_of_the_queue(tmp_path / "queue")
+    pin = (queue / "PIN").read_text()
+    (queue / "PIN").write_text(pin.replace(PIN["patched-larch-tree"], "0" * 40))
+    out = tmp_path / "out"
+    result = run_build(out, script=queue / "build.py")
+    assert result.returncode != 0
+    assert "patched-larch-tree" in result.stderr
+    assert not out.exists()
+
+
+def test_a_corrupted_patch_stops_the_build_and_writes_nothing(tmp_path):
+    queue = copy_of_the_queue(tmp_path / "queue")
+    patch = next((queue / "series").glob("0003-*.patch"))
+    text = patch.read_text()
+    # Damage a context line of the first hunk, so git am cannot place it.
+    hunk = text.index("\n@@ ")
+    line_start = text.index("\n ", hunk + 1) + 2
+    patch.write_text(text[:line_start] + "corrupted " + text[line_start:])
+    out = tmp_path / "out"
+    result = run_build(out, script=queue / "build.py")
+    assert result.returncode != 0
+    assert "0003-" in result.stderr and "does not apply" in result.stderr
+    assert not out.exists()
