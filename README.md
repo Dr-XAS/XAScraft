@@ -1,33 +1,35 @@
-## Larch:  Data Analysis Tools for X-ray Spectroscopy and More
+# XAScraft
 
+XAScraft is a browser workbench for X-ray absorption spectroscopy, built on
+[Larch](https://github.com/xraypy/xraylarch) (xraylarch). It runs upstream Larch at a
+pinned commit plus a small queue of patches; it does not carry its own copy of Larch.
+For Larch itself (the Python library, its desktop applications, its macro language and
+its documentation) see the [xraylarch repository](https://github.com/xraypy/xraylarch)
+and the [Larch documentation](https://xraypy.github.io/xraylarch/). The best citable
+reference for Larch is https://doi.org/10.1088/1742-6596/430/1/012007.
 
-[![A](https://github.com/xraypy/xraylarch/actions/workflows/test-ubuntu.yml/badge.svg)](https://github.com/xraypy/xraylarch/actions/workflows/test-ubuntu.yml)
-[![B](https://github.com/xraypy/xraylarch/actions/workflows/test-windows.yml/badge.svg)](https://github.com/xraypy/xraylarch/actions/workflows/test-windows.yml)
+`LICENSE` is Larch's MIT licence, unchanged; `NOTICE` says what in this repository comes
+from xraylarch.
 
+### Repository layout
 
-Larch is an open-source library and set of applications for
-visualizing, processing, and analyzing X-ray absorption and
-fluorescence spectroscopy data from synchrotron beamlines.  While its
-origins and emphasis are in X-ray absorption fine-structure
-spectroscopy (XAS), including X-ray absorption near-edge spectroscopy
-(XANES) and extended X-ray absorption fine-structure spectroscopy
-(EXAFS), it also supports visualization and analysis tools for several
-related X-ray measurement modes.  These include X-ray fluorescence
-(XRF) spectra and XRF and X-ray diffraction (XRD) images as collected
-at scanning X-ray microprobe beamlines.
+| Path | What it is |
+| --- | --- |
+| `backend/` | The FastAPI backend (`xraylarch_web`), its tests and `requirements.txt` |
+| `frontend/` | The Next.js frontend and its unit and browser tests |
+| `larch-patches/` | Where Larch comes from: `PIN` (the upstream commit), `series/` (the patches), `build.py` (builds the patched Larch wheel) and `install-dev.sh` (installs it into a development venv). See [larch-patches/README.md](larch-patches/README.md) |
+| `examples/` | Example spectra and projects from xraylarch, plus the team's curated demo cases; the app, the installer and the tests read them |
+| `installers/local/`, `Install.command`, `Install Windows.cmd` | The per-user installer; see [docs/local-installation.md](docs/local-installation.md) |
+| `scripts/`, `deploy/` | The hosted deploy scripts, the release constraints (`deploy/python-release-constraints.txt`) and the deployment manifest |
+| `tests/` | Installer, CI and deploy/watcher tests (the app's own tests are in `backend/` and `frontend/`) |
+| `docs/` | Feature references, verification records and guides |
 
-Larch is written in Python, and makes heavy use of the excellent
-scientific Python libraries.  It can be used as a Python library, or
-through one of several Graphical User Interfaces, including Larix, and
-others listed in the table below.
-
-Larch is distributed under the MIT licence.  It has been under active
-and open development for more than a decade, and is built on XAFS
-analysis tools that go back to the 1990s.  Development is done
-primarily at the University of Chicago, with support from the US
-National Science Foundation, and the US Departmen of Energy.
-
-The best citable reference for Larch is https://doi.org/10.1088/1742-6596/430/1/012007
+**Larch version.** The patched build is versioned
+`<upstream version at the pin>.xascraft.<patch-set id>`, for example
+`2026.3.1.post35+g8d6cd41c2.xascraft.9b231a511159`. The patch-set id is a hash of the patch
+files, so the version changes only when the pin or a patch changes. Processed groups report
+it as `larch_version`; `backend/.venv/bin/python -c "import larch; print(larch.__version__)"`
+prints the installed one.
 
 ## Athena Web branch
 
@@ -539,11 +541,35 @@ Plots and image exports share the lazy-loaded Plotly 4 bundle through
 dependency) and `plotly.js-dist-min` pinned to the same version. Rendering uses
 `react-plotly.js/factory`, so its default, separate Plotly bundle is not loaded.
 
-Create the backend environment as `larch-patches/README.md` ("Installing for
-development") describes: the release constraints, the patched Larch build from
-`larch-patches/install-dev.sh`, then `backend/requirements.txt`. Start the
-backend in one terminal, from `backend/`, where the web backend package lives
-(at the repository root, its `larch/` folder would shadow the installed build):
+Set up a checkout once, from the repository root. It needs Python 3.12, Git, and
+network access to PyPI and GitHub; the frontend step needs Node.js 24 first on `PATH`:
+
+```bash
+python3.12 -m venv backend/.venv
+backend/.venv/bin/pip install -r deploy/python-release-constraints.txt -c deploy/python-release-constraints.txt
+larch-patches/install-dev.sh
+(cd backend && .venv/bin/pip install -r requirements.txt -c ../deploy/python-release-constraints.txt)
+(cd frontend && npm ci)
+```
+
+The backend venv gets every package at the release pins, then Larch from
+`larch-patches/install-dev.sh`: it fetches the pinned upstream commit from GitHub,
+applies the patches, builds the wheel and installs it, then checks the installed
+version. To build from a local xraylarch clone instead of GitHub, run
+`larch-patches/install-dev.sh --upstream /path/to/xraylarch` (the clone is only read).
+`backend/requirements.txt` does not install Larch. After the pin or a patch changes,
+run `larch-patches/install-dev.sh` again. [larch-patches/README.md](larch-patches/README.md)
+describes the build, the patches and their tests.
+
+Check the backend with a quick smoke test (the installed Larch build, then HTTP
+import and processing; under a minute):
+
+```bash
+cd backend && .venv/bin/python -m pytest -q tests/test_larch_dependency.py tests/test_api.py
+```
+
+Start the backend in one terminal. Projects are stored in `backend/data/xraylarch-web`
+unless `XRAYLARCH_DATA_ROOT` names another directory:
 
 ```bash
 cd backend && .venv/bin/python -m uvicorn xraylarch_web.main:app --reload --reload-dir xraylarch_web --port 8006
@@ -696,39 +722,7 @@ This is not zero downtime. A failure stops only recorded target/candidate
 processes and restores the prior release's symlink, state, processes, and
 health.
 
-## Larch Applications
-
-These applications installed with Larch, in addition to a basic Python
-library. Here, GUI = Graphical User Interface, CLI = Command Line
-Interface, and `beta` indicates a work in progress.
-
-
-| Application Name  | GUI/CLI    | Description                                            |
-| ----------------- |----------- | ------------------------------------------------------ |
-| larch             | CLI        | simple shell command-line interface                    |
-| Larch GUI         | GUI        | enhanced command-line interface with data browser      |
-| Larix             | GUI        | XAFS Processing and Analysis: XANES pre-edge peak      |
-|                   |            | fitting, linear analysis, PCA/LASSO, EXAFS processing  |
-|                   |            | Running Feff, fitting EXAFS data to Feff paths.        |
-| GSE Map Viewer    | GUI        | XRF Map Viewer for GSECARS X-ray microprobe data.      |
-| larch_xrf         | GUI        | Display and analyze XRF Spectra.                       |
-| larch_xrd1d       | GUI        | Display and work with 1-D XRD patterns, integrate XRD  |
-|                   |            | images, search for XRD patterns of known structures    |
-| feff6l            | CLI        | Feff 6 EXAFS calculations                              |
-| feff8l            | CLI        | Feff 8 EXAFS calculations (no XANES)                   |
-| qtrixs            | GUI `beta` | Display RIXS planes, take profiles                     |
-
-
-
-In addition, the applications built with it also use a built-in
-Python-like macro language for interactive and batch processing.  This
-embedded "miniPython" language is intended to be very easy to use for
-novices while also being complete enough to automate data processing
-and analysis and to encourage and facilitate a gentle transition to
-transition from GUI-only analyses to scripted and programmatic
-analysis of larger data sets, and allows Larch to be run as a service,
-interacting with other processes or languages via XML-RPC.
-# Optional Dr.XAS integration configuration
+## Optional Dr.XAS integration configuration
 
 The host deployer reads `/local/apps/xraylarch-web/config/integration.json` only
 in the backend child. Create the parent directory privately and make the JSON
