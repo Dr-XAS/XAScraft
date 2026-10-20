@@ -1,0 +1,207 @@
+From b334e57f8057cc25bef21d91968101c28195337a Mon Sep 17 00:00:00 2001
+From: Xiangyu Yin <xyin@anl.gov>
+Date: Mon, 12 Oct 2026 14:22:03 -0500
+Subject: [PATCH] Fix three EXAFS defects: Debye sigma2 read the wrong path
+ after lmfit copied the parameters, AUTOBK clamps depended on the units of mu,
+ and estimate_noise ignored its window
+
+sigma2_debye and sigma2_eins stayed bound to the interpreter lmfit had copied
+from, so every path got the last path's sigma2 and the fitted Debye
+temperature moved with the path order. AUTOBK now weighs its endpoint clamps
+on chi in edge-step units. estimate_noise passed its window under a keyword
+the transform ignores.
+
+XAScraft-commit: b334e57f8057cc25bef21d91968101c28195337a
+---
+ larch/xafs/autobk.py         | 11 +++--
+ larch/xafs/estimate_noise.py |  2 +-
+ larch/xafs/feffdat.py        |  9 +++-
+ tests/test_xafs_defects.py   | 91 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+), 5 deletions(-)
+ create mode 100644 tests/test_xafs_defects.py
+
+diff --git a/larch/xafs/autobk.py b/larch/xafs/autobk.py
+index c5ac86caa68920b309a0283f133416828b0ddf7d..c6920d20d2896a1f7f377f38c60d6ba8645aab08 100644
+--- a/larch/xafs/autobk.py
++++ b/larch/xafs/autobk.py
+@@ -27,7 +27,7 @@ def spline_eval(kraw, mu, knots, coefs, order, kout):
+     return bkg, chi
+ 
+ def _resid(vcoefs, ncoef, kraw, mu, chi_std, knots, order, kout,
+-            ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi):
++            ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi, edge_step=1.0):
+     global NFEV
+     NFEV += 1
+     nspl = len(vcoefs)
+@@ -36,6 +36,9 @@ def _resid(vcoefs, ncoef, kraw, mu, chi_std, knots, order, kout,
+     bkg, chi = spline_eval(kraw, mu, knots, coefs, order, kout)
+     if chi_std is not None:
+         chi = chi - chi_std
++    # The clamps act on dimensionless chi, not on the arbitrary units of mu;
++    # chi_std keeps its contract (the units of mu) and is subtracted first.
++    chi = chi / edge_step
+     out =  realimag(xftf_fast(chi*ftwin, nfft=nfft)[:irbkg])
+     if nclamp == 0:
+         return out
+@@ -193,7 +196,7 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
+ 
+     vcoefs = 1.0*coefs[:nspl]
+     userargs = (len(coefs), kraw_, mu_, chi_std, knots, order, kout,
+-               ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi)
++               ftwin, nfft, irbkg, nclamp, clamp_lo, clamp_hi, edge_step)
+ 
+     lsout = leastsq(_resid, vcoefs, userargs, maxfev=2000*(ncoefs+1),
+                     gtol=0.0, ftol=1.e-6, xtol=1.e-6, epsfcn=1.e-6,
+@@ -294,12 +297,13 @@ def autobk_delta_chi(group, err_sigma=1):
+ 
+ def _lmfit_resid(pars, ncoefs=1, knots=None, order=3, irbkg=1, nfft=2048,
+             kraw=None, mu=None, kout=None, ftwin=1, kweight=1, chi_std=None,
+-            nclamp=0, clamp_lo=0, clamp_hi=0, **kws):
++            nclamp=0, clamp_lo=0, clamp_hi=0, edge_step=1.0, **kws):
+     # coefs = [getattr(pars, FMT_COEF % i) for i in range(ncoefs)]
+     coefs = [pars[FMT_COEF % i].value for i in range(ncoefs)]
+     bkg, chi = spline_eval(kraw, mu, knots, coefs, order, kout)
+     if chi_std is not None:
+         chi = chi - chi_std
++    chi = chi / edge_step
+     out =  realimag(xftf_fast(chi*ftwin, nfft=nfft)[:irbkg])
+     if nclamp == 0:
+         return out
+@@ -466,6 +470,7 @@ def autobk_lmfit(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=
+                                  kraw=kraw[:iemax-iek0+1],
+                                  mu=mu[iek0:iemax+1], irbkg=irbkg, kout=kout,
+                                  ftwin=ftwin, kweight=kweight,
++                                 edge_step=edge_step,
+                                  nfft=nfft, nclamp=nclamp,
+                                  clamp_lo=clamp_lo, clamp_hi=clamp_hi))
+ 
+diff --git a/larch/xafs/estimate_noise.py b/larch/xafs/estimate_noise.py
+index 86b3280b063f561cdecea6c7419ca6720b6c2486..69e5da42295321ec5d57baf4476d0f9b16653068 100644
+--- a/larch/xafs/estimate_noise.py
++++ b/larch/xafs/estimate_noise.py
+@@ -66,7 +66,7 @@ def estimate_noise(k, chi=None, group=None, rmin=15.0, rmax=30.0,
+     rmax_out = min(10*pi, rmax+2)
+ 
+     xftf(k, chi, kmin=kmin, kmax=kmax, rmax_out=rmax_out,
+-         kweight=kweight, dk=dk, dk2=dk2, kwindow=kwindow,
++         kweight=kweight, dk=dk, dk2=dk2, window=kwindow,
+          nfft=nfft, kstep=kstep, group=tmpgroup)
+ 
+     chir  = tmpgroup.chir
+diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
+index 9762a7192833d2b06dfbbd6f03ec8c2b73f65ca1..aef38ebd0bfe27fd4f21ac06a74691d019baf33d 100644
+--- a/larch/xafs/feffdat.py
++++ b/larch/xafs/feffdat.py
+@@ -491,7 +491,14 @@ class FeffPathGroup(Group):
+             isinstance(self.params, dict)):
+             self.params = dict2params(self.params)
+ 
+-        symtab = self.params._asteval.symtable
++        aeval = self.params._asteval
++        sigma2_debye = aeval.symtable.get('sigma2_debye', None)
++        if getattr(sigma2_debye, '__asteval__', aeval) is not aeval:
++            # lmfit copies Parameters into a new interpreter but carries the
++            # sigma2 procedures over, still bound to the old one: they would read
++            # the path stored there, giving every path the same sigma2. Rebind.
++            add_sigma2funcs(self.params)
++        symtab = aeval.symtable
+         symtab['feffpath'] = self._feffdat
+         for attr in FEFFDAT_VALUES:
+             symtab[attr] = getattr(self._feffdat, attr)
+diff --git a/tests/test_xafs_defects.py b/tests/test_xafs_defects.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..70a9f2b3ab4225ba1be61d701c5c119d5ff5a2ed
+--- /dev/null
++++ b/tests/test_xafs_defects.py
+@@ -0,0 +1,91 @@
++"""Regression tests for three EXAFS defects, each with a known answer."""
++from pathlib import Path
++
++import numpy as np
++import pytest
++
++from larch import Group
++from larch.xafs import (autobk, estimate_noise, feffit, feffit_dataset, feffit_transform,
++                        feffpath, path2chi, pre_edge)
++from larch.fitting import guess, param, param_group
++import larch.xafs.sigma2_models as sigma2_models
++
++FEFF_CU = Path(__file__).parents[1] / 'examples' / 'feffit' / 'Feff_Cu'
++
++
++@pytest.fixture
++def python_debye(monkeypatch):
++    """Larch's own Python correlated-Debye model in place of the native library,
++    which is not built for every platform. The defect is in which path is read,
++    not in the model."""
++    def debye(natoms, tk, theta, rnorm, x, y, z, atwt):
++        floats = lambda values: [float(value) for value in values]
++        return sigma2_models.sigma2_correldebye_py(natoms, tk, theta, float(rnorm), floats(x),
++                                                   floats(y), floats(z), floats(atwt))
++    monkeypatch.setattr(sigma2_models, 'sigma2_correldebye', debye)
++
++
++def test_reversing_the_path_list_leaves_every_path_its_own_debye_sigma2(python_debye):
++    """lmfit copies the parameters into a new interpreter but kept the sigma2
++    procedures bound to the old one, so every path got the last path's sigma2
++    and the fitted Debye temperature moved with the path order (348 K forward,
++    307 K reversed, true 315 K)."""
++    files = [FEFF_CU / 'feff0001.dat', FEFF_CU / 'feff0005.dat']
++    temperature, theta_true = 300.0, 315.0
++    k = np.linspace(0, 16, 321)
++    chi = np.zeros_like(k)
++    for name in files:
++        path = feffpath(str(name), s02=0.9, e0=0.0)
++        path.sigma2 = float(sigma2_models.sigma2_debye(temperature, theta_true, path))
++        path2chi(path, k=k)
++        chi += path.chi
++    transform = feffit_transform(kmin=3, kmax=14, kw=2, dk=1, window='hanning', rmin=1.4, rmax=5.0)
++    fitted = []
++    for order in ([0, 1], [1, 0]):
++        params = param_group(amp=param(0.9, vary=False), e0=param(0.0, vary=False),
++                             theta=guess(250.0, min=100, max=600))
++        paths = [feffpath(str(files[i]), s02='amp', e0='e0',
++                          sigma2=f'sigma2_debye({temperature}, theta)') for i in order]
++        dataset = feffit_dataset(data=Group(k=k, chi=chi), pathlist=paths, transform=transform)
++        theta = feffit(params, dataset).params['theta'].value
++        fitted.append(theta)
++        for path in (dataset.paths.values() if isinstance(dataset.paths, dict) else dataset.paths):
++            used = path.path_paramvals()['sigma2']
++            assert used == pytest.approx(sigma2_models.sigma2_debye(temperature, theta, path), rel=1e-9)
++    assert fitted == pytest.approx([theta_true, theta_true], abs=1e-3)
++
++
++def test_autobk_chi_does_not_depend_on_the_units_of_mu():
++    """The endpoint clamps weighed chi in the raw units of mu, so the same
++    absorption in other units gave another background: chi(k) changed by 15%
++    (k^2-weighted RMS, k 3-10) when mu was multiplied by 100."""
++    energy = np.linspace(6339., 7439., 280)
++    relative = energy - 6539.
++    k = np.sqrt(.2624682917 * np.maximum(relative, 0))
++    step = .5 + np.arctan(relative / 1.6) / np.pi
++    mu = .2 - 4.5e-5 * relative + step * (1 + .04 * np.sin(4.8 * k) * np.exp(-.01 * k * k) / np.maximum(k, 1))
++    chis = []
++    for scale in (.01, 1., 100.):
++        group = Group(energy=energy, mu=scale * mu)
++        pre_edge(group, e0=6539., pre1=-170., pre2=-40., norm1=100., norm2=880., nnorm=2)
++        autobk(group, e0=6539., rbkg=1., kweight=2, kmax=14., clamp_lo=1, clamp_hi=1)
++        chis.append(group.chi)
++        mask = (group.k >= 3) & (group.k <= 10)
++    for chi in (chis[0], chis[2]):
++        difference = np.linalg.norm(((chi - chis[1]) * group.k**2)[mask])
++        assert difference < 1e-9 * np.linalg.norm((chis[1] * group.k**2)[mask])
++
++
++def test_estimate_noise_uses_the_window_it_is_given():
++    """The window was passed under a keyword the transform ignores, so every
++    estimate used a Kaiser window; Hanning with dk=0 became an all-zero Kaiser
++    window and the estimate failed."""
++    k = np.arange(0, 20.001, 0.05)
++    chi = np.random.default_rng(1).normal(0, 0.002, k.size)
++    estimates = {}
++    for window, dk in (('hanning', 2), ('kaiser', 2), ('hanning', 0)):
++        group = Group()
++        estimate_noise(k, chi, group=group, kmin=3, kmax=14, dk=dk, kweight=2, kwindow=window)
++        estimates[window, dk] = group.epsilon_k
++    assert np.isfinite(estimates['hanning', 0])
++    assert estimates['hanning', 2] != estimates['kaiser', 2]

@@ -1,0 +1,48 @@
+From ab60c3776904a1f84b06652042894b762e7c55ff Mon Sep 17 00:00:00 2001
+From: Juanjuan Huang <juanjuan.cathy@gmail.com>
+Date: Thu, 10 Sep 2026 00:11:52 -0500
+Subject: [PATCH] Improve Athena project compatibility
+
+XAScraft-commit: ab60c3776904a1f84b06652042894b762e7c55ff
+
+---
+ larch/xafs/autobk.py | 6 +++++-
+ larch/xafs/xafsft.py | 3 ++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/larch/xafs/autobk.py b/larch/xafs/autobk.py
+index 6a807a865cdf052a247dbf03765c6a573cb5778b..c5ac86caa68920b309a0283f133416828b0ddf7d 100644
+--- a/larch/xafs/autobk.py
++++ b/larch/xafs/autobk.py
+@@ -207,7 +207,11 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
+     chisqr = ((_resid(best, *userargs))**2).sum()
+     redchi = chisqr / (2*irbkg+2*nclamp - nspl)
+ 
+-    coefs_std = np.array([np.sqrt(redchi*covar[i, i]) for i in range(nspl)])
++    # A singular covariance does not invalidate the fitted spline itself.
++    # Preserve its curves; uncertainty propagation below already requires
++    # an available covariance matrix.
++    coefs_std = (None if covar is None else
++                 np.array([np.sqrt(redchi*covar[i, i]) for i in range(nspl)]))
+     bkg, chi = spline_eval(kraw[:iemax-iek0+1], mu[iek0:iemax+1],
+                            knots, final_coefs, order, kout)
+     obkg = mu[:]*1.0
+diff --git a/larch/xafs/xafsft.py b/larch/xafs/xafsft.py
+index 8a408897d82dfc04b6a72546be8bfa22d2f138eb..c128816cdb597e20f9fca26fea62045a24b646ce 100644
+--- a/larch/xafs/xafsft.py
++++ b/larch/xafs/xafsft.py
+@@ -69,12 +69,13 @@ def ftwindow(x, xmin=None, xmax=None, dx=1, dx2=None,
+         gaussian             Gaussian (normal) function window
+         sine                 sine function window
+         kaiser               Kaiser-Bessel function-derived window
++        bessel               legacy Ifeffit Kaiser-Bessel window
+ 
+     """
+     if window is None:
+         window = FT_WINDOWS_SHORT[0]
+     nam = window.strip().lower()[:3]
+-    if nam not in FT_WINDOWS_SHORT:
++    if nam not in FT_WINDOWS_SHORT and nam != 'bes':
+         raise RuntimeError("invalid window name %s" % window)
+ 
+     dx1 = dx

@@ -1,0 +1,177 @@
+From 8d37ac3580dd99d687d2548dee053642af53b989 Mon Sep 17 00:00:00 2001
+From: Xiangyu Yin <xyin@anl.gov>
+Date: Mon, 12 Oct 2026 14:32:47 -0500
+Subject: [PATCH] Rebind each copied asteval procedure to the new interpreter
+ instead of reinstalling Larch's defaults, and give AUTOBK's chi uncertainty
+ the edge-step units of chi
+
+Re-running add_sigma2funcs replaced models a user had customized, and
+user-defined procedures still read the old interpreter's path. delta_chi
+stayed in the units of mu while feffit takes it as dimensionless.
+
+XAScraft-commit: 8d37ac3580dd99d687d2548dee053642af53b989
+---
+ larch/xafs/autobk.py       |  9 ++++++---
+ larch/xafs/feffdat.py      | 33 +++++++++++++++++++++++++++------
+ tests/test_xafs_defects.py | 30 ++++++++++++++++++++++++++++--
+ 3 files changed, 61 insertions(+), 11 deletions(-)
+
+diff --git a/larch/xafs/autobk.py b/larch/xafs/autobk.py
+index c6920d20d2896a1f7f377f38c60d6ba8645aab08..201100224be84d1a8ffd50e07da97453d49623cb 100644
+--- a/larch/xafs/autobk.py
++++ b/larch/xafs/autobk.py
+@@ -241,7 +241,8 @@ def autobk(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=None,
+                                  coefs_std=coefs_std, iek0=iek0, iemax=iemax,
+                                  ek0=ek0, covar=covar, chisqr=chisqr,
+                                  redchi=redchi, init_bkg=init_bkg,
+-                                 knots_y=knots_y, kraw=kraw, mu=mu)
++                                 knots_y=knots_y, kraw=kraw, mu=mu,
++                                 edge_step=edge_step)
+ 
+     if  calc_uncertainties and covar is not None:
+         autobk_delta_chi(group, err_sigma=err_sigma)
+@@ -288,7 +289,9 @@ def autobk_delta_chi(group, err_sigma=1):
+     dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*d.redchi)
+ 
+     if not any(np.isnan(dchi)):
+-        group.delta_chi = dchi
++        # chi is in edge-step units; its uncertainty must be too. The
++        # background and its uncertainty stay in the units of mu.
++        group.delta_chi = dchi/abs(getattr(d, 'edge_step', 1.0))
+         group.delta_bkg = 0.0*d.mu
+         group.delta_bkg[d.iek0:d.iek0+len(dbkg)] = dbkg
+ 
+@@ -549,6 +552,6 @@ def autobk_lmfit(energy, mu=None, group=None, rbkg=1, nknots=None, e0=None, ek0=
+         dbkg = t.ppf(prob, nmue-nspl) * np.sqrt(dfbkg*redchi)
+ 
+         if not any(np.isnan(dchi)):
+-            group.delta_chi = dchi
++            group.delta_chi = dchi/abs(edge_step)
+             group.delta_bkg = 0.0*mu
+             group.delta_bkg[iek0:iek0+len(dbkg)] = dbkg
+diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
+index aef38ebd0bfe27fd4f21ac06a74691d019baf33d..98d5e9ac72272344aa7f71b0133388e11b2bef2a 100644
+--- a/larch/xafs/feffdat.py
++++ b/larch/xafs/feffdat.py
+@@ -33,6 +33,8 @@ from larch.utils.strutils import b32hash
+ from larch.fitting import group2params, dict2params, isParameter, param_value
+ from .xafsutils import ETOK, ktoe, set_xafsGroup, gfmt, gformat
+ from .sigma2_models import add_sigma2funcs
++import weakref
++from asteval.astutils import Procedure
+ 
+ SMALL_ENERGY = 1.e-6
+ 
+@@ -286,6 +288,30 @@ class FeffDatFile(Group):
+         self.__rmass = None  # reduced mass of path
+         self.__geometry = None  # path geometry list [atom, dist, angle]
+ 
++_REBOUND = weakref.WeakSet()
++
++
++def _rebind_procedures(aeval):
++    """lmfit copies Parameters into a new interpreter but carries the asteval
++    procedures over (sigma2_debye, sigma2_eins, gnxas, any user def), still
++    bound to the old interpreter: they read the path stored there, so every
++    path got the same sigma2. Give this interpreter its own copy of each,
++    keeping custom bodies and aliases and leaving the source untouched."""
++    if aeval in _REBOUND:
++        return
++    copies = {}
++    for name, value in list(aeval.symtable.items()):
++        if isinstance(value, Procedure) and value.__asteval__ is not aeval:
++            if id(value) not in copies:
++                copies[id(value)] = Procedure(
++                    value.name, aeval, doc=value.__doc__, lineno=value.lineno,
++                    body=value.__body__, text=value.__text__, args=value.__argnames__,
++                    kwargs=value.__kwargs__, vararg=value.__vararg__,
++                    varkws=value.__varkws__, is_lambda=value.__is_lambda__)
++            aeval.symtable[name] = copies[id(value)]
++    _REBOUND.add(aeval)
++
++
+ class FeffPathGroup(Group):
+     def __init__(self, filename=None, label='', feffrun='', s02=None, degen=None,
+                  e0=None, ei=None, deltar=None, sigma2=None, third=None,
+@@ -492,12 +518,7 @@ class FeffPathGroup(Group):
+             self.params = dict2params(self.params)
+ 
+         aeval = self.params._asteval
+-        sigma2_debye = aeval.symtable.get('sigma2_debye', None)
+-        if getattr(sigma2_debye, '__asteval__', aeval) is not aeval:
+-            # lmfit copies Parameters into a new interpreter but carries the
+-            # sigma2 procedures over, still bound to the old one: they would read
+-            # the path stored there, giving every path the same sigma2. Rebind.
+-            add_sigma2funcs(self.params)
++        _rebind_procedures(aeval)
+         symtab = aeval.symtable
+         symtab['feffpath'] = self._feffdat
+         for attr in FEFFDAT_VALUES:
+diff --git a/tests/test_xafs_defects.py b/tests/test_xafs_defects.py
+index 70a9f2b3ab4225ba1be61d701c5c119d5ff5a2ed..d3876cc671a1d2fa7cc1755a38f8ea55780b2853 100644
+--- a/tests/test_xafs_defects.py
++++ b/tests/test_xafs_defects.py
+@@ -1,4 +1,5 @@
+ """Regression tests for three EXAFS defects, each with a known answer."""
++from copy import deepcopy
+ from pathlib import Path
+ 
+ import numpy as np
+@@ -8,6 +9,7 @@ from larch import Group
+ from larch.xafs import (autobk, estimate_noise, feffit, feffit_dataset, feffit_transform,
+                         feffpath, path2chi, pre_edge)
+ from larch.fitting import guess, param, param_group
++from lmfit import Parameters
+ import larch.xafs.sigma2_models as sigma2_models
+ 
+ FEFF_CU = Path(__file__).parents[1] / 'examples' / 'feffit' / 'Feff_Cu'
+@@ -55,6 +57,25 @@ def test_reversing_the_path_list_leaves_every_path_its_own_debye_sigma2(python_d
+     assert fitted == pytest.approx([theta_true, theta_true], abs=1e-3)
+ 
+ 
++def test_copied_parameters_keep_custom_procedures_and_read_the_current_path():
++    """Rebinding must not reinstall Larch's defaults over a model the user
++    replaced, and a user's own procedure must read the path being evaluated,
++    not the one the copied-from interpreter last saw."""
++    params = Parameters()
++    params._asteval('def custom_disorder():\n    return 0.001*reff')
++    paths = [feffpath(str(FEFF_CU / name), sigma2='custom_disorder()', s02=0.9)
++             for name in ('feff0001.dat', 'feff0005.dat')]
++    for path in paths:
++        path.create_path_params(params=params)
++    params._asteval('def sigma2_eins(t, theta):\n    return 0.012345')
++    copied = deepcopy(params)
++    for path in paths:
++        path2chi(path, params=copied)
++        assert path.path_paramvals()['sigma2'] == pytest.approx(0.001 * path.reff, rel=1e-12)
++    assert copied._asteval('sigma2_eins(300, 300)') == 0.012345
++    assert params._asteval.symtable['custom_disorder'].__asteval__ is params._asteval
++
++
+ def test_autobk_chi_does_not_depend_on_the_units_of_mu():
+     """The endpoint clamps weighed chi in the raw units of mu, so the same
+     absorption in other units gave another background: chi(k) changed by 15%
+@@ -64,16 +85,21 @@ def test_autobk_chi_does_not_depend_on_the_units_of_mu():
+     k = np.sqrt(.2624682917 * np.maximum(relative, 0))
+     step = .5 + np.arctan(relative / 1.6) / np.pi
+     mu = .2 - 4.5e-5 * relative + step * (1 + .04 * np.sin(4.8 * k) * np.exp(-.01 * k * k) / np.maximum(k, 1))
+-    chis = []
++    chis, errors = [], []
+     for scale in (.01, 1., 100.):
+         group = Group(energy=energy, mu=scale * mu)
+         pre_edge(group, e0=6539., pre1=-170., pre2=-40., norm1=100., norm2=880., nnorm=2)
+-        autobk(group, e0=6539., rbkg=1., kweight=2, kmax=14., clamp_lo=1, clamp_hi=1)
++        autobk(group, e0=6539., rbkg=1., kweight=2, kmax=14., clamp_lo=1, clamp_hi=1,
++               calc_uncertainties=True)
+         chis.append(group.chi)
++        errors.append(group.delta_chi)
+         mask = (group.k >= 3) & (group.k <= 10)
+     for chi in (chis[0], chis[2]):
+         difference = np.linalg.norm(((chi - chis[1]) * group.k**2)[mask])
+         assert difference < 1e-9 * np.linalg.norm((chis[1] * group.k**2)[mask])
++    # feffit takes delta_chi as dimensionless, like chi: it was in the units of mu.
++    for error in (errors[0], errors[2]):
++        np.testing.assert_allclose(error, errors[1], rtol=1e-6)
+ 
+ 
+ def test_estimate_noise_uses_the_window_it_is_given():

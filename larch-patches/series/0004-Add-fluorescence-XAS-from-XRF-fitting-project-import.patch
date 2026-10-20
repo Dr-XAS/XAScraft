@@ -1,0 +1,251 @@
+From cc099c125537e919eae5af4f9e3c86f671c3a1bd Mon Sep 17 00:00:00 2001
+From: Xiangyu Yin <xyin@anl.gov>
+Date: Tue, 6 Oct 2026 08:44:53 -0500
+Subject: [PATCH] Add fluorescence XAS from XRF fitting, project import and
+ analysis tools
+
+Fits the full multi-element detector spectrum at every scan point and shows the
+result beside the window sum, each with its own quality checks. Adds beamline
+readers and HDF5 layouts read through a bounded, link-free HDF5 layer, folder and
+project import, LCF search and series, shared-peak series fits, and an optional
+fast EXAFS backend offered only where it is installed. Backend CI now limits each
+test and runs the XRF extraction tests as their own job.
+
+XAScraft-commit: cc099c125537e919eae5af4f9e3c86f671c3a1bd
+---
+ larch/io/xafs_beamlines.py      |  30 +++++-----
+ larch/io/xdi.py                 |   8 +--
+ larch/xrf/xrf_model.py          |  20 ++++++-
+ tests/test_read_beamlinedata.py |  12 ++++
+ tests/test_xrf_model.py         | 100 ++++++++++++++++++++++++++++++++
+ 5 files changed, 151 insertions(+), 19 deletions(-)
+ create mode 100644 tests/test_xrf_model.py
+
+diff --git a/larch/io/xafs_beamlines.py b/larch/io/xafs_beamlines.py
+index 419762c1fcf32f8f884efacb20b1143731e9c4ac..dfcddb348514f38ff2365e6fa42aebd69e457de3 100644
+--- a/larch/io/xafs_beamlines.py
++++ b/larch/io/xafs_beamlines.py
+@@ -219,20 +219,24 @@ class APS12BM_BeamlineData(GenericBeamlineData):
+         labelline = self.headerlines[-1].replace('#C', ' ').strip()
+         words = labelline.split()
+ 
+-        labels = []
++        # Labels are written 'N_name'. The number places the label: a name
++        # may itself contain '_' ('5_I0_corr'), and a word written without a
++        # number takes the next column rather than being dropped, which
++        # would shift every later label one column to the left.
++        numbered = {}
++        last = 0
+         for word in words:
+-            if '_' in word:
+-                pref, suff = word.split('_')
+-                isint = False
+-                try:
+-                    ipref = int(pref)
+-                    isint = True
+-                except ValueError:
+-                    pass
+-                if isint: labels.append(suff)
+-            elif len(labels) == 1:
+-                word = word.replace('(', '').replace(')', '')
+-                self.energy_units = word
++            pref, sep, suff = word.partition('_')
++            if sep and pref.isdigit() and suff:
++                last = int(pref)
++                numbered[last] = suff
++            elif word.startswith('(') and word.endswith(')'):
++                if last == 1:
++                    self.energy_units = word[1:-1]
++            else:
++                last += 1
++                numbered[last] = word
++        labels = [numbered.get(i, f'col{i}') for i in range(1, max(numbered, default=0) + 1)]
+         return self._set_labels(labels, ncolumns=ncolumns)
+ 
+ 
+diff --git a/larch/io/xdi.py b/larch/io/xdi.py
+index d5c9d2a63c0ace3ebcbd277bfe6ef6d078cca78b..153d4c0b56539a0785622558279adcb34bc7c43f 100644
+--- a/larch/io/xdi.py
++++ b/larch/io/xdi.py
+@@ -389,10 +389,10 @@ invalid XDI version in fist line''')
+                     self.element = value
+                 elif 'edge_en' in field:
+                     self.edge_energy = value
+-                elif 'mono' in family and 'dspacing' in field:
+-                    self.d_spacing = float(value)
+-                elif 'mono' in family and 'd_spacing' in field:
+-                    self.d_spacing = float(value)
++                elif 'mono' in family and ('dspacing' in field or 'd_spacing' in field):
++                    # The value may carry a unit ("3.1356369 Ang"), as the
++                    # angle/energy conversion in _assign_arrays already assumes.
++                    self.d_spacing = float(value.split()[0])
+                 elif 'scan' in family and 'start_time' in field:
+                     self.start_time = value
+                 elif 'scan' in family and 'end_time' in field:
+diff --git a/larch/xrf/xrf_model.py b/larch/xrf/xrf_model.py
+index 2801b331c8ec477f01eb1d0b2e1e696ca0cdda81..e599d31346cac229ca93b523585066fcfc62ff93 100644
+--- a/larch/xrf/xrf_model.py
++++ b/larch/xrf/xrf_model.py
+@@ -435,7 +435,15 @@ class XRF_Model:
+                                  sigma=sigma, step=step, tail=tail,
+                                  beta=beta, gamma=gamma)
+             comp *= amp * self.atten * self.count_time
+-            comp += self.escape_amp * interp1d(energy-self.escape_energy, comp, energy)
++            if self.use_escape:
++                # Outside the recorded window there is no parent intensity for
++                # a photon to escape from, so the escape term is zero there.
++                # With the default fill of NaN it was instead undefined, and
++                # the line below then erased the component itself wherever the
++                # shifted axis left the window -- which, for a detector whose
++                # escape energy exceeds the window width, is everywhere.
++                comp = comp + self.escape_amp * interp1d(energy-self.escape_energy,
++                                                         comp, energy, fill_value=0.0)
+             comp[np.where(np.isnan(comp))] = 0.0
+             self.comps[elem.symbol] = comp
+             self.eigenvalues[elem.symbol] = amp
+@@ -456,7 +464,15 @@ class XRF_Model:
+                             sigma=sigma, step=step, tail=tail, beta=beta,
+                             gamma=gamma)
+             comp *= amp * self.atten * self.count_time
+-            comp += self.escape_amp * interp1d(energy-self.escape_energy, comp, energy)
++            if self.use_escape:
++                # Outside the recorded window there is no parent intensity for
++                # a photon to escape from, so the escape term is zero there.
++                # With the default fill of NaN it was instead undefined, and
++                # the line below then erased the component itself wherever the
++                # shifted axis left the window -- which, for a detector whose
++                # escape energy exceeds the window width, is everywhere.
++                comp = comp + self.escape_amp * interp1d(energy-self.escape_energy,
++                                                         comp, energy, fill_value=0.0)
+             comp[np.where(np.isnan(comp))] = 0.0
+             self.comps[p] = comp
+             self.eigenvalues[p] = amp
+diff --git a/tests/test_read_beamlinedata.py b/tests/test_read_beamlinedata.py
+index d86d62b8955f20d3351de96beadfbd1b757d5e33..af784f0603c885cfe7f08c83b98f0402d43f81a1 100644
+--- a/tests/test_read_beamlinedata.py
++++ b/tests/test_read_beamlinedata.py
+@@ -91,6 +91,18 @@ def test_apsgse_old(fname='APS13ID_2008.dat'):
+     assert(labels[2]  == 'i0')
+     assert(labels[3]  == 'i1')
+ 
++def test_aps12bm_label_with_two_underscores_or_no_number_keeps_its_column():
++    # 'pref, suff = word.split("_")' raised on '5_I0_corr', failing the read,
++    # and a label written without its number was dropped, shifting every
++    # later label one column to the left.
++    from larch.io.xafs_beamlines import APS12BM_BeamlineData
++    header = ['#C exafs_region 50 275 225 1 0 0 0',
++              '#C 1_Energy (keV) 2_sec 3_I0 4_I0_corr It 6_If']
++    bldat = APS12BM_BeamlineData(header)
++    assert bldat.get_array_labels() == ['energy', 'sec', 'i0', 'i0_corr', 'it', 'if']
++    assert bldat.energy_units == 'keV'
++
++
+ def test_aps12bm(fname='APS12BM_2019.dat'):
+     bldat, labels = _tester(fname)
+     assert('12bm' in bldat.name.lower())
+diff --git a/tests/test_xrf_model.py b/tests/test_xrf_model.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c6d644e064517835ff06d735001a9eb382c58d70
+--- /dev/null
++++ b/tests/test_xrf_model.py
+@@ -0,0 +1,100 @@
++"""Regression tests for larch.xrf.xrf_model component construction."""
++import numpy as np
++import pytest
++
++from larch.xrf.xrf_model import XRF_Model
++
++
++def build_model(escape=None):
++    model = XRF_Model(xray_energy=6.8, energy_min=1.5, energy_max=7.5)
++    model.set_detector(material='Ge', thickness=1.0, cal_offset=0.0, cal_slope=0.010)
++    model.add_element('Mn')
++    model.add_scatter_peak('elastic', center=6.8)
++    if escape is not None:
++        model.add_escape(scale=escape)
++    return model, 0.010 * np.arange(380, 771)
++
++
++def build_silicon_model(escape=None):
++    """A detector whose escape energy is small enough that both the parent
++    line and its escape copy fall inside the recorded window."""
++    model = XRF_Model(xray_energy=8.5, energy_min=1.0, energy_max=8.0)
++    model.set_detector(material='Si', thickness=0.5, cal_offset=0.0, cal_slope=0.010)
++    model.add_element('Fe')
++    if escape is not None:
++        model.add_escape(scale=escape)
++    return model, 0.010 * np.arange(100, 800)
++
++
++def test_calc_spectrum_without_escape_peaks_does_not_need_escape_energy():
++    """Every component added the escape term unconditionally, but escape_energy
++    is only assigned inside calc_escape_scale(), which runs only when escape
++    peaks are enabled. Any model built with the default use_escape=False raised
++    AttributeError instead of returning a spectrum."""
++    model, energy = build_model()
++    assert not model.use_escape
++    spectrum = model.calc_spectrum(energy)
++    assert np.isfinite(spectrum).all()
++    assert spectrum.sum() > 0
++
++
++def test_escape_does_not_erase_the_components_it_shifts_out_of_the_window():
++    """The escape term interpolates each component onto an axis shifted down
++    by the detector's Ka energy. Outside the recorded window there is nothing
++    to escape from, but the interpolation filled that region with NaN and the
++    next line replaced every NaN by zero -- deleting the component itself. A
++    germanium detector recording below its own K edge makes the damage total:
++    the escape fraction there is zero, so the spectrum must come back exactly
++    as it was, and instead it came back empty."""
++    plain, energy = build_model()
++    escaping, _ = build_model(escape=0.5)
++    assert escaping.use_escape
++
++    spectrum = escaping.calc_spectrum(energy)
++    assert np.isfinite(spectrum).all()
++    assert spectrum.sum() > 0
++    assert np.allclose(spectrum, plain.calc_spectrum(energy), rtol=1e-12, atol=0.0)
++    for name in ('Mn', 'elastic'):
++        assert escaping.comps[name].sum() > 0
++
++
++def test_escape_adds_a_copy_of_each_line_one_detector_ka_lower():
++    """The point of the term: a photon that ionises the detector and lets the
++    detector's own Ka out is recorded at E - E_Ka. A silicon detector can do
++    this for iron, and the copy has to land there and nowhere else."""
++    plain, energy = build_silicon_model()
++    escaping, _ = build_silicon_model(escape=1.0)
++
++    without = plain.calc_spectrum(energy)
++    with_escape = escaping.calc_spectrum(energy)
++    assert escaping.escape_energy == pytest.approx(1.74, abs=0.05)
++    assert np.isfinite(with_escape).all()
++
++    # The parent Ka peak is untouched, in place and in size.
++    parent = int(without.argmax())
++    assert energy[parent] == pytest.approx(6.40, abs=0.05)
++    assert with_escape[parent] == pytest.approx(without[parent], rel=1e-6)
++
++    # A new peak stands where the escape copy belongs, on a baseline that was
++    # four orders of magnitude below the parent.
++    shifted = int(np.abs(energy - (energy[parent] - escaping.escape_energy)).argmin())
++    assert without[shifted] < 1e-4 * without.max()
++    assert with_escape[shifted] > 20 * without[shifted]
++    added = with_escape - without
++    assert (added >= -1e-9 * without.max()).all()
++    assert abs(int(added.argmax()) - shifted) <= 2
++
++
++@pytest.mark.parametrize('xray_energy, expected_edges',
++                         [(6.2, []), (6.6, ['K']), (7.2, ['K'])])
++def test_element_lines_are_gated_by_the_incident_energy(xray_energy, expected_edges):
++    """The Mn K edge sits at 6.539 keV. Larch drops edges above the incident
++    energy, so a model built below the edge must contribute no Mn lines at all
++    -- the behaviour the scan-resolved fit relies on to gate matrix elements."""
++    model = XRF_Model(xray_energy=xray_energy, energy_min=1.5, energy_max=7.5)
++    model.set_detector(material='Ge', thickness=1.0, cal_offset=0.0, cal_slope=0.010)
++    model.add_element('Mn')
++    assert model.elements[0].edges == expected_edges
++    energy = 0.010 * np.arange(380, 771)
++    model.calc_spectrum(energy)
++    assert (model.comps['Mn'].sum() > 0) == bool(expected_edges)
