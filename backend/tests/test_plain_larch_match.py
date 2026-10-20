@@ -19,9 +19,9 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from larch import Group
-from larch.fitting import guess, param, param_group
+from larch.fitting import guess, minimize, param, param_group
 from larch.io import read_ascii
-from larch.math import index_of
+from larch.math import index_of, interp
 from larch.xafs import autobk, feffit, feffit_dataset, feffit_transform, feffpath, pre_edge
 from lmfit.models import GaussianModel, LinearModel, StepModel, VoigtModel
 
@@ -46,11 +46,15 @@ def client(tmp_path):
         yield client
 
 
-def import_columns(client, name, x, y, data_type):
-    """Upload two columns as a file and import them as one group, as the UI does."""
-    project = client.post("/api/athena/projects")
-    assert project.status_code == 200, project.text
-    project = project.json()
+def import_columns(client, name, x, y, data_type, project=None):
+    """Upload two columns as a file and import them as one group, as the UI does.
+
+    The group goes into `project`, or into a new project when none is given.
+    """
+    if project is None:
+        project = client.post("/api/athena/projects")
+        assert project.status_code == 200, project.text
+        project = project.json()
     content = "# x y\n" + "".join(f"{float(a)!r} {float(b)!r}\n" for a, b in zip(x, y))
     inspected = client.post(f"/api/athena/projects/{project['id']}/inspect",
                             files={"file": (name, content.encode())})
@@ -417,3 +421,92 @@ def test_fitting_ex2_fe_pre_edge_peaks_match_plain_larch(client, example):
         assert off_by <= VALUE_SIGMA, f"{name}: {off_by:.3g} sigma ({row['value']!r} vs {expected.value!r})"
         np.testing.assert_allclose(row["stderr"], expected.stderr, rtol=STDERR_RTOL, err_msg=f"{name} stderr")
     np.testing.assert_allclose(app["redchi"], reference.redchi, rtol=REDCHI_RTOL)
+
+
+# --- fitting_examples Ex3: Au linear combination (examples/fitting/doc_example3/*.lar) ---
+# The scripts fit weights in [0, 1] with the last one tied to 1 minus the others, which is
+# the app's LCF with sum_to_one and nonnegative. The scripts divide the residual by
+# eps=0.001; Larch's minimize scales the covariance by reduced chi-square, so that changes
+# chi-square (by 1/eps**2) and nothing else. The app solves the same least squares
+# directly. fit1 is s1+s2 from 0.5; fit3's eleven models include fit2's five.
+
+AU = EXAMPLES / "fitting" / "doc_example3"
+AU_EPS = 0.001
+AU_MODELS = {
+    # name: (standards fitted freely, the standard tied to 1 - the others, start value)
+    "fit1": ((1,), 2, 0.5),
+    "fit3-s1s2": ((1,), 2, 0.4),
+    "fit3-s1s2s3": ((1, 2), 3, 0.4),
+    "fit3-s1s2s4": ((1, 2), 4, 0.4),
+    "fit3-s1s2s5": ((1, 2), 5, 0.4),
+    "fit3-s1s2s6": ((1, 2), 6, 0.4),
+    "fit3-s1s2s3s4": ((1, 2, 3), 4, 0.4),
+    "fit3-s1s2s3s5": ((1, 2, 3), 5, 0.4),
+    "fit3-s1s2s3s6": ((1, 2, 3), 6, 0.4),
+    "fit3-s1s2s4s5": ((1, 2, 4), 5, 0.4),
+    "fit3-s1s2s5s6": ((1, 2, 5), 6, 0.3),
+    "fit3-s1s2s4s6": ((1, 2, 4), 6, 0.4),
+}
+
+
+def au_read_data():
+    """ReadData.lar: the unknown between index_of(11870) and index_of(12030), standards on its grid."""
+    d1 = read_ascii(str(AU / "unknown.dat"))
+    standards = {index: read_ascii(str(AU / f"s{index}.dat")) for index in range(1, 7)}
+    i1, i2 = index_of(d1.energy, 11870), index_of(d1.energy, 12030)
+    data = Group(energy=d1.energy[i1:i2 + 1], mu=d1.munorm[i1:i2 + 1])
+    for index, standard in standards.items():
+        setattr(data, f"s{index}", interp(standard.energy, standard.munorm, data.energy))
+    data.eps = AU_EPS
+    return d1, standards, data
+
+
+def au_resid(pars, data):
+    model = sum(getattr(pars, f"amp{index}") * getattr(data, f"s{index}") for index in range(1, 7))
+    return (data.mu - model) / data.eps
+
+
+AU_S6_ON_ITS_BOUND = pytest.mark.xfail(strict=True, reason=(
+    "Genuine difference, kept visible: in fit3's s1+s2+s5+s6 model the constrained optimum puts s6 on "
+    "its zero bound. The app finds it (weights 0.278665, 0.532070, 0.189264, 1.1e-17; s6 held at zero "
+    "with no error, the same fit as s1+s2+s5; chi-square 5.07829e-3, reduced 3.21411e-5). The script's "
+    "lmfit fit, with amp6 = 1 - amp1 - amp2 - amp5 as a bounded expression, stops after 150 evaluations "
+    "at a worse point: 0.276955 +/- 0.016713, 0.532733 +/- 0.003270, 0.190310 +/- 0.012601, "
+    "1.26e-6 +/- 0.004146; chi-square 5.07954e-3, reduced 3.23537e-5. amp1 differs by 0.102 of its "
+    "uncertainty, beyond the 0.01 allowed."))
+
+
+@pytest.mark.parametrize("model", [pytest.param(model, marks=AU_S6_ON_ITS_BOUND if model == "fit3-s1s2s5s6" else ())
+                                   for model in AU_MODELS])
+def test_fitting_ex3_au_linear_combination_matches_plain_larch(client, model):
+    free, tied, start = AU_MODELS[model]
+    d1, standards, data = au_read_data()
+    pars = param_group(**{f"amp{index}": param(start if index in free + (tied,) else 0.0, min=0, max=1)
+                          for index in range(1, 7)})
+    for index in free:
+        getattr(pars, f"amp{index}").vary = True
+    getattr(pars, f"amp{tied}").expr = "1 - " + " - ".join(f"amp{index}" for index in free)
+    reference = minimize(au_resid, pars, args=(data,)).fit_details
+    assert reference.success
+
+    used = sorted(free + (tied,))
+    project, target = import_columns(client, "unknown.dat", d1.energy, d1.munorm, "norm")
+    group_ids = [target["id"]]
+    for index in used:
+        project, group = import_columns(client, f"s{index}.dat", standards[index].energy,
+                                        standards[index].munorm, "norm", project=project)
+        group_ids.append(group["id"])
+    reply = client.post(f"/api/athena/projects/{project['id']}/analyze", json={
+        "version": project["version"], "action": "lcf", "group_ids": group_ids, "options": {
+            "array": "norm", "xmin": float(data.energy[0]), "xmax": float(data.energy[-1]),
+            "sum_to_one": True, "nonnegative": True}})
+    assert reply.status_code == 200, reply.text
+    app = reply.json()["result"]
+
+    np.testing.assert_array_equal(app["x"], data.energy)
+    for weight, stderr, index in zip(app["weights"], app["weight_stderr"], used):
+        expected = reference.params[f"amp{index}"]
+        off_by = abs(weight - expected.value) / expected.stderr
+        assert off_by <= VALUE_SIGMA, f"amp{index}: {off_by:.3g} sigma ({weight!r} vs {expected.value!r})"
+        np.testing.assert_allclose(stderr, expected.stderr, rtol=STDERR_RTOL, err_msg=f"amp{index} stderr")
+    np.testing.assert_allclose(app["reduced_chisqr"], reference.redchi * AU_EPS ** 2, rtol=REDCHI_RTOL)
