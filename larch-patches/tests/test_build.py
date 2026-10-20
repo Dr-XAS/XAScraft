@@ -11,12 +11,10 @@ has.
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
 import subprocess
 import sys
-import tarfile
 from pathlib import Path
 
 import pytest
@@ -81,17 +79,26 @@ def test_full_build_gives_the_larch_tree_recorded_in_pin(full, tmp_path):
     assert larch_tree_of(full, tmp_path / "git") == PIN["patched-larch-tree"]
 
 
-def test_full_build_larch_equals_the_baseline_larch_byte_for_byte(full):
-    tag = subprocess.run(["git", "rev-parse", "-q", "--verify", "refactor-baseline^{commit}"],
-                         cwd=REPO_ROOT, capture_output=True, text=True)
-    if tag.returncode != 0:
-        pytest.skip("tag refactor-baseline is not in this clone; the PIN tree test still runs")
-    archive = subprocess.run(["git", "archive", "--format=tar", "refactor-baseline", "larch"],
-                             cwd=REPO_ROOT, check=True, capture_output=True).stdout
-    baseline = full.parent / "baseline"
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(baseline, filter="data")
-    assert files_under(full / "xraylarch-src" / "larch") == files_under(baseline / "larch")
+def larch_files_the_series_changes() -> set[str]:
+    """Paths under ``larch/`` named in the series' diff headers."""
+    names = set()
+    for patch in sorted((PATCHES_DIR / "series").glob("*.patch")):
+        for line in patch.read_text().splitlines():
+            if line.startswith("diff --git a/larch/"):
+                names.add(line.split()[2].removeprefix("a/larch/"))
+    return names
+
+
+def test_full_build_larch_is_upstream_at_the_pin_except_the_patched_files(full, pure):
+    """Byte for byte, the full build's ``larch/`` is upstream's at the pin outside the files
+    the series names, and differs from it in each of those."""
+    patched = files_under(full / "xraylarch-src" / "larch")
+    upstream = files_under(pure / "xraylarch-src" / "larch")
+    named = larch_files_the_series_changes()
+    assert named and named <= patched.keys()
+    assert {k: v for k, v in patched.items() if k not in named} == {
+        k: v for k, v in upstream.items() if k not in named}
+    assert all(patched[k] != upstream.get(k) for k in named)
 
 
 # The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3).

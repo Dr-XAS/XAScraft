@@ -93,11 +93,11 @@ def test_series_has_one_patch_per_team_commit():
     assert [n[:5] for n in names] == [f"{i:04d}-" for i in range(1, 8)]
 
 
-def test_series_reproduces_the_baseline_larch_tree(patched):
+def test_series_reproduces_the_pinned_larch_tree(patched):
     assert git("rev-parse", "HEAD:larch", cwd=patched).strip() == read_pin()["patched-larch-tree"]
 
 
-def test_series_reproduces_the_baseline_pyproject(patched):
+def test_series_reproduces_the_pinned_pyproject(patched):
     assert (
         git("rev-parse", "HEAD:pyproject.toml", cwd=patched).strip()
         == read_pin()["patched-pyproject-blob"]
@@ -114,6 +114,39 @@ def test_expected_hashes_in_pin_are_the_baseline_ones():
     pin = read_pin()
     assert (pin["patched-larch-tree"], pin["patched-pyproject-blob"]) == (larch, pyproject)
     assert larch == "72b7101ea9da8e7e4801c94a4d17ef289ec1517b"
+
+
+# What the series carries (README "Maintaining the queue"), less tests/run_tests.sh, whose
+# context is upstream's list and so moves with the pin (checked on its own below).
+CARRIED_PATHS = ["larch", "pyproject.toml", "tests/test_xafs_defects.py",
+                 "tests/test_xrf_model.py", "tests/test_read_beamlinedata.py"]
+
+
+def patch_id(sha: str, cwd: Path) -> str:
+    """``git patch-id --stable`` of a commit's changes to ``CARRIED_PATHS``: the same for the
+    same change at other line numbers, so it survives a re-pin that only moved the context."""
+    diff = git("show", "--format=", sha, "--", *CARRIED_PATHS, cwd=cwd)
+    result = subprocess.run(["git", "patch-id", "--stable"], cwd=cwd, input=diff,
+                            check=True, capture_output=True, text=True)
+    return result.stdout.split()[0]
+
+
+def test_each_applied_commit_makes_the_change_its_xascraft_commit_made(patched):
+    """Needs XAScraft's history, which this checkout has.  Whatever the pin, each patch makes
+    the same change as the team's commit made to the vendored copy."""
+    upstream = read_pin()["upstream-commit"]
+    applied = git("rev-list", "--reverse", f"{upstream}..HEAD", cwd=patched).split()
+    assert len(applied) == len(TEAM_COMMITS)
+    for sha, new in zip(TEAM_COMMITS, applied):
+        assert patch_id(new, patched) == patch_id(sha, REPO_ROOT), sha
+
+
+def test_run_tests_sh_is_upstreams_plus_the_team_regression_file(patched):
+    """0007 keeps the team's change to upstream's test list, on upstream's current file."""
+    upstream = read_pin()["upstream-commit"]
+    before = git("show", f"{upstream}:tests/run_tests.sh", cwd=patched).split()
+    after = git("show", "HEAD:tests/run_tests.sh", cwd=patched).split()
+    assert after == before + ["test_xafs_defects.py"]
 
 
 def test_applied_commits_carry_their_xascraft_sha_in_order(patched):
