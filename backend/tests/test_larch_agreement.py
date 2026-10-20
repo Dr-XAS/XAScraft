@@ -43,8 +43,17 @@ def bundled_groups(bundled_project):
     return bundled_project["groups"]
 
 
+def _example_project(client):
+    """A new project holding the bundled copper series, for a test that changes it."""
+    project = client.post("/api/athena/projects").json()
+    response = client.post(f"/api/athena/projects/{project['id']}/command", json={
+        "version": project["version"], "action": "example", "group_ids": [], "options": {}})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def test_pre_edge_default_ranges_are_larchs(bundled_groups):
-    """Copy: backend/xraylarch_web/athena_science.py:233-264 (_normalization_ranges).
+    """Copy: backend/xraylarch_web/athena_science.py, _normalization_ranges.
 
     Original: larch/xafs/pre_edge.py preedge(), the pre1/pre2/norm1/norm2/nnorm
     defaults. With every range left unset, the ranges the API reports must be
@@ -59,54 +68,76 @@ def test_pre_edge_default_ranges_are_larchs(bundled_groups):
         assert {key: effective[key] for key in RANGES} == pytest.approx(larch_ranges), group["label"]
 
 
-def _autobk_pre_checks(monkeypatch, group, parameters):
-    """The spline size the app checked, and the one Larch then used.
+TOO_FEW_RESIDUALS = "AUTOBK has too few residuals for its spline"
 
-    The app's copy is not reported anywhere: it only decides whether to refuse
-    the request. It is read from process_spectrum's frame at the moment the app
-    hands the spectrum to Larch's autobk; Larch's own count is read from the
-    autobk_details it leaves on the group.
-    """
-    import sys
 
-    from xraylarch_web import athena_science
+def _larch_spline(group, settings):
+    """The spline size Larch's autobk uses for this spectrum and these settings: its own
+    autobk_details.nspl and irbkg. nclamp adds residuals, not knots, so a large one lets
+    every case fit without changing the count."""
+    effective = group["result"]["effective"]
+    native = Group()
+    kmax = settings["bkg_kmax"] if settings["bkg_kmax"] is not None else effective["available_kmax"]
+    autobk(np.asarray(group["energy"]), np.asarray(group["mu"]), group=native, ek0=effective["e0"],
+           edge_step=effective["edge_step"], rbkg=settings["rbkg"], nknots=settings["nknots"] or None,
+           kmin=settings["bkg_kmin"], kmax=kmax, kstep=settings["kstep"], nfft=settings["nfft"],
+           nclamp=64, calc_uncertainties=False)
+    return native.autobk_details.nspl, native.autobk_details.irbkg
 
-    seen = []
 
-    def spy(*args, **kwargs):
-        app = sys._getframe(1).f_locals
-        autobk(*args, **kwargs)
-        details = kwargs["group"].autobk_details
-        seen.append(dict(app=(app["nspl"], app["irbkg"]), larch=(details.nspl, details.irbkg)))
-
-    monkeypatch.setattr(athena_science, "autobk", spy)
-    athena_science.process_spectrum(group["energy"], group["mu"], parameters)
-    assert seen, "process_spectrum did not reach Larch's autobk"
-    return seen[0]
+def _autobk_outcome(client, project, group_id, options):
+    """("refused" | "processed", project) for a parameter change through the API, or the
+    reply itself when it is neither (e.g. Larch's own failure, reported as a 400 too)."""
+    response = client.post(f"/api/athena/projects/{project['id']}/command", json={
+        "version": project["version"], "action": "parameters", "group_ids": [group_id],
+        "options": options})
+    if response.status_code == 400 and TOO_FEW_RESIDUALS in response.text:
+        return "refused", project
+    if response.status_code == 200:
+        project = response.json()
+        [group] = [g for g in project["groups"] if g["id"] == group_id]
+        if group["processing_error"] is None:
+            return "processed", project
+    return f"HTTP {response.status_code}: {response.text[:300]}", project
 
 
 AUTOBK_CASES = [
     pytest.param({}, id="defaults"),
     pytest.param(dict(rbkg=1.4, bkg_kmin=0.5, bkg_kmax=12), id="rbkg-and-range"),
     pytest.param(dict(rbkg=0.01), id="rbkg-below-the-r-grid"),
-    pytest.param(dict(nknots=12), id="nknots", marks=pytest.mark.xfail(strict=True, reason=(
-        "athena_science.py:621-622 sizes the spline from rbkg alone; Larch's autobk.py:164 "
-        "replaces it with nknots when nknots is given, so the residual check uses the wrong count."))),
+    pytest.param(dict(rbkg=0.01, nknots=12), id="nknots", marks=pytest.mark.xfail(strict=True, reason=(
+        "process_spectrum (athena_science.py) sizes the spline from rbkg alone; Larch's autobk() "
+        "uses nknots when it is given, so the residual check counts too few knots and hands Larch "
+        "a spline it has too few residuals for."))),
 ]
 
 
 @pytest.mark.parametrize("parameters", AUTOBK_CASES)
-def test_autobk_spline_count_is_larchs(monkeypatch, bundled_groups, parameters):
-    """Copy: backend/xraylarch_web/athena_science.py:620-630 (rbkg floor, nspl_raw, nspl, irbkg).
+def test_autobk_spline_count_is_larchs(client, parameters):
+    """Copy: backend/xraylarch_web/athena_science.py, process_spectrum's AUTOBK checks
+    (the rbkg floor, nspl_raw, nspl, irbkg: "too few residuals for its spline").
 
-    Original: larch/xafs/autobk.py:141-166 (rgrid, rbkg floor, nspl, irbkg,
-    nknots, the 5..128 clamp), reported as autobk_details.nspl/irbkg. The app
-    refuses a request on its own count before Larch sees it, so the two counts
-    must be the same.
+    Original: larch/xafs/autobk.py autobk() (rgrid, the rbkg floor, nspl, irbkg, nknots,
+    the 5..128 clamp), reported as autobk_details.nspl/irbkg. The app refuses a request on
+    its own count before Larch sees it, when 2·irbkg + 2·nclamp ≤ nspl.
+
+    The app's count shows in the API only as that refusal, so the test asks the API, at
+    the nclamp values where Larch's own count changes the answer (0, the largest nclamp it
+    leaves too few residuals for, and one more), and compares the API's answer with the one
+    Larch's count gives. Where Larch's count leaves enough residuals even at nclamp 0 (the
+    first two cases: irbkg is several times nspl), the API can only show that the app does
+    not refuse.
     """
-    for group in bundled_groups:
-        counts = _autobk_pre_checks(monkeypatch, group, parameters)
-        assert counts["app"] == counts["larch"], group["label"]
+    project = _example_project(client)
+    for group in list(project["groups"]):
+        settings = {**group["parameters"], **parameters}
+        nspl, irbkg = _larch_spline(group, settings)
+        boundary = (nspl - 2 * irbkg) // 2  # the largest nclamp Larch's count refuses
+        for nclamp in sorted({0, boundary, boundary + 1} & set(range(101))):
+            expected = "refused" if 2 * irbkg + 2 * nclamp <= nspl else "processed"
+            outcome, project = _autobk_outcome(client, project, group["id"],
+                                               {**parameters, "nclamp": nclamp})
+            assert outcome == expected, (group["label"], nclamp, (nspl, irbkg))
 
 
 def _fit(client, project, transform, guesses):
@@ -137,9 +168,9 @@ FEFFIT_TRANSFORMS = [
 
 @pytest.mark.parametrize("transform", FEFFIT_TRANSFORMS)
 def test_feffit_independent_points_are_larchs(client, bundled_project, transform):
-    """Copy: backend/xraylarch_web/artemis.py:344-346 (n_independent, the too-many-guesses refusal).
+    """Copy: backend/xraylarch_web/artemis.py, _parameters (n_independent, the too-many-guesses refusal).
 
-    Original: larch/xafs/feffit.py:464 FeffitDataSet.prepare_fit n_idp, which a
+    Original: larch/xafs/feffit.py FeffitDataSet.prepare_fit n_idp, which a
     fit reports as statistics.n_independent. The app refuses a model with as
     many guesses as its own count before Larch runs; with one guess fewer the
     fit runs and reports Larch's. The two counts must agree.
@@ -179,7 +210,7 @@ def _xrf_model(symbols, xray_energy_kev, energy_window, material, escape_amp=0.0
 
 @pytest.mark.parametrize("case", XRF_MODELS)
 def test_xrf_line_columns_sum_to_larchs_element_components(case):
-    """Copy: backend/xraylarch_web/athena_xrf_xas.py:874-915 (element_columns) and :849-861 (detected).
+    """Copy: backend/xraylarch_web/athena_xrf_xas.py, element_columns and detected.
 
     Original: larch/xrf/xrf_model.py XRF_Model.calc_spectrum, the per-element
     loop that fills model.comps. The app splits each element's lines by
@@ -211,7 +242,7 @@ def test_xrf_line_columns_sum_to_larchs_element_components(case):
 
 @pytest.mark.parametrize("case", XRF_MODELS)
 def test_xrf_scatter_column_is_larchs_scatter_component(case):
-    """Copy: backend/xraylarch_web/athena_xrf_xas.py:926-934 (scatter_column).
+    """Copy: backend/xraylarch_web/athena_xrf_xas.py, scatter_column.
 
     Original: larch/xrf/xrf_model.py XRF_Model.calc_spectrum, the Rayleigh and
     Compton loop. A unit-amplitude scatter column must be Larch's own scatter
@@ -268,8 +299,8 @@ def copper_dataset(copper_path):
 
 
 def test_private_finde0_takes_an_explicit_step(bundled_groups):
-    """Site 1: backend/xraylarch_web/athena_science.py:21 imports larch.xafs.pre_edge._finde0,
-    called at :221-223 as _finde0(x, y, estep=..., use_smooth=...)[0] for 50-99 point scans."""
+    """Site 1: backend/xraylarch_web/athena_science.py imports larch.xafs.pre_edge._finde0;
+    _edge calls it as _finde0(x, y, estep=..., use_smooth=...)[0] for 50-99 point scans."""
     import inspect
 
     from larch.xafs.pre_edge import _finde0
@@ -282,9 +313,9 @@ def test_private_finde0_takes_an_explicit_step(bundled_groups):
 
 
 def test_private_feffdat_carries_the_arrays_and_geometry_read_from_it(copper_path):
-    """Sites 2, 5, 6, 7: path._feffdat read at backend/xraylarch_web/artemis.py:363-370,
-    artemis_disorder.py:64 (geom, rnorman), artemis_fast.py:453; its filename is set at
-    artemis_export.py:227."""
+    """Sites 2, 5, 6, 7: path._feffdat read in backend/xraylarch_web/artemis.py _read_path,
+    artemis_disorder.py evaluate_disorder (geom, rnorman) and artemis_fast.py _path_arrays;
+    artemis_export.py export_larix sets its filename."""
     native = copper_path._feffdat
     arrays = [native.k, native.real_phc, native.mag_feff, native.pha_feff, native.red_fact, native.lam, native.rep]
     assert len({np.asarray(a).size for a in arrays}) == 1 and np.asarray(native.k).size >= 8
@@ -297,8 +328,8 @@ def test_private_feffdat_carries_the_arrays_and_geometry_read_from_it(copper_pat
 
 
 def test_private_calc_chi_takes_resolved_path_values(copper_path):
-    """Site 3: backend/xraylarch_web/artemis.py:826 path._calc_chi(k=k, s02=, e0=, deltar=, sigma2=),
-    the preview; the upstream 'expected 7, got 3' break lived here."""
+    """Site 3: backend/xraylarch_web/artemis.py preview_paths calls
+    path._calc_chi(k=k, s02=, e0=, deltar=, sigma2=); the upstream 'expected 7, got 3' break lived here."""
     k = np.arange(241) * 0.05
     copper_path._calc_chi(k=k, s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
     assert np.asarray(copper_path.chi).shape == k.shape
@@ -306,7 +337,8 @@ def test_private_calc_chi_takes_resolved_path_values(copper_path):
 
 
 def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
-    """Site 4: backend/xraylarch_web/artemis.py:828,841 transform._xafsft(chi, group=, rmax_out=10)."""
+    """Site 4: backend/xraylarch_web/artemis.py preview_paths calls
+    transform._xafsft(chi, group=, rmax_out=10), per path and for the sum."""
     from larch.xafs import feffit_transform
 
     k = np.arange(241) * 0.05
@@ -322,8 +354,8 @@ def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
 
 
 def test_internal_sigma2_models_used_for_disorder(copper_path):
-    """Site 5: backend/xraylarch_web/artemis_disorder.py:9 imports EINS_FACTOR and
-    sigma2_correldebye_py from larch.xafs.sigma2_models; :33-37 copies Larch's Einstein formula."""
+    """Site 5: backend/xraylarch_web/artemis_disorder.py imports EINS_FACTOR and
+    sigma2_correldebye_py from larch.xafs.sigma2_models; its _einstein copies Larch's Einstein formula."""
     import inspect
 
     from larch.xafs.sigma2_models import EINS_FACTOR, sigma2_correldebye_py, sigma2_eins
@@ -340,9 +372,9 @@ def test_internal_sigma2_models_used_for_disorder(copper_path):
 
 
 def test_private_session_symbols_survive_save_session(tmp_path, copper_path):
-    """Site 6: backend/xraylarch_web/artemis_export.py:252 save_session(fname, symbols=[...,
-    '_feffcache', '_feffpaths'], histbuff=[], _larch=<object with .symtable>), storing paths
-    through the app's FeffPathGroup adapter (:164-177)."""
+    """Site 6: backend/xraylarch_web/artemis_export.py export_larix calls save_session(fname,
+    symbols=[..., '_feffcache', '_feffpaths'], histbuff=[], _larch=<object with .symtable>),
+    storing paths through the app's FeffPathGroup adapter."""
     from types import SimpleNamespace
 
     from larch.io import read_session, save_session
@@ -364,8 +396,8 @@ def test_private_session_symbols_survive_save_session(tmp_path, copper_path):
 
 
 def test_private_dataset_chi_and_residual(copper_dataset):
-    """Sites 7, 8: backend/xraylarch_web/artemis_fast.py:338 reads dataset._chi and :508 calls
-    dataset._residual(params) for the engine parity check."""
+    """Sites 7, 8: backend/xraylarch_web/artemis_fast.py build_residual_spec reads dataset._chi,
+    and fast_fit_group calls dataset._residual(params) for the engine parity check."""
     dataset, params = copper_dataset
     dataset.prepare_fit(params)
     assert np.asarray(dataset._chi).shape == np.asarray(dataset.model.k).shape
@@ -374,8 +406,8 @@ def test_private_dataset_chi_and_residual(copper_dataset):
 
 
 def test_one_element_kweight_list_collapses_the_noise_estimate(copper_dataset):
-    """Site 11: backend/xraylarch_web/artemis.py:608-612 (also artemis_export.py:232-233) pass
-    a scalar kweight because this Larch collapses a one-element list's noise estimate
+    """Site 11: backend/xraylarch_web/artemis.py fit_inputs (also artemis_export.py export_larix)
+    passes a scalar kweight because this Larch collapses a one-element list's noise estimate
     to a scalar, which its residual then indexes per weight. If Larch stops doing
     so, the workaround can go."""
     dataset, _ = copper_dataset
@@ -388,10 +420,10 @@ def test_one_element_kweight_list_collapses_the_noise_estimate(copper_dataset):
 
 
 def test_xrf_model_internals_read_and_written():
-    """Site 9: backend/xraylarch_web/athena_xrf_xas.py:1486-1515 and :849-934 read and write
-    XRF_Model internals (efano, use_escape, detector.material, escape_energy, escape_scale,
-    atten, count_time, det_sigma, params) and call calc_spectrum with a valuesdict-only
-    params object (:864-872, :891-897)."""
+    """Site 9: backend/xraylarch_web/athena_xrf_xas.py (Fitter._build, build_model, detected,
+    element_columns, scatter_column) reads and writes XRF_Model internals (efano, use_escape,
+    detector.material, escape_energy, escape_scale, atten, count_time, det_sigma, params) and
+    calls calc_spectrum with a valuesdict-only params object (_Values)."""
     import inspect
 
     from larch.xrf.xrf_model import XRF_Model
@@ -416,7 +448,7 @@ def test_xrf_model_internals_read_and_written():
 
 
 def test_autobk_resid_subtracts_the_standard_before_dividing_by_edge_step():
-    """Site 10: backend/xraylarch_web/athena_science.py:430-436 (_standard_arguments) scales
+    """Site 10: backend/xraylarch_web/athena_science.py _standard_arguments scales
     chi_std by edge_step because larch.xafs.autobk._resid subtracts chi_std before
     dividing by edge_step."""
     import importlib
