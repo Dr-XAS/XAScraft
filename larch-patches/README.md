@@ -8,6 +8,7 @@ plus the patches in this folder. Nothing else in the repository changes Larch.
 | `PIN` | The upstream URL and commit, the upstream version string at that commit, and the `larch/` tree and `pyproject.toml` blob that applying the series must give. |
 | `series/NNNN-*.patch` | `git format-patch` files, applied in order with `git am`. Each keeps the original author, date and message, and carries an `XAScraft-commit: <sha>` trailer naming the XAScraft commit it came from. |
 | `build.py` | Builds the patched Larch: source tree, wheel, sdist and `IDENTITY`. See [Building](#building). |
+| `run-upstream-tests.sh` | Runs upstream's own test suite, from a built source tree, against the installed Larch. See [Running the tests](#running-the-tests). |
 | `tests/test_series.py` | Applies the series to the pin in a scratch clone and checks the result against `PIN` and the original commits. |
 | `tests/test_build.py` | Runs `build.py` and checks its output, its version and its failure modes. |
 | `tests/test_*.py` (others) | The team's Larch regression tests. They run against whatever Larch is installed. |
@@ -86,6 +87,20 @@ XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/test
 XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_build.py
 ```
 
+```sh
+# Upstream's own suite, from build.py's source tree, against the Larch installed in PYTHON's
+# environment (runs in a scratch copy of the tree; about 10 seconds):
+larch-patches/install-dev.sh --python PYTHON --keep build/larch
+larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON
+```
+
+- The upstream suite runs the files upstream's `tests/run_tests.sh` names at the pin, plus
+  `test_xrf_model.py`. It deselects 11 `test_larchexamples_xafs.py` scripts: they call wx
+  plotting commands (`plot_bkg`, `plot_chifit`, ...), which do not exist without wxPython, and
+  they fail the same way on plain upstream. XAScraft's environments have no wxPython. Expected:
+  180 passed, 1 skipped (`test_plot_rixsdata_import.py` needs `wx`), 11 deselected.
+- The CI workflow `.github/workflows/larch-patches.yml` runs all of the above: build from
+  GitHub, the series and build tests, the regression tests and the upstream suite.
 - Use the `pytest` command, not `python -m pytest` from the repository root. While the root
   `larch/` folder still exists, `python -m` puts it on `sys.path` ahead of the installed Larch.
   The session header names the Larch that was tested.
