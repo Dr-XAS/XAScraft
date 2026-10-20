@@ -21,7 +21,9 @@ from fastapi.testclient import TestClient
 from larch import Group
 from larch.fitting import guess, param, param_group
 from larch.io import read_ascii
-from larch.xafs import autobk, feffit, feffit_dataset, feffit_transform, feffpath
+from larch.math import index_of
+from larch.xafs import autobk, feffit, feffit_dataset, feffit_transform, feffpath, pre_edge
+from lmfit.models import GaussianModel, LinearModel, StepModel, VoigtModel
 
 from xraylarch_web.config import Settings
 from xraylarch_web.main import create_app
@@ -316,3 +318,102 @@ def test_feffit_ex6_znse_one_scatterer_matches_plain_larch(client, scatterer):
                                     rmin=1.5, rmax=3.0))
 
     assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
+
+
+# --- fitting_examples Ex2: Fe pre-edge peaks (examples/fitting/doc_example2{a,b,c}.lar) --
+# The scripts model the window as peaks + off + erf_amp*erf(erf_wid*(e - erf_cen)). The
+# app's peak model is lmfit peaks + a linear background + lmfit's erf StepModel, with its
+# own bounds, so both sides use the app's model. The scripts' erf is that step exactly:
+# amplitude 2*erf_amp, sigma 1/erf_wid, and the offset off - erf_amp in the intercept.
+# The app adds the free slope. Tolerances are the fast engine's precedent: two
+# optimizers on one model agree within 1% of each parameter's uncertainty.
+
+VALUE_SIGMA = 0.01
+STDERR_RTOL = 0.01
+REDCHI_RTOL = 1e-6
+
+FE_PEAKS = {
+    # example: (peak kind, [(amp, cen, wid), ...] as the script's params start them)
+    "2a": ("gaussian", [(0.25, 7113.25, 0.6), (0.25, 7116.0, 1.2)]),
+    "2b": ("gaussian", [(0.25, 7113.25, 0.6), (0.25, 7116.0, 1.2), (0.5, 7122.0, 1.2)]),
+    "2c": ("voigt", [(0.25, 7113.25, 0.6), (0.25, 7116.0, 1.2), (0.5, 7122.0, 1.2)]),
+}
+FE_ERF = dict(off=0.50, erf_amp=0.50, erf_wid=0.50, erf_cen=7123.5)
+
+
+def fe_pre_edge_window():
+    """The scripts' data: plain pre_edge, then norm from just above index_of(7105) to index_of(7125)."""
+    dat = read_ascii(str(EXAMPLES / "fitting" / "doc_example2.dat"), labels="energy xmu i0")
+    pre_edge(dat.energy, dat.xmu, group=dat)
+    i1, i2 = index_of(dat.energy, 7105), index_of(dat.energy, 7125)
+    return dat, dat.energy[i1 + 1:i2 + 1], dat.norm[i1 + 1:i2 + 1]
+
+
+def app_model_reference_fit(e, y, kind, peaks, step):
+    """The app's documented peak model, written as a plain lmfit script."""
+    span = float(e[-1] - e[0])
+    min_width = max(float(np.min(np.diff(e))) / 10, span * 1e-9)
+    model = LinearModel(prefix="background_")
+    params = model.make_params(slope=0.0, intercept=FE_ERF["off"] - FE_ERF["erf_amp"])
+    step_model = StepModel(form="erf", prefix="step_")
+    params.update(step_model.make_params(**step))
+    params["step_center"].set(min=float(e[0] - span), max=float(e[-1] + span))
+    params["step_sigma"].set(min=min_width, max=span)
+    params["step_amplitude"].set(min=0)
+    model = model + step_model
+    for index, (amplitude, center, sigma) in enumerate(peaks, start=1):
+        prefix = f"peak_{index}_"
+        peak = {"gaussian": GaussianModel, "voigt": VoigtModel}[kind](prefix=prefix)
+        params.update(peak.make_params(center=center, sigma=sigma, amplitude=amplitude))
+        params[prefix + "center"].set(min=float(e[0]), max=float(e[-1]))
+        params[prefix + "sigma"].set(min=min_width, max=span)
+        params[prefix + "amplitude"].set(min=0)
+        model = model + peak
+    return model.fit(y, params, x=e, method="leastsq", max_nfev=2000)
+
+
+FE_2B_DOES_NOT_CONVERGE = pytest.mark.xfail(strict=True, reason=(
+    "Genuine limitation, kept visible: Example 2b (three Gaussians) does not converge in the app's model. "
+    "The script holds cen3 in [7120, 7124] and erf_cen in [7121, 7124]; the app has no per-parameter "
+    "bounds, and with its own (centres anywhere in the 7105.07-7124.95 eV window, step centre one window "
+    "width either side) plus the free slope, peak_3_center runs to the window edge (7124.9502) and the "
+    "step narrows to sigma 0.0906 eV. The plain lmfit reference of the app's model stops at max_nfev=2000 "
+    "(and 5000) with 'Tolerance seems to be too small. Could not estimate error-bars.', redchi 1.1844e-4; "
+    "the app refuses the same request with HTTP 400 'Peak fit did not converge within max_nfev=2000' "
+    "and the same lmfit message. So the two sides agree, but neither reproduces the example."))
+
+
+@pytest.mark.parametrize("example", [pytest.param(example, marks=FE_2B_DOES_NOT_CONVERGE if example == "2b" else ())
+                                     for example in sorted(FE_PEAKS)])
+def test_fitting_ex2_fe_pre_edge_peaks_match_plain_larch(client, example):
+    kind, peaks = FE_PEAKS[example]
+    step = dict(amplitude=2 * FE_ERF["erf_amp"], center=FE_ERF["erf_cen"], sigma=1 / FE_ERF["erf_wid"])
+    dat, e, y = fe_pre_edge_window()
+    reference = app_model_reference_fit(e, y, kind, peaks, step)
+    assert reference.success
+
+    project, group = import_columns(client, "doc_example2.nor", dat.energy, dat.norm, "norm")
+    reply = client.post(f"/api/athena/projects/{project['id']}/analyze", json={
+        "version": project["version"], "action": "peaks", "group_ids": [group["id"]], "options": {
+            "array": "norm", "xmin": float(e[0]), "xmax": float(e[-1]),
+            "peaks": [dict(kind=kind, amplitude=amplitude, center=center, sigma=sigma)
+                      for amplitude, center, sigma in peaks],
+            "background": dict(slope=0.0, intercept=FE_ERF["off"] - FE_ERF["erf_amp"],
+                               step=dict(step, form="erf", vary=True))}})
+    assert reply.status_code == 200, reply.text
+    app = reply.json()["result"]
+
+    np.testing.assert_array_equal(app["x"], e)
+    np.testing.assert_array_equal(app["observed"], y)
+    assert app["details"]["nvarys"] == reference.nvarys
+    assert set(app["parameters"]) == set(reference.params)
+    for name, expected in reference.params.items():
+        row = app["parameters"][name]
+        if expected.stderr is None:
+            assert row["stderr"] is None, name
+            assert row["value"] == pytest.approx(expected.value, rel=1e-12, abs=0), name
+            continue
+        off_by = abs(row["value"] - expected.value) / expected.stderr
+        assert off_by <= VALUE_SIGMA, f"{name}: {off_by:.3g} sigma ({row['value']!r} vs {expected.value!r})"
+        np.testing.assert_allclose(row["stderr"], expected.stderr, rtol=STDERR_RTOL, err_msg=f"{name} stderr")
+    np.testing.assert_allclose(app["redchi"], reference.redchi, rtol=REDCHI_RTOL)
