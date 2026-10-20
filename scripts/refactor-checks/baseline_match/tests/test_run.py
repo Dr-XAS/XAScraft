@@ -34,6 +34,12 @@ def tiny_app():
     def csv():
         return Response("energy,mu\n8979.0,0.5\n", media_type="text/csv")
 
+    @app.get("/prj")
+    def prj():
+        text = ('# Athena project file\n# Athena-Web {"metadata": {"seconds": {"fit": 0.09}}}\n'
+                "$old_group = 'abc';\n@x = [8979.0];\n")
+        return Response(gzip.compress(text.encode()), media_type="application/octet-stream")
+
     @app.get("/missing")
     def missing():
         return Response('{"error": {"message": "not found"}}', status_code=404, media_type="application/json")
@@ -56,10 +62,24 @@ def test_json_text_and_gzip_bodies_are_recorded_as_their_content():
          "content_disposition": 'attachment; filename="copper.prj"',
          "gzip": True, "body": {"groups": [{"label": "Cu foil"}]}},
         {"step": "csv", "request": "GET /csv", "status": 200, "content_type": "text/csv; charset=utf-8",
-         "body": "energy,mu\n8979.0,0.5\n"},
+         "body": {"lines": ["energy,mu", "8979.0,0.5", ""]}},
         {"step": "missing", "request": "GET /missing", "status": 404, "content_type": "application/json",
          "body": {"error": {"message": "not found"}}},
     ]
+
+
+def test_json_embedded_in_a_text_line_is_recorded_as_json_so_its_fields_can_be_masked():
+    session = Session(lambda: TestClient(tiny_app()))
+
+    session.call("export", "GET", "/prj")
+
+    assert session.steps[-1]["body"] == {"lines": [
+        "# Athena project file",
+        {"prefix": "# Athena-Web ", "json": {"metadata": {"seconds": {"fit": 0.09}}}},
+        "$old_group = 'abc';",
+        "@x = [8979.0];",
+        "",
+    ]}
 
 
 def test_a_failed_step_a_scenario_depends_on_stops_it():

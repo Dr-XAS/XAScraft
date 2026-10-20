@@ -81,7 +81,20 @@ def _decode(content):
     try:
         return json.loads(text)
     except ValueError:
-        return text
+        return {"lines": [_line(line) for line in text.split("\n")]}
+
+
+def _line(line):
+    """A text line, or its JSON object when the line carries one (e.g. `# Athena-Web {...}`)."""
+    start = line.find("{")
+    if start >= 0 and line.endswith("}"):
+        try:
+            value = json.loads(line[start:])
+        except ValueError:
+            return line
+        if isinstance(value, dict):
+            return {"prefix": line[:start], "json": value}
+    return line
 
 
 def _dates(*moments):
