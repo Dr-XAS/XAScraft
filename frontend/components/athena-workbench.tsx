@@ -473,7 +473,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   const [feffPathState, setFeffPathState] = useState<{ projectId: string; groupId: string; paths: FeffPathSummary[]; model: ArtemisPreviewRequest | null } | null>(null)
   const [cifSelection, setCifSelection] = useState<{ projectId?: string; attachmentId: string; siteIndex?: number } | null>(null)
   const [shownViewers, setShownViewers] = useState<Set<ViewerId>>(() => new Set(viewerIds))
-  const active = project?.groups.find(g => g.id === activeId) ?? project?.groups[0]
+  const active = project?.groups.find(g => g.id === activeId)
   const activeModelCif = active?.artemis?.model.paths.map(path => path.metadata.sourceCif).find(source =>
     source?.attachmentId && project?.artemis_structures?.some(attachment =>
       attachment.id === source.attachmentId && attachment.sha256 === source.sha256))
@@ -483,8 +483,13 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     })
   }, [project?.id, active?.id, activeModelCif?.attachmentId, activeModelCif?.siteIndex, activeModelCif?.sha256])
   const marked = useMemo(() => project?.groups.filter(g => g.marked) ?? [], [project?.groups])
-  const hasMultipleMarked = marked.length > 1
-  const visibleViewers = useMemo(() => new Set([...shownViewers].filter(id => id !== "multiple" || hasMultipleMarked)), [shownViewers, hasMultipleMarked])
+  const canShowSingle = !!active || marked.length === 0
+  const canShowMultiple = marked.length > 1 || (!active && marked.length > 0)
+  const unavailableViewers = useMemo<Partial<Record<ViewerId, string>>>(() => ({
+    single: canShowSingle ? undefined : "Select data in the list to show a single spectrum.",
+    multiple: canShowMultiple ? undefined : active ? "Mark at least two spectra to compare." : "Mark data to plot.",
+  }), [canShowSingle, canShowMultiple, !!active])
+  const visibleViewers = useMemo(() => new Set([...shownViewers].filter(id => !unavailableViewers[id])), [shownViewers, unavailableViewers])
   const [viewerSort, setViewerSort] = useState<ViewerSort>("default")
   const [customViewerOrder, setCustomViewerOrder] = useState<ViewerId[]>(() => [...viewerIds])
   const viewerPreference = useRef<ReturnType<typeof readViewerOrderPreference> | null>(null)
@@ -1087,7 +1092,11 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     }
     setAnalysis(p.analyses?.at(-1) ?? null)
     if (!integrated) localStorage.setItem("athena.project", p.id)
-    setActiveId(id => p.groups.some(g => g.id === id) ? id : p.groups[0]?.id ?? "")
+    setActiveId(id => {
+      // Checkbox and processing replies must retain a deliberately cleared current data item.
+      if (!id && previous?.id === p.id && previous.groups.length > 0) return ""
+      return p.groups.some(g => g.id === id) ? id : p.groups[0]?.id ?? ""
+    })
   }
   function acceptArtemisProject(updated: AthenaProject) {
     const current = projectRef.current
@@ -1977,7 +1986,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     }
     moveAnchorRef.current = group.id
     setMoveSelection(new Set())
-    setActiveId(group.id)
+    setActiveId(id => id === group.id ? "" : group.id)
     setAnalysisVisible(false)
   }
   function markSpectra(ids: string[], value: boolean) {
@@ -2523,7 +2532,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       if (event.key === "Escape" && groupDragRef.current?.id === group.id) { event.preventDefault(); cancelGroupDrag(); return }
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
       event.preventDefault(); cancelGroupDrag(); moveGroupBy(group.id, event.key === "ArrowUp" ? -1 : 1)
-    }}><GripVertical size={14} /></button><input aria-label={`Mark ${group.label}`} type="checkbox" checked={group.marked} disabled={!!busy || parameterUpdatePending || !canCommand("metadata")} onChange={event => markSpectra([group.id], event.target.checked)} /><button className="ath-group-select" disabled={!!busy} aria-pressed={moveSelection.has(group.id)} aria-describedby="ath-group-multiselect-help" onClick={event => selectGroupForMove(event, group)} onPointerDown={event => beginGroupDrag(event, group)} onPointerMove={updateGroupDrag} onPointerUp={finishGroupDrag} onPointerCancel={cancelGroupDrag} onLostPointerCapture={event => { if (groupDragRef.current?.pointerId === event.pointerId) cancelGroupDrag() }}><span className="ath-swatch" style={{ background: spectrumColors.get(group.id) ?? "var(--ath-line)" }} /><span className="ath-group-copy"><GroupLabel label={group.label} /><span className="ath-group-meta"><small>{isDifferenceGroup(group) ? (group.data_type === "chi" ? "Δχ(k)" : "Difference (E)") : dataTypeLabel(group)} · {group.energy.length.toLocaleString()} points{group.processing_error ? " · needs processing" : ""}</small>{measurementMode && <span className="ath-measurement-tag" data-tag={measurementMode} title={measurementMode === "trans" ? "Transmission" : "Fluorescence"}>{measurementMode}</span>}{isTheory && <span className="ath-measurement-tag" data-tag="theory" title="Theoretical spectrum">theory</span>}{isReference && <span className="ath-measurement-tag" data-tag="ref" title={consumers.length ? `Reference for ${consumers.map(sample => sample.label).join(", ")}` : "Reference"}>ref{consumers.length > 0 ? ` · ${consumers.length}` : ""}</span>}{group.frozen && <LockKeyhole size={12} />}{drafts[group.id] && !sameParameters(drafts[group.id], group.parameters) && <i title={autoApplyPlans[group.id]?.status === "failed" ? "Automatic processing failed" : autoApplyPlans[group.id] ? "Pending automatic processing" : "Draft parameter values"} className="ath-dirty-dot" />}</span></span></button>
+    }}><GripVertical size={14} /></button><input aria-label={`Mark ${group.label}`} type="checkbox" checked={group.marked} disabled={!!busy || parameterUpdatePending || !canCommand("metadata")} onChange={event => markSpectra([group.id], event.target.checked)} /><button className="ath-group-select" disabled={!!busy} aria-current={active?.id === group.id ? "true" : undefined} aria-pressed={moveSelection.has(group.id)} title={active?.id === group.id ? "Click again to clear current data" : "View this spectrum"} aria-describedby="ath-group-multiselect-help" onClick={event => selectGroupForMove(event, group)} onPointerDown={event => beginGroupDrag(event, group)} onPointerMove={updateGroupDrag} onPointerUp={finishGroupDrag} onPointerCancel={cancelGroupDrag} onLostPointerCapture={event => { if (groupDragRef.current?.pointerId === event.pointerId) cancelGroupDrag() }}><span className="ath-swatch" style={{ background: spectrumColors.get(group.id) ?? "var(--ath-line)" }} /><span className="ath-group-copy"><GroupLabel label={group.label} /><span className="ath-group-meta"><small>{isDifferenceGroup(group) ? (group.data_type === "chi" ? "Δχ(k)" : "Difference (E)") : dataTypeLabel(group)} · {group.energy.length.toLocaleString()} points{group.processing_error ? " · needs processing" : ""}</small>{measurementMode && <span className="ath-measurement-tag" data-tag={measurementMode} title={measurementMode === "trans" ? "Transmission" : "Fluorescence"}>{measurementMode}</span>}{isTheory && <span className="ath-measurement-tag" data-tag="theory" title="Theoretical spectrum">theory</span>}{isReference && <span className="ath-measurement-tag" data-tag="ref" title={consumers.length ? `Reference for ${consumers.map(sample => sample.label).join(", ")}` : "Reference"}>ref{consumers.length > 0 ? ` · ${consumers.length}` : ""}</span>}{group.frozen && <LockKeyhole size={12} />}{drafts[group.id] && !sameParameters(drafts[group.id], group.parameters) && <i title={autoApplyPlans[group.id]?.status === "failed" ? "Automatic processing failed" : autoApplyPlans[group.id] ? "Pending automatic processing" : "Draft parameter values"} className="ath-dirty-dot" />}</span></span></button>
       {!reference && canAssignReference && <button type="button" className="ath-reference-edit" aria-label={`Assign reference for ${group.label}`} title="Assign reference foil" disabled={!!busy || parameterUpdatePending} onClick={() => openReferencePicker([group.id])}><Link2 size={14} /></button>}
       {reference && <div className="ath-reference-branch" role="group" aria-label={`Reference for ${group.label}`}>
         <button type="button" className="ath-reference-link" disabled={!!busy} aria-label={`View reference ${reference.label} for ${group.label}`} title={`View ${reference.label}`} onClick={() => viewReference(reference)}><Link2 size={12} aria-hidden="true" /><span className="ath-reference-kind">ref</span><span className="ath-reference-name">{reference.label}</span></button>
@@ -2609,7 +2618,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
     {error && !modal && <div className="ath-error" role="alert">{error}<button onClick={() => { void task("Reloading project", async () => { if (integrated) accept(await athenaApi<AthenaProject>(`/projects/${projectRef.current?.id ?? session.projectId}`)); else accept(await openLocalProject(projectRef.current?.id ?? localStorage.getItem("athena.project"))) }) }}>Reload workspace</button><button onClick={() => setError("")} aria-label="Dismiss error"><X size={15} /></button></div>}
     <nav className="ath-mobile-workspace-nav" aria-label="Workspace sections"><a href="#athena-data-groups">Data</a><a href="#athena-processing-parameters">Parameters</a><a href="#athena-spectrum-viewer">Results</a></nav>
     <ResizableAthenaWorkspace
-      groups={<aside id="athena-data-groups" className="ath-groups"><div className="ath-panel-heading"><h2><ContextLabel label="current data" open={event => showContext(event, { kind: "group" })}>Data <span>{project?.groups.length ?? 0}</span></ContextLabel><SectionHelp label="Selecting and moving data" id="ath-group-multiselect-help">⌘/Ctrl-click to select · Shift-click for a range · Right-click selected spectra to group them · Drag into a group</SectionHelp></h2><button aria-label="Import spectra" disabled={!project || !!busy} onClick={() => setModal("import")}><Plus size={17} /></button></div>
+      groups={<aside id="athena-data-groups" className="ath-groups"><div className="ath-panel-heading"><h2><ContextLabel label="current data" open={event => showContext(event, { kind: "group" })}>Data <span>{project?.groups.length ?? 0}</span></ContextLabel><SectionHelp label="Selecting and moving data" id="ath-group-multiselect-help">Click current data again to clear it · ⌘/Ctrl-click to select · Shift-click for a range · Right-click selected spectra to group them · Drag into a group</SectionHelp></h2><button aria-label="Import spectra" disabled={!project || !!busy} onClick={() => setModal("import")}><Plus size={17} /></button></div>
         <div className="ath-sidebar-example"><button disabled={!!busy || parameterUpdatePending || !project || !canCommand("example")} onClick={() => { void loadDemoCases() }}><Activity size={16} />Load demo cases</button></div>
         <div className="ath-sidebar-actions" role="group" aria-label="Project actions">{!integrated && <button type="button" disabled={!project || !!busy || parameterUpdatePending} onClick={() => openTool("open")}><FolderOpen size={15} />Open project</button>}<button type="button" onClick={() => openTool("journal")} disabled={!project || !!busy || parameterUpdatePending || !can("project")} aria-label="Project journal"><FileText size={15} /></button></div>
         <label className="ath-search"><Search size={14} /><input aria-describedby="ath-group-search-help" aria-label="Search data" placeholder="Find a spectrum…" value={search} onChange={e => { cancelGroupDrag(); setSearch(e.target.value) }} /><SectionHelp label="Search data" id="ath-group-search-help">Filter visible data by their labels. Hidden data keep their marks and can still be included in marked or all-data operations.</SectionHelp></label>
@@ -2626,8 +2635,8 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
             {active && <button className="ath-subtle" disabled={!canOpen("metadata")} onClick={() => openTool("metadata")} aria-label="Edit data information"><Settings2 size={16} /></button>}
           </div><label>Order <SectionHelp label="Viewer order">Drag the viewer handles to save a custom order in this browser. Default order restores the original arrangement. Process order: Single and multiple spectra stay first; saved CIF attachment and this spectrum’s recorded wavelet, path-list, and fit events follow oldest first. Missing events keep default order.</SectionHelp><select aria-label="Sort viewers" value={viewerSort} onChange={event => changeViewerSort(event.target.value as ViewerSort)}><option value="default">Default order</option><option value="custom">Custom order</option><option value="process">Process order (this session)</option></select></label></div>
           <AthenaViewerChooser order={orderedViewerIds} shown={visibleViewers}
-            disabled={{ multiple: hasMultipleMarked ? undefined : "Mark at least two spectra to compare." }}
-            onToggleAll={() => setShownViewers(previous => availableViewers.filter(id => id !== "multiple" || hasMultipleMarked).every(id => previous.has(id)) ? new Set() : new Set(availableViewers))}
+            disabled={unavailableViewers}
+            onToggleAll={() => setShownViewers(previous => availableViewers.filter(id => !unavailableViewers[id]).every(id => previous.has(id)) ? new Set() : new Set(availableViewers))}
             onToggle={id => setShownViewers(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next })}
             onMove={moveResultViewer} />
 

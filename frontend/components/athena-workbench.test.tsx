@@ -3135,7 +3135,8 @@ describe("AthenaWorkbench native context actions", () => {
     const initial = projectFixture()
     initial.groups[1].reference_id = 'foil'
     const project = await openSaved(initial)
-    selectGroup(label)
+    // Clicking an already-current spectrum clears it; this report needs a current spectrum.
+    if (plotProps('current').active?.label !== label) selectGroup(label)
     const selected = project.groups.find(g => g.label === label)!
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Energy shift' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Identify this data’s reference' }))
@@ -6827,6 +6828,138 @@ describe('Athena processing settings', () => {
     fireEvent.change(within(panel).getByRole('combobox', { name: 'Current data' }), { target: { value: 'sample' } })
     expect(within(panel).getByRole('checkbox', { name: 'Input already normalized' })).toBeChecked()
     expect(within(panel).getByRole('checkbox', { name: 'Enable EXAFS processing' })).not.toBeChecked()
+  })
+})
+
+describe('AthenaWorkbench optional current spectrum', () => {
+  function spectrumButton(id: string) {
+    return document.querySelector<HTMLButtonElement>(`.ath-group[data-group-id="${id}"] .ath-group-select`)!
+  }
+
+  function viewerPanel(viewer: 'single' | 'multiple') {
+    return document.querySelector(`[data-viewer-id="${viewer}"]`)!
+  }
+
+  it('deselects the current spectrum without changing marks and restores its viewer settings on selection', async () => {
+    await openSaved()
+    const chooser = within(screen.getByRole('group', { name: 'Choose viewers' }))
+    const markedBefore = plotProps().groups.map(g => g.id)
+    fireEvent.click(singleViewer().getByRole('checkbox', { name: 'Show legend' }))
+    fireEvent.click(singleViewer().getByRole('radio', { name: 'μ(E) · normalized' }))
+    expect(spectrumButton('foil')).toHaveAttribute('aria-current', 'true')
+    expect(spectrumButton('foil')).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(spectrumButton('foil'))
+
+    expect(document.querySelector('.ath-group-select[aria-current="true"]')).toBeNull()
+    expect(plotProps('current').active).toBeUndefined()
+    expect(plotProps('current').groups).toEqual([])
+    expect(plotProps().groups.map(g => g.id)).toEqual(markedBefore)
+    expect(screen.getByRole('checkbox', { name: 'Mark Foil scan' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Mark Sample scan' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Mark Oxide standard' })).toBeChecked()
+    expect(viewerPanel('single')).not.toBeVisible()
+    expect(viewerPanel('multiple')).toBeVisible()
+    expect(chooser.getByRole('button', { name: 'Single spectrum viewer' })).toBeDisabled()
+    expect(screen.getByText('No current data.')).toBeVisible()
+    expect(api).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(spectrumButton('foil'))
+
+    expect(spectrumButton('foil')).toHaveAttribute('aria-current', 'true')
+    expect(viewerPanel('single')).toBeVisible()
+    expect(chooser.getByRole('button', { name: 'Single spectrum viewer' })).toBeEnabled()
+    expect(singleViewer().getByRole('checkbox', { name: 'Show legend' })).not.toBeChecked()
+    expect(singleViewer().getByRole('radio', { name: 'μ(E) · normalized' })).toBeChecked()
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps an explicitly hidden single viewer hidden across deselection and reselection', async () => {
+    await openSaved()
+    const singleToggle = within(screen.getByRole('group', { name: 'Choose viewers' }))
+      .getByRole('button', { name: 'Single spectrum viewer' })
+    fireEvent.click(singleToggle)
+    fireEvent.click(spectrumButton('foil'))
+    fireEvent.click(spectrumButton('sample'))
+
+    expect(spectrumButton('sample')).toHaveAttribute('aria-current', 'true')
+    expect(plotProps('current').groups.map(g => g.id)).toEqual(['sample'])
+    expect(viewerPanel('single')).not.toBeVisible()
+    expect(singleToggle).toHaveAttribute('aria-pressed', 'false')
+    expect(singleToggle).toBeEnabled()
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['selection', 'project'] as const)('preserves no current spectrum after a same-project %s checkbox response', async responseMode => {
+    const project = await openSaved()
+    fireEvent.click(spectrumButton('foil'))
+    const saved = nextProject(project, { sample: { marked: false } })
+    const response = deferred<AthenaProject | AthenaSelectionUpdate>()
+    api.mockReturnValueOnce(response.promise)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Mark Sample scan' }))
+    expect(plotProps('current').active).toBeUndefined()
+    expect(viewerPanel('single')).not.toBeVisible()
+    expect(viewerPanel('multiple')).toBeVisible()
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith(`/projects/${project.id}/command`, {
+      version: project.version, action: 'metadata', group_ids: ['sample'],
+      options: { marked: false }, response_mode: 'selection',
+    }))
+    const selection: AthenaSelectionUpdate = {
+      kind: 'selection', id: project.id, name: project.name, base_version: project.version,
+      version: saved.version, updated: project.updated,
+      groups: saved.groups.map(g => ({ id: g.id, marked: g.marked, frozen: g.frozen })),
+      undo: [], redo: [], history: [], analyses: [],
+      group_versions: Object.fromEntries(saved.groups.map(g => [g.id, saved.version])),
+      last_operation: undefined,
+    }
+    await act(async () => response.resolve(responseMode === 'selection' ? selection : saved))
+    await waitForWorkbenchIdle()
+
+    expect(document.querySelector('.ath-group-select[aria-current="true"]')).toBeNull()
+    expect(plotProps('current').active).toBeUndefined()
+    expect(plotProps().groups.map(g => g.id)).toEqual(['oxide'])
+    expect(screen.getByRole('checkbox', { name: 'Mark Sample scan' })).not.toBeChecked()
+    expect(viewerPanel('single')).not.toBeVisible()
+    expect(viewerPanel('multiple')).toBeVisible()
+    expect(api).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows one marked spectrum in the multiple viewer only while no spectrum is current', async () => {
+    await openSaved(projectFixture({ groups: [group('foil', 'Foil scan'), group('sample', 'Sample scan', true)] }))
+    const multipleToggle = within(screen.getByRole('group', { name: 'Choose viewers' }))
+      .getByRole('button', { name: 'Multiple spectra viewer' })
+    expect(viewerPanel('multiple')).not.toBeVisible()
+    expect(multipleToggle).toBeDisabled()
+
+    fireEvent.click(spectrumButton('foil'))
+
+    expect(viewerPanel('single')).not.toBeVisible()
+    expect(viewerPanel('multiple')).toBeVisible()
+    expect(multipleToggle).toBeEnabled()
+    expect(plotProps().groups.map(g => g.id)).toEqual(['sample'])
+    expect(plotProps().active).toBeUndefined()
+
+    fireEvent.click(spectrumButton('sample'))
+
+    expect(viewerPanel('single')).toBeVisible()
+    expect(viewerPanel('multiple')).not.toBeVisible()
+    expect(multipleToggle).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Mark Sample scan' })).toBeChecked()
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows no current spectrum and no marks while retaining the empty single viewer', async () => {
+    await openSaved(projectFixture({ groups: [group('foil', 'Foil scan'), group('sample', 'Sample scan')] }))
+    fireEvent.click(spectrumButton('foil'))
+
+    expect(document.querySelector('.ath-group-select[aria-current="true"]')).toBeNull()
+    expect(plotProps('current').active).toBeUndefined()
+    expect(plotProps('current').groups).toEqual([])
+    expect(plotProps().groups).toEqual([])
+    expect(viewerPanel('single')).toBeVisible()
+    expect(viewerPanel('multiple')).not.toBeVisible()
+    expect(screen.getByText('No current data.')).toBeVisible()
+    expect(api).toHaveBeenCalledTimes(1)
   })
 })
 

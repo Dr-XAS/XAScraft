@@ -157,6 +157,10 @@ Disorder-model inputs are assumptions; inequivalent sites are not averaged autom
 
 The **Single spectrum viewer** plots the highlighted group, independently of
 its checkbox. The **Multiple spectra viewer** plots the checked data groups.
+Click the highlighted spectrum again to clear the current spectrum without
+changing its mark. When marked spectra remain, the single viewer hides and
+the multiple viewer can show even one marked spectrum. Selecting a spectrum
+again restores the single viewer according to its previous display preference.
 Both panels can stay open together and keep independent plot spaces, ranges,
 colors, legends, and heights. In **R** and **q**, use the component checkboxes to
 overlay **Magnitude**, **Real**, **Imaginary**, and **Phase**. Components share
