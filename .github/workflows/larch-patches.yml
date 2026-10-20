@@ -1,0 +1,60 @@
+name: Larch patch queue
+
+# Builds XAScraft's patched Larch (upstream xraylarch at larch-patches/PIN plus
+# larch-patches/series) from GitHub, then runs the team's regression tests and upstream's
+# own test suite, from the built source tree, against it.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'larch-patches/**'
+      - 'examples/**'
+      - 'deploy/python-release-constraints.txt'
+      - 'tests/ci/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'larch-patches/**'
+      - 'examples/**'
+      - 'deploy/python-release-constraints.txt'
+      - 'tests/ci/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  patched-larch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # test_series.py compares each patch with the XAScraft commit it came from.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Make an environment from the release constraints
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --quiet --disable-pip-version-check \
+            -r deploy/python-release-constraints.txt -c deploy/python-release-constraints.txt
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+      - name: Workflow files parse and name existing files
+        run: pytest -p no:cacheprovider -q tests/ci
+      - name: Build the patched Larch from GitHub and install it
+        shell: bash
+        run: bash larch-patches/install-dev.sh --python "$(command -v python)" --keep "$RUNNER_TEMP/larch"
+      - name: Patch series and build script
+        run: pytest -p no:cacheprovider -q larch-patches/tests/test_series.py larch-patches/tests/test_build.py
+      - name: Team regression tests
+        run: pytest -p no:cacheprovider -q larch-patches/tests -k "not test_series and not test_build"
+      - name: Upstream test suite
+        shell: bash
+        run: bash larch-patches/run-upstream-tests.sh "$RUNNER_TEMP/larch/xraylarch-src" --python "$(command -v python)"
