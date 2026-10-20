@@ -316,6 +316,12 @@ the digest first: it usually answers what the arrays were wanted for.
 - Frontend: `cd frontend && npx vitest run`; browser walks:
   `cd frontend && npx playwright test tests/e2e/<spec> --reporter=line` (the
   config starts the backend and Next.js itself).
+- Screenshot comparison, for changes that must not change the UI:
+  `cd frontend && npx playwright test --config=playwright.screens.config.ts`
+  compares every page, menu, viewer and main dialog pixel for pixel against
+  snapshots recorded earlier (`--update-snapshots` records them, e.g. on the
+  commit before the change). Only this config runs the `*.screens.ts` specs; see
+  `frontend/tests/e2e/screens/README.md`.
 - The fast EXAFS fit and the second XRF engine need optional packages (jax with
   diffexafs-core, and torch with mapstorch) that the release install leaves out.
   Their tests skip when a package is missing; keep it that way, and check a

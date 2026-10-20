@@ -25,7 +25,8 @@ from xraylarch.
 | `docs/` | Feature references, verification records and guides |
 
 **Larch version.** The patched build is versioned
-`<upstream version at the pin>.xascraft.<patch-set id>`, for example
+`<upstream version at the pin>.xascraft.<patch-set id>`. The upstream version is the one
+setuptools-scm gives the pinned commit, so it ends in `+g<short upstream sha>`; for example
 `2026.3.1.post35+g8d6cd41c2.xascraft.9b231a511159`. The patch-set id is a hash of the patch
 files, so the version changes only when the pin or a patch changes. Processed groups report
 it as `larch_version`; `backend/.venv/bin/python -c "import larch; print(larch.__version__)"`
@@ -625,7 +626,11 @@ dependency installer. Its focused browser checks cover:
   mounted development server. It validates this application's handoff flow;
   it does not run the external Dr.XAS consumer.
 
-The full browser suite remains available with `npm run test:e2e`. Local CI-style
+The full browser suite remains available with `npm run test:e2e`. A change that must not
+change the UI can also be checked pixel for pixel against snapshots recorded before it, with
+the screenshot comparison suite (`npx playwright test --config=playwright.screens.config.ts`,
+run from `frontend/`; record with `--update-snapshots`). No workflow runs it; see
+[frontend/tests/e2e/screens/README.md](frontend/tests/e2e/screens/README.md). Local CI-style
 checks can use an installed Chrome with `XRAYLARCH_E2E_BROWSER_CHANNEL=chrome`.
 To enforce a merge gate, select the `Web frontend / frontend` check in the
 repository's branch protection settings.
