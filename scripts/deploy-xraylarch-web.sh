@@ -981,6 +981,11 @@ assert_backend_application_import() (
 install_release_backend() (
   local release="$1" python="${1}/backend/.venv/bin/python" larch_out='' wheel
   local constraints="${1}/deploy/python-release-constraints.txt"
+  if [[ -n "${XASCRAFT_LARCH_WHEEL:-}" ]]; then
+    [[ -z "${XASCRAFT_LARCH_UPSTREAM:-}" ]] || { fail "set XASCRAFT_LARCH_WHEEL or XASCRAFT_LARCH_UPSTREAM, not both"; return 1; }
+    [[ "$XASCRAFT_LARCH_WHEEL" == /* && -f "$XASCRAFT_LARCH_WHEEL" && "$(basename -- "$XASCRAFT_LARCH_WHEEL")" == xraylarch-*.whl ]] \
+      || { fail "XASCRAFT_LARCH_WHEEL must be the absolute path of an xraylarch-*.whl file"; return 1; }
+  fi
   cd "${release}/backend" || return 1
   run_clean "$python" -m pip install \
     --requirement "$constraints" --constraint "$constraints" || return 1
@@ -988,22 +993,27 @@ install_release_backend() (
   run_clean "$python" -m pip install \
     --no-deps --no-build-isolation --upgrade \
     'setuptools==79.0.1' 'wheel==0.47.0' 'setuptools-scm==9.2.2' || return 1
-  # Larch is XAScraft's patched build, never the release checkout: build.py
-  # fetches upstream at larch-patches/PIN (from GitHub, or XASCRAFT_LARCH_UPSTREAM)
-  # and applies the series.
-  larch_out="${release}/.release-larch"
-  [[ ! -e "$larch_out" && ! -L "$larch_out" ]] || { fail "stale Larch build output: $larch_out"; return 1; }
-  local build_args=(--out "$larch_out" --build-python "$python")
-  [[ -z "${XASCRAFT_LARCH_UPSTREAM:-}" ]] || build_args+=(--upstream "$XASCRAFT_LARCH_UPSTREAM")
-  run_clean "$python" -I "${release}/larch-patches/build.py" "${build_args[@]}" || return 1
-  wheel=$(find "${larch_out}/dist" -maxdepth 1 -type f -name 'xraylarch-*.whl' -print -quit) || return 1
-  [[ -n "$wheel" ]] || { fail "build.py produced no Larch wheel"; return 1; }
+  # Larch is XAScraft's patched build, never the release checkout: a prebuilt
+  # wheel (XASCRAFT_LARCH_WHEEL), or build.py, which fetches upstream at
+  # larch-patches/PIN (from GitHub, or XASCRAFT_LARCH_UPSTREAM) and applies the
+  # series. assert_patched_larch binds either to this release's pin and series.
+  if [[ -n "${XASCRAFT_LARCH_WHEEL:-}" ]]; then
+    wheel="$XASCRAFT_LARCH_WHEEL"
+  else
+    larch_out="${release}/.release-larch"
+    [[ ! -e "$larch_out" && ! -L "$larch_out" ]] || { fail "stale Larch build output: $larch_out"; return 1; }
+    local build_args=(--out "$larch_out" --build-python "$python")
+    [[ -z "${XASCRAFT_LARCH_UPSTREAM:-}" ]] || build_args+=(--upstream "$XASCRAFT_LARCH_UPSTREAM")
+    run_clean "$python" -I "${release}/larch-patches/build.py" "${build_args[@]}" || return 1
+    wheel=$(find "${larch_out}/dist" -maxdepth 1 -type f -name 'xraylarch-*.whl' -print -quit) || return 1
+    [[ -n "$wheel" ]] || { fail "build.py produced no Larch wheel"; return 1; }
+  fi
   run_clean "$python" -m pip install --constraint "$constraints" "$wheel" || return 1
   install_backend_requirements "$release" || return 1
   run_clean "$python" -c 'import larch, xraylarch_web' || return 1
   assert_backend_application_import "$release" || return 1
   assert_patched_larch "$release" || return 1
-  rm -rf -- "$larch_out" || return 1
+  [[ -z "$larch_out" ]] || rm -rf -- "$larch_out" || return 1
   run_clean "$python" -m pip check || return 1
   run_clean "$python" -m pip freeze --all > pip-freeze.txt
 )

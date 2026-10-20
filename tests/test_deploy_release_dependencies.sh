@@ -131,6 +131,29 @@ XASCRAFT_LARCH_UPSTREAM="$test_root/xraylarch clone" run_larch_install none \
 [[ "$(larch_call larch_build)" == *"--build-python $larch_release/backend/.venv/bin/python --upstream $test_root/xraylarch clone" ]] \
   || fail_test "XASCRAFT_LARCH_UPSTREAM must reach build.py: $(larch_call larch_build)"
 
+# Or take a prebuilt patched wheel; the version check still binds it to this
+# release's pin and series.
+prebuilt="$test_root/prebuilt dist/xraylarch-2026.3.1.post35+g8d6cd41c2.xascraft.test-py3-none-any.whl"
+mkdir -p "$(dirname "$prebuilt")"
+: > "$prebuilt"
+XASCRAFT_LARCH_WHEEL="$prebuilt" run_larch_install none \
+  || fail_test 'release backend install from a prebuilt wheel must succeed'
+[[ "$(larch_stages)" == 'constraints build_tools larch_install backend import app larch_check check freeze' ]] \
+  || fail_test "a prebuilt wheel must skip build.py: $(larch_stages)"
+[[ "$(larch_call larch_install)" == "$larch_release/backend/.venv/bin/python -m pip install --constraint $larch_release/deploy/python-release-constraints.txt $prebuilt" ]] \
+  || fail_test "the prebuilt wheel must be installed under the release constraints: $(larch_call larch_install)"
+XASCRAFT_LARCH_WHEEL="$prebuilt" run_larch_install larch_check && fail_test 'a prebuilt wheel of another build must fail the version check'
+for bad_wheel in "$test_root/missing/xraylarch-1.0-py3-none-any.whl" "prebuilt dist/$(basename "$prebuilt")" "$test_root/prebuilt dist"; do
+  if XASCRAFT_LARCH_WHEEL="$bad_wheel" run_larch_install none 2>/dev/null; then
+    fail_test "XASCRAFT_LARCH_WHEEL=$bad_wheel must be refused"
+  fi
+  [[ ! -s "$test_root/larch-calls" ]] || fail_test "XASCRAFT_LARCH_WHEEL=$bad_wheel must be refused before installing anything"
+done
+if XASCRAFT_LARCH_WHEEL="$prebuilt" XASCRAFT_LARCH_UPSTREAM="$test_root/xraylarch" run_larch_install none 2>/dev/null; then
+  fail_test 'a prebuilt wheel and an upstream to build from are mutually exclusive'
+fi
+[[ ! -s "$test_root/larch-calls" ]] || fail_test 'conflicting Larch sources must be refused before installing anything'
+
 # Mounted builds must receive their public path at build time. Health qualification
 # must bind the backend response to the exact immutable release and contract.
 build_source=$(declare -f build_release)
