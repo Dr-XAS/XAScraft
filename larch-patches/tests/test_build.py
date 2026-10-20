@@ -129,3 +129,54 @@ def test_identity_names_the_pin_the_patch_set_and_the_version(full):
         assert len(entry["xascraft_commit"]) == 40
         assert (PATCHES_DIR / "series" / entry["file"]).is_file()
     assert ident["larch_tree"] == PIN["patched-larch-tree"]
+
+
+def the_wheel(out: Path) -> Path:
+    wheels = sorted((out / "dist").glob("*.whl"))
+    assert len(wheels) == 1, wheels
+    return wheels[0]
+
+
+def installed_versions(wheel: Path, target: Path) -> list[str]:
+    """Install the wheel (no dependencies) into ``target`` and ask it for its version
+    the two ways the app and Python can: package metadata and ``larch.__version__``."""
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps",
+                    "--target", str(target), str(wheel)], check=True)
+    probe = (
+        "import sys; sys.path.insert(0, sys.argv[1]);"
+        "import importlib.metadata as md, larch;"
+        "assert larch.__file__.startswith(sys.argv[1]), larch.__file__;"
+        "print(md.version('xraylarch')); print(larch.__version__)"
+    )
+    # Run outside the repository, so its root larch/ folder cannot shadow the install.
+    result = subprocess.run([sys.executable, "-I", "-c", probe, str(target)], cwd=target,
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.split()
+
+
+def test_installed_wheel_reports_the_version(full, tmp_path):
+    version = f"2026.3.1.post35+g8d6cd41c2.xascraft.{series_id(PATCHES_DIR)}"
+    wheel = the_wheel(full)
+    assert wheel.name == f"xraylarch-{version}-py3-none-any.whl"
+    assert installed_versions(wheel, tmp_path / "site") == [version, version]
+
+
+def test_wheel_carries_the_whole_patched_larch_tree(full):
+    """Built without git, the wheel still ships every file under larch/ (MANIFEST.in), plus
+    the generated _version.py and nothing else."""
+    import zipfile
+
+    with zipfile.ZipFile(the_wheel(full)) as whl:
+        in_wheel = {n: whl.read(n) for n in whl.namelist()
+                    if n.startswith("larch/") and not n.endswith("/")}
+    version_py = in_wheel.pop("larch/_version.py").decode()
+    assert f"__version__ = version = '{identity(full)['version']}'" in version_py
+    source = {f"larch/{k}": v for k, v in files_under(full / "xraylarch-src" / "larch").items()}
+    assert in_wheel.keys() == source.keys()
+    assert in_wheel == source
+
+
+def test_dist_has_a_matching_sdist(full):
+    sdists = sorted((full / "dist").glob("*.tar.gz"))
+    assert [s.name for s in sdists] == [f"xraylarch-{identity(full)['version']}.tar.gz"]

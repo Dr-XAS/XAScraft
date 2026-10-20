@@ -134,6 +134,70 @@ def make_identity(pin: dict[str, str], patches: list[Path], larch_tree: str) -> 
     }
 
 
+def build_requirements() -> list[str]:
+    """The build backend's pins, taken from the release constraints (the deploy pins)."""
+    constraints = HERE.parent / "deploy" / "python-release-constraints.txt"
+    if not constraints.is_file():
+        raise BuildError(f"{constraints} not found; pass --build-python")
+    wanted = {"setuptools", "wheel", "setuptools-scm"}
+    pins = [line.strip() for line in constraints.read_text().splitlines()
+            if line.partition("==")[0].strip().lower() in wanted]
+    if len(pins) != len(wanted):
+        raise BuildError(f"{constraints} does not pin all of {sorted(wanted)}")
+    return [*pins, "--constraint", str(constraints)]
+
+
+def build_environment(work: Path) -> str:
+    """A fresh venv with the pinned build backend (needs PyPI or a pip cache)."""
+    env_dir = work / "build-env"
+    run([sys.executable, "-m", "venv", str(env_dir)], "creating the build venv")
+    python = str(env_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    run([python, "-m", "pip", "install", "-q", "--disable-pip-version-check",
+         *build_requirements()], "installing the build backend")
+    return python
+
+
+def run(cmd: list[str], what: str, **kwargs) -> str:
+    result = subprocess.run(cmd, capture_output=True, text=True, **kwargs)
+    if result.returncode != 0:
+        raise BuildError(f"{what} failed:\n{(result.stdout + result.stderr).strip()}")
+    return result.stdout
+
+
+# Runs in the build environment: PEP 517 hooks, the way `python -m build` calls them.
+HOOK = """\
+import sys
+import setuptools.build_meta as backend
+hook = backend.build_sdist if sys.argv[1] == "sdist" else backend.build_wheel
+print(hook(sys.argv[2]))
+"""
+
+
+def build_dists(src: Path, work: Path, dist: Path, python: str, version: str,
+                epoch: str) -> None:
+    """Build the sdist and the wheel, each from its own fresh copy of ``src``."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("SETUPTOOLS_SCM_") and k not in ("PYTHONPATH",)}
+    env.update({
+        # The tree has no .git; this is the only version setuptools-scm may use.
+        "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_XRAYLARCH": version,
+        # Fixed timestamps in the archives: the patched commit's time.
+        "SOURCE_DATE_EPOCH": epoch,
+        # Never let setuptools-scm's file finder see a repository around the temp dir.
+        "GIT_CEILING_DIRECTORIES": str(work),
+    })
+    dist.mkdir()
+    for kind in ("sdist", "wheel"):
+        copy = work / f"build-{kind}"
+        shutil.copytree(src, copy, symlinks=True)
+        name = run([python, "-I", "-c", HOOK, kind, str(dist)], f"building the {kind}",
+                   cwd=copy, env=env).strip().splitlines()[-1]
+        built = name.split("-")[1] if kind == "wheel" else name.removesuffix(".tar.gz").removeprefix("xraylarch-")
+        if built != version:
+            raise BuildError(f"the {kind} {name} has version {built!r}, not {version!r} "
+                             "(setuptools normalised it)")
+
+
 def build(args: argparse.Namespace) -> Path:
     out = Path(args.out).resolve()
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
@@ -151,6 +215,9 @@ def build(args: argparse.Namespace) -> Path:
         stage = work / "out"
         stage.mkdir()
         export_tree(repo, stage / "xraylarch-src")
+        python = args.build_python or build_environment(work)
+        build_dists(stage / "xraylarch-src", work, stage / "dist", python, ident["version"],
+                    git("log", "-1", "--format=%ct", cwd=repo).strip())
         (stage / "IDENTITY").write_text(json.dumps(ident, indent=2) + "\n")
         if out.exists():
             out.rmdir()
