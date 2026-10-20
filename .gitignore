@@ -11,9 +11,6 @@ env/*
 *.prj
 *.lar
 *.h5
-conda_constructor/*.sh
-conda_constructor/*.exe
-conda_constructor/*.pkg
 __pycache__
 .deps
 MANIFEST
