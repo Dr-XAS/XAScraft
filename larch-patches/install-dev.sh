@@ -11,7 +11,7 @@
 # setuptools, wheel and setuptools-scm at the pins in deploy/python-release-constraints.txt;
 # an environment made from that file has them. The wheel's dependencies are installed under
 # the same constraints. Any Larch already installed (an editable one included) is replaced.
-# Ends by importing larch from outside the repository and checking its version against IDENTITY.
+# Ends by checking, with installed.py, that `import larch` gives IDENTITY's version from site-packages.
 set -Eeuo pipefail
 
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -49,25 +49,9 @@ version="$("$PYTHON" -I -c 'import json, sys; print(json.load(open(sys.argv[1]))
 "$PYTHON" -m pip install --no-input --quiet --disable-pip-version-check \
   --constraint "$CONSTRAINTS" "${wheels[0]}"
 
-# Import from a neutral directory, so neither the repository nor its larch/ is on sys.path.
-( cd "$WORK" && "$PYTHON" -I - "$version" "$REPO" <<'PY'
-import sys
-from importlib.metadata import version
-from pathlib import Path
-import larch
-expected, repo = sys.argv[1], Path(sys.argv[2]).resolve()
-where = Path(larch.__file__).resolve()
-problems = []
-if larch.__version__ != expected or version("xraylarch") != expected:
-    problems.append(f"larch reports {larch.__version__} (metadata {version('xraylarch')}), "
-                    f"IDENTITY says {expected}")
-if where.is_relative_to(repo) and "site-packages" not in where.parts:
-    problems.append(f"larch is imported from the repository: {where}")
-if problems:
-    sys.exit("install-dev.sh: " + "; ".join(problems))
-print(f"install-dev.sh: installed larch {larch.__version__} at {where.parent}")
-PY
-)
+# From a neutral directory, so neither the repository nor any larch/ folder is on sys.path.
+( cd "$WORK" && "$PYTHON" -I "$HERE/installed.py" --version "$version" ) \
+  || { echo "install-dev.sh: the installed Larch is not the build just made" >&2; exit 1; }
 
 if [[ -n "$KEEP" ]]; then
   mkdir -p -- "$KEEP"

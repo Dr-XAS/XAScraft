@@ -62,6 +62,9 @@ def build_release(root: Path, release: Path, metadata: dict, uv: Path):
             cwd=source / "backend", env=env, log=log)
         run([uv, "pip", "check", "--python", py], env=env, log=log)
         import subprocess
+        # Its own check, not larch-patches/installed.py: the installer runs from a snapshot
+        # zip that carries the wheel and IDENTITY but not larch-patches/. The version to
+        # expect is the snapshot's (from IDENTITY), and uv installed into a fresh venv.
         installed = subprocess.check_output(
             [str(py), "-I", "-c", "from importlib.metadata import version; print(version('xraylarch'))"],
             cwd=release, env=env, text=True).strip()

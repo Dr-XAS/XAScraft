@@ -4,7 +4,7 @@ The patched build is upstream xraylarch at the pin in ``larch-patches/PIN`` plus
 in ``larch-patches/series/``; ``larch-patches/build.py`` builds it and names its version.
 """
 import ast
-from importlib.metadata import distributions, version
+from importlib.metadata import distributions
 from importlib.util import find_spec, module_from_spec, spec_from_file_location
 from io import StringIO
 from pathlib import Path
@@ -22,13 +22,18 @@ REPO = Path(__file__).resolve().parents[2]
 PATCHES = REPO / "larch-patches"
 
 
+def patches_module(name: str):
+    """``larch-patches/<name>.py``, loaded under a name of its own."""
+    spec = spec_from_file_location(f"larch_patches_{name}", PATCHES / f"{name}.py")
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def patched_build_version() -> str:
     """The version ``build.py`` gives a build of the current pin and series (IDENTITY's
     ``version``)."""
-    spec = spec_from_file_location("larch_patches_build", PATCHES / "build.py")
-    build = module_from_spec(spec)
-    spec.loader.exec_module(build)
-    return build.expected_version(PATCHES)
+    return patches_module("build").expected_version(PATCHES)
 
 
 def canonical(name: str) -> str:
@@ -97,12 +102,9 @@ def test_requirements_declare_every_direct_import_at_the_baseline_pin_and_no_lar
 
 
 def test_larch_is_the_installed_patched_build_not_the_repository_copy():
-    import larch
-
-    where = Path(larch.__file__).resolve()
-    assert not where.is_relative_to(REPO / "larch")
-    assert owners().get(where) == "xraylarch"
-    assert larch.__version__ == version("xraylarch") == patched_build_version()
+    # The check install-dev.sh and the deploy script make: version, distribution, site-packages.
+    _, problems = patches_module("installed").check(patched_build_version())
+    assert problems == []
 
 
 @pytest.fixture

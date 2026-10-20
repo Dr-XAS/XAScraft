@@ -8,9 +8,11 @@ plus the patches in this folder. Nothing else in the repository changes Larch.
 | `PIN` | The upstream URL and commit, the upstream version string at that commit, and the `larch/` tree and `pyproject.toml` blob that applying the series must give. |
 | `series/NNNN-*.patch` | `git format-patch` files, applied in order with `git am`. Each keeps the original author, date and message, and carries an `XAScraft-commit: <sha>` trailer naming the XAScraft commit it came from. |
 | `build.py` | Builds the patched Larch: source tree, wheel, sdist and `IDENTITY`. See [Building](#building). |
+| `installed.py` | Checks that the Larch an interpreter imports is the patched build (version, distribution, site-packages); `install-dev.sh`, the deploy script and the backend tests use it. |
 | `run-upstream-tests.sh` | Runs upstream's own test suite, from a built source tree, against the installed Larch. See [Running the tests](#running-the-tests). |
 | `tests/test_series.py` | Applies the series to the pin in a scratch clone and checks the result against `PIN` and the original commits. |
 | `tests/test_build.py` | Runs `build.py` and checks its output, its version and its failure modes. |
+| `tests/test_installed.py` | Runs `installed.py` against the installed build, another version and a source-tree `larch/`. |
 | `tests/test_upstream_suite.py` | Runs `run-upstream-tests.sh` on a built tree: the main run, and the known pre-existing failures. |
 | `tests/test_*.py` (others) | The team's Larch regression tests. They run against whatever Larch is installed. |
 
@@ -65,7 +67,9 @@ larch-patches/install-dev.sh --upstream ~/xraylarch       # omit --upstream to f
 
 `install-dev.sh` runs `build.py` with the venv's interpreter as the build backend, installs the
 wheel under the release constraints (replacing any Larch already installed, an editable one
-included), and checks that `import larch` gives IDENTITY's version from site-packages.
+included), and checks with `installed.py` that `import larch` gives IDENTITY's version from
+site-packages. `python -I larch-patches/installed.py` makes the same check in any environment
+against the build of the current pin and series.
 `--python PYTHON` installs into another environment; `--keep DIR` keeps the build output.
 Run it again after the pin or a patch changes: `backend/tests/test_larch_dependency.py` fails
 while the installed Larch is not the current build.

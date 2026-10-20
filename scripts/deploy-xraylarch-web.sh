@@ -948,31 +948,12 @@ install_backend_requirements() (
 )
 
 # The installed Larch must be the patched build of this release's pin and series
-# (the version build.py writes to IDENTITY), imported from site-packages.
+# (the version build.py writes to IDENTITY), imported from site-packages:
+# larch-patches/installed.py checks it, as install-dev.sh and the backend tests do.
 assert_patched_larch() (
   local release="$1"
   cd "${release}/backend" || return 1
-  run_clean "${release}/backend/.venv/bin/python" -I -c '
-import sys
-from importlib.metadata import version
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-release = Path(sys.argv[1]).resolve()
-patches = release / "larch-patches"
-spec = spec_from_file_location("larch_patches_build", patches / "build.py")
-build = module_from_spec(spec)
-spec.loader.exec_module(build)
-expected = build.expected_version(patches)
-import larch
-where = Path(larch.__file__).resolve()
-metadata = version("xraylarch")
-if larch.__version__ != expected or metadata != expected:
-    sys.exit(f"installed Larch is {larch.__version__} (metadata {metadata}), "
-             f"the patched build of this release is {expected}")
-if "site-packages" not in where.parts:
-    sys.exit(f"Larch is not imported from site-packages: {where}")
-print(f"patched Larch {expected} at {where.parent}")
-' "$release"
+  run_clean "${release}/backend/.venv/bin/python" -I "${release}/larch-patches/installed.py"
 )
 
 assert_backend_application_import() (
