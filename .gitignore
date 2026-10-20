@@ -11,7 +11,6 @@ env/*
 *.prj
 *.lar
 *.h5
-larch/_version.py
 conda_constructor/*.sh
 conda_constructor/*.exe
 conda_constructor/*.pkg

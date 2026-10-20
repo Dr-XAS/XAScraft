@@ -1,8 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto eol=lf
 
-larch/bin/*/feff8l_* -text
-larch/bin/*/feff6l -text
 *.exe -text
 *.dll -text
 *.so -text
