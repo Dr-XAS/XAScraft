@@ -1,6 +1,0 @@
-[submodule "wxutils"]
-	path = wxutils
-	url = git@github.com:newville/wxutils.git
-[submodule "wxmplot"]
-	path = wxmplot
-	url = git@github.com:newville/wxmplot.git
