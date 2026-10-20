@@ -32,7 +32,8 @@ TEAM_COMMITS = [
 # Every patch after the team patches is temporary: written while tracking upstream, it undoes
 # an upstream regression, or keeps an app result that upstream changed on purpose until the
 # owner decides (README.md, "Patches"). It comes from no XAScraft commit, so it carries no
-# trailer.
+# trailer, and its subject starts with this prefix.
+TEMPORARY_SUBJECT_PREFIX = "Temporary: "
 
 COMMITTER = {
     "GIT_COMMITTER_NAME": "XAScraft patch queue",
@@ -167,6 +168,22 @@ def test_temporary_patches_change_only_larch_and_carry_no_xascraft_commit(patche
         trailer = git("log", "-1", "--format=%(trailers:key=XAScraft-commit,valueonly)", sha,
                       cwd=patched)
         assert trailer.strip() == "", sha
+
+
+def test_temporary_patches_say_so_in_their_subject(patched):
+    for sha in temporary_commits(patched):
+        subject = git("log", "-1", "--format=%s", sha, cwd=patched)
+        assert subject.startswith(TEMPORARY_SUBJECT_PREFIX), subject
+
+
+def test_patches_are_dated_in_series_order(patched):
+    """Author dates never go back along the series, so ``git log`` lists the patches in the
+    order they apply."""
+    upstream = read_pin()["upstream-commit"]
+    dates = [int(t) for t in git("log", "--reverse", "--format=%at", f"{upstream}..HEAD",
+                                 cwd=patched).split()]
+    assert len(dates) == len(series())
+    assert dates == sorted(dates)
 
 
 def test_run_tests_sh_is_upstreams_plus_the_team_regression_file(patched):
