@@ -1,16 +1,16 @@
-"""The FLUO self-absorption correction gives step 1's numbers, through the HTTP API.
+"""The FLUO self-absorption correction gives the numbers of the previous Larch, through the API.
 
-Step 1 (the original baseline, `refactor-baseline` = 3461938ac) is the reference: its
-preview and saved group for Cu, Fe3C and Ni from `examples/xafsdata`, imported the way
-the UI imports a file, are pinned in
-`fixtures/athena-self-absorption-fluo-step1.json.gz`, written by
-`reference/self_absorption_step1_reference.py` on that tree. Each spectrum runs twice:
-with the E0 the import found, and with E0 set to the tabulated edge energy.
+The reference is Larch 2026.3.1.post534+g3461938ac: the Larch XAScraft vendored at commit
+3461938ac, which is upstream 8d6cd41c2 with the team's patches. Its preview and saved group for
+Cu, Fe3C and Ni from `examples/xafsdata`, imported the way the UI imports a file, are pinned in
+`fixtures/athena-self-absorption-fluo-larch-3461938ac.json.gz`, written by
+`reference/self_absorption_fluo_reference.py` on that tree. Each spectrum runs twice: with the
+E0 the import found, and with E0 set to the tabulated edge energy.
 
-Upstream Larch `d6d27ccca` ("fluo: force recalculation of e0") made `fluo_corr` ignore
-the E0 it is given and normalize around its own, which moves the corrected curve by up
-to 2.6% of its maximum on these spectra. Temporary patch 0009 keeps the E0 the app
-passes until the owner decides (larch-patches/README.md, ledger "Self-absorption E0").
+Upstream Larch `d6d27ccca` ("fluo: force recalculation of e0") made `fluo_corr` ignore the E0
+it is given and normalize around its own, which moves the normalized corrected curve by up to
+3.7% of the edge step on these spectra. Temporary patch 0009 keeps the E0 the app passes until
+the owner decides (larch-patches/README.md, ledger "Self-absorption E0").
 """
 import gzip
 import json
@@ -24,7 +24,7 @@ from xraylarch_web.config import Settings
 from xraylarch_web.main import create_app
 
 XAFSDATA = Path(__file__).resolve().parents[2] / "examples" / "xafsdata"
-FIXTURE = Path(__file__).parent / "fixtures" / "athena-self-absorption-fluo-step1.json.gz"
+FIXTURE = Path(__file__).parent / "fixtures" / "athena-self-absorption-fluo-larch-3461938ac.json.gz"
 ATHENA = "/api/athena/projects"
 
 # name: (file, formula, absorber, tabulated K-edge energy in eV)
@@ -34,7 +34,12 @@ SPECTRA = {
     "ni": ("ni_metal_rt.xdi", "Ni", "Ni", 8333.0),
 }
 E0_CHOICES = ("imported", "tabulated")
-CASES = [f"{name}-{e0}" for name in SPECTRA for e0 in E0_CHOICES]
+# (spectrum name, E0 choice); the fixture keys each case as "name-choice".
+CASES = [(name, e0) for name in SPECTRA for e0 in E0_CHOICES]
+
+
+def case_key(case):
+    return "-".join(case)
 
 
 def ok(response):
@@ -55,7 +60,7 @@ def import_mutrans(client, name):
 
 def fluo_outputs(client, case):
     """The panel's preview and the saved group's normalized mu for one case."""
-    name, e0_choice = case.rsplit("-", 1)
+    name, e0_choice = case
     filename, formula, element, tabulated = SPECTRA[name]
     project = import_mutrans(client, filename)
     group = project["groups"][0]
@@ -81,7 +86,7 @@ def fluo_outputs(client, case):
 
 
 @pytest.fixture(scope="module")
-def step1():
+def recorded():
     return json.loads(gzip.decompress(FIXTURE.read_bytes()))
 
 
@@ -91,9 +96,9 @@ def client(tmp_path_factory):
         yield client
 
 
-@pytest.mark.parametrize("case", CASES)
-def test_fluo_correction_gives_step1_numbers(client, step1, case):
-    expected = step1["cases"][case]
+@pytest.mark.parametrize("case", CASES, ids=case_key)
+def test_fluo_correction_gives_the_numbers_of_larch_3461938ac(client, recorded, case):
+    expected = recorded["cases"][case_key(case)]
     got = fluo_outputs(client, case)
     assert got["method"] == expected["method"] == "larch.fluo_corr"
     assert got["e0"] == expected["e0"]

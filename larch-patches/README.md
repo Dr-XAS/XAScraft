@@ -319,7 +319,7 @@ retired when **the owner adopts upstream's behavior**.
   - The measured curve and the reported E0 do not change. Booth, and the FLUO branch with a
     fixed step or `nvict`, use the app's own formula and do not change.
 - **Covering test:** `test_xafs_fluo.py::test_fluo_corr_normalizes_around_the_e0_it_is_given`;
-  through the HTTP API, `backend/tests/test_athena_self_absorption_step1_numbers.py`. Upstream's
+  through the HTTP API, `backend/tests/test_athena_self_absorption_matches_larch_3461938ac.py`. Upstream's
   `tests/test_xafs_fluo.py` still passes with the patch.
 - **Exit condition:** the owner adopts upstream's behavior. Then retire the patch, and re-pin the
   backend test's numbers to upstream's.
