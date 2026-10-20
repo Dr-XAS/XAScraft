@@ -6,6 +6,8 @@ test here runs bundled data through the copy and through Larch, and fails if
 they part. A copy that disagrees today is marked xfail(strict=True) with the
 reason, so a change in either side is noticed.
 """
+import re
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -19,16 +21,26 @@ RANGES = ("pre1", "pre2", "norm1", "norm2", "nnorm")
 
 
 @pytest.fixture(scope="module")
-def bundled_groups(tmp_path_factory):
-    """The bundled copper series, processed by the API with every range left to the app."""
+def client(tmp_path_factory):
     with TestClient(create_app(Settings(data_root=tmp_path_factory.mktemp("agreement")))) as client:
-        project = client.post("/api/athena/projects").json()
-        response = client.post(f"/api/athena/projects/{project['id']}/command", json={
-            "version": project["version"], "action": "example", "group_ids": [], "options": {}})
-        assert response.status_code == 200, response.text
-        groups = response.json()["groups"]
-    assert groups and all(g["processing_error"] is None for g in groups)
-    return groups
+        yield client
+
+
+@pytest.fixture(scope="module")
+def bundled_project(client):
+    """The bundled copper series, processed by the API with every range left to the app."""
+    project = client.post("/api/athena/projects").json()
+    response = client.post(f"/api/athena/projects/{project['id']}/command", json={
+        "version": project["version"], "action": "example", "group_ids": [], "options": {}})
+    assert response.status_code == 200, response.text
+    project = response.json()
+    assert project["groups"] and all(g["processing_error"] is None for g in project["groups"])
+    return project
+
+
+@pytest.fixture(scope="module")
+def bundled_groups(bundled_project):
+    return bundled_project["groups"]
 
 
 def test_pre_edge_default_ranges_are_larchs(bundled_groups):
@@ -95,3 +107,51 @@ def test_autobk_spline_count_is_larchs(monkeypatch, bundled_groups, parameters):
     for group in bundled_groups:
         counts = _autobk_pre_checks(monkeypatch, group, parameters)
         assert counts["app"] == counts["larch"], group["label"]
+
+
+def _fit(client, project, transform, guesses):
+    """Fit the bundled 10 K Cu foil with Larch's feffcu01 first-shell path.
+
+    `guesses` names the path parameters left free; the others are Set at the
+    example's starting value.
+    """
+    from xraylarch_web.artemis import copper_example
+
+    example = copper_example()
+    group = next(g for g in project["groups"] if g["label"] == "Cu foil · 10 K")
+    parameters = [parameter | {"kind": "guess" if parameter["name"] in guesses else "set"}
+                  for parameter in example["parameters"]]
+    path = {key: value for key, value in example["path"].items() if key != "metadata"}
+    return client.post(f"/api/artemis/projects/{project['id']}/groups/{group['id']}/fit?view=summary", json=dict(
+        version=project["version"], parameters=parameters, transform=transform,
+        paths=[path | {"id": "cu1", "label": "Cu first shell"}]))
+
+
+# n_idp = 1 + 2 Δk ΔR / π falls between three and four free parameters for each.
+FEFFIT_TRANSFORMS = [
+    pytest.param(dict(kmin=3, kmax=8, rmin=1.4, rmax=2.2, kweight=[2]), id="r-space"),
+    pytest.param(dict(kmin=3.5, kmax=9.5, rmin=1.5, rmax=2.1, kweight=[1, 2, 3], fitspace="k"), id="k-space"),
+    pytest.param(dict(kmin=2.6, kmax=10.1, rmin=1.7, rmax=2.25, dk=1, kweight=[0, 3]), id="decimal-ranges"),
+]
+
+
+@pytest.mark.parametrize("transform", FEFFIT_TRANSFORMS)
+def test_feffit_independent_points_are_larchs(client, bundled_project, transform):
+    """Copy: backend/xraylarch_web/artemis.py:344-346 (n_independent, the too-many-guesses refusal).
+
+    Original: larch/xafs/feffit.py:464 FeffitDataSet.prepare_fit n_idp, which a
+    fit reports as statistics.n_independent. The app refuses a model with as
+    many guesses as its own count before Larch runs; with one guess fewer the
+    fit runs and reports Larch's. The two counts must agree.
+    """
+    refused = _fit(client, bundled_project, transform, {"amp", "del_e0", "del_r", "sig2"})
+    assert refused.status_code == 400, refused.text
+    match = re.search(r"only ([0-9.]+) independent points", refused.text)
+    assert match, refused.text
+    app_count = float(match.group(1))
+
+    fitted = _fit(client, bundled_project, transform, {"amp", "del_e0", "del_r"})
+    assert fitted.status_code == 200, fitted.text
+    larch_count = fitted.json()["statistics"]["n_independent"]
+    assert 3 < larch_count < 4
+    assert app_count == pytest.approx(larch_count, abs=0.005)
