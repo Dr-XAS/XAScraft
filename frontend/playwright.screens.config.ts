@@ -76,10 +76,12 @@ const serve = (port: string) => `npm run build && npm run start -- --hostname 12
 
 // Playwright's headless shell has no WebGL, so the 3Dmol viewers and Plotly's 3D
 // surface would not render. SwiftShader, Chromium's CPU implementation, gives WebGL
-// without a GPU. The rest of the flags make the page's own rasterisation repeatable:
-// on the GPU path, or with several raster threads, or re-rastering only the damaged
-// part of a tile, some pixels (blurred dialog backdrops, form controls) change by a
-// level or two from run to run, and a stale tile once showed through a plot.
+// without a GPU. The rest of the flags keep the page itself on the CPU: rasterised
+// on the GPU path, or on several raster threads, or re-rastering only the damaged
+// part of a tile, some pixels (blurred dialog backdrops, form controls) changed by a
+// level or two from run to run; composited on the GPU path, about one dialog in
+// twenty showed a stale tile (a piece of a plot where a menu had been) behind its
+// blurred backdrop.
 const chromium = {
   ...devices["Desktop Chrome"],
   deviceScaleFactor: 1,
@@ -89,6 +91,7 @@ const chromium = {
     args: [
       "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
       "--disable-gpu-rasterization", "--num-raster-threads=1", "--disable-partial-raster",
+      "--disable-gpu-compositing",
     ],
   },
 }

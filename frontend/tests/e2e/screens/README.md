@@ -28,11 +28,14 @@ Set in `playwright.screens.config.ts`:
 - **WebGL**: through SwiftShader, Chromium's CPU renderer
   (`--use-angle=swiftshader --enable-unsafe-swiftshader`), because the headless
   shell has no WebGL and the 3Dmol viewers and the 3D wavelet surface need it.
-- **Repeatable raster**: `--disable-gpu-rasterization --num-raster-threads=1
-  --disable-partial-raster`. Without them, some pixels (blurred dialog
-  backdrops, rounded borders, form controls) changed by one or two levels between
-  runs, and stale tiles from the page once showed through a plot and a panel.
-  The same flags are used for every run.
+- **Repeatable raster and compositing**: `--disable-gpu-rasterization
+  --num-raster-threads=1 --disable-partial-raster --disable-gpu-compositing`,
+  so the page itself is drawn and composited on the CPU. Without the first three,
+  some pixels (blurred dialog backdrops, rounded borders, form controls) changed
+  by one or two levels between runs; without the last, about one Process dialog
+  in twenty showed a stale tile (a piece of a plot where the menu had been)
+  behind its blurred backdrop (8 diffs in 171 compared dialogs, against 0 of 171
+  with it). The same flags are used for every run.
 - **Settled screens**: before each screenshot the page has had no request in
   flight for 1.5 s (tool previews fetch after a debounce longer than Playwright's
   `networkidle`), fonts are loaded, nothing is `aria-busy`, and the project bar
