@@ -994,10 +994,22 @@ install_release_backend() (
   cd "${release}/backend" || return 1
   run_clean "$python" -m pip install \
     --requirement "$constraints" --constraint "$constraints" || return 1
-  # build.py uses the release interpreter as its build backend, so it needs these pins.
+  # build.py uses the release interpreter as its build backend, so it needs the build
+  # backend's pins, which build.py's build_requirements() reads from the release constraints.
+  local pins pin build_tools
+  pins=$(run_clean "$python" -I -c '
+import sys
+from importlib.util import module_from_spec, spec_from_file_location
+spec = spec_from_file_location("larch_patches_build", sys.argv[1])
+build = module_from_spec(spec)
+spec.loader.exec_module(build)
+print("\n".join(build.build_requirements()))
+' "${release}/larch-patches/build.py") || return 1
+  build_tools=()
+  while IFS= read -r pin; do [[ -z "$pin" ]] || build_tools+=("$pin"); done <<< "$pins"
+  [[ ${#build_tools[@]} -gt 0 ]] || { fail "build.py named no build-backend pins"; return 1; }
   run_clean "$python" -m pip install \
-    --no-deps --no-build-isolation --upgrade \
-    'setuptools==79.0.1' 'wheel==0.47.0' 'setuptools-scm==9.2.2' || return 1
+    --no-deps --no-build-isolation --upgrade "${build_tools[@]}" || return 1
   # Larch is XAScraft's patched build, never the release checkout: a prebuilt
   # wheel (XASCRAFT_LARCH_WHEEL), or build.py, which fetches upstream at
   # larch-patches/PIN (from GitHub, or XASCRAFT_LARCH_UPSTREAM) and applies the

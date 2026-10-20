@@ -79,6 +79,11 @@ run_larch_install() (
   run_clean() {
     local stage=''
     case "$*" in
+      *'build_requirements()'*)
+        stage=build_pins
+        # build.py's pins from the release constraints; other versions than the real ones.
+        printf '%s\n' setuptools==1.0 wheel==2.0 setuptools-scm==3.0 --constraint "$larch_release/deploy/python-release-constraints.txt"
+        ;;
       *'pip install --requirement '*'/deploy/python-release-constraints.txt '*) stage=constraints ;;
       *'pip install --no-deps --no-build-isolation --upgrade setuptools=='*) stage=build_tools ;;
       *'pip wheel '*) stage=checkout_wheel ;;
@@ -115,8 +120,10 @@ larch_call() { grep "^$1"$'\t' "$test_root/larch-calls" | cut -f2-; }
 
 unset XASCRAFT_LARCH_UPSTREAM XASCRAFT_LARCH_WHEEL
 run_larch_install none || fail_test 'release backend install with a Larch build must succeed'
-[[ "$(larch_stages)" == 'constraints build_tools larch_build larch_install backend import app larch_check check freeze' ]] \
+[[ "$(larch_stages)" == 'constraints build_pins build_tools larch_build larch_install backend import app larch_check check freeze' ]] \
   || fail_test "unexpected release install stages: $(larch_stages)"
+[[ "$(larch_call build_tools)" == "$larch_release/backend/.venv/bin/python -m pip install --no-deps --no-build-isolation --upgrade setuptools==1.0 wheel==2.0 setuptools-scm==3.0 --constraint $larch_release/deploy/python-release-constraints.txt" ]] \
+  || fail_test "the build backend must get build.py's pins from the release constraints: $(larch_call build_tools)"
 larch_out=$(cat "$test_root/larch-out")
 build_call=$(larch_call larch_build)
 [[ "$build_call" == "$larch_release/backend/.venv/bin/python -I $larch_release/larch-patches/build.py --out $larch_out --build-python $larch_release/backend/.venv/bin/python" ]] \
@@ -138,7 +145,7 @@ mkdir -p "$(dirname "$prebuilt")"
 : > "$prebuilt"
 XASCRAFT_LARCH_WHEEL="$prebuilt" run_larch_install none \
   || fail_test 'release backend install from a prebuilt wheel must succeed'
-[[ "$(larch_stages)" == 'constraints build_tools larch_install backend import app larch_check check freeze' ]] \
+[[ "$(larch_stages)" == 'constraints build_pins build_tools larch_install backend import app larch_check check freeze' ]] \
   || fail_test "a prebuilt wheel must skip build.py: $(larch_stages)"
 [[ "$(larch_call larch_install)" == "$larch_release/backend/.venv/bin/python -m pip install --constraint $larch_release/deploy/python-release-constraints.txt $prebuilt" ]] \
   || fail_test "the prebuilt wheel must be installed under the release constraints: $(larch_call larch_install)"
@@ -162,7 +169,7 @@ health_source=$(declare -f backend_health_ok)
 [[ "$health_source" == *'git_revision'* ]] || fail_test 'backend health must verify the exact release revision'
 [[ "$health_source" == *'integration_contract_version'* ]] || fail_test 'backend health must verify integration contract version 2'
 
-for failure in constraints larch_build larch_install backend app larch_check check freeze collection runtime frontend_runtime; do
+for failure in constraints build_pins larch_build larch_install backend app larch_check check freeze collection runtime frontend_runtime; do
 (
   XRAYLARCH_WEB_TEST_MODE=1 source "$repo_root/scripts/deploy-xraylarch-web.sh"
   RELEASES_ROOT="$test_root/build-releases-$failure"
@@ -182,6 +189,7 @@ for failure in constraints larch_build larch_install backend app larch_check che
         ;;
       *'rev-parse '*) printf '%s\n' "$REQUESTED_SHA" ;;
       *'git '*describe*) printf '1.0.0\n' ;;
+      *'build_requirements()'*) stage=build_pins; printf '%s\n' setuptools==1.0 wheel==2.0 setuptools-scm==3.0 ;;
       *'pip install --requirement '*'/deploy/python-release-constraints.txt '*) stage=constraints ;;
       *'pip wheel '*) fail_test 'the release checkout must not be built as Larch' ;;
       *'larch-patches/build.py '*)
