@@ -110,6 +110,13 @@ def assert_same_feffit(app, reference, dataset, names):
         np.testing.assert_allclose(statistics[key], expected_statistics[key], rtol=FEFFIT_RTOL, atol=0, err_msg=key)
 
 
+
+
+def guesses(**values):
+    """Larch param(value, vary=True) / guess(value), as the app's Guess rows."""
+    return [dict(name=name, kind="guess", value=value) for name, value in values.items()]
+
+
 # --- feffit Ex1: Cu first shell (examples/feffit/doc_feffit1.py) -------------------------
 
 def cu_metal_chi(rbkg):
@@ -118,22 +125,37 @@ def cu_metal_chi(rbkg):
     return data
 
 
-def test_feffit_ex1_cu_first_shell_matches_plain_larch(client):
+def run_ex1(client, reference_data):
+    """doc_feffit1.py on `reference_data`, then the same fit through the app."""
     cu_data = cu_metal_chi(rbkg=1.0)
     pars = param_group(amp=param(1.0, vary=True), del_e0=param(0.0, vary=True),
                        sig2=param(0.0, vary=True), del_r=guess(0.0, vary=True))
     path1 = feffpath(str(FEFFIT / "feffcu01.dat"), s02="amp", e0="del_e0", sigma2="sig2", deltar="del_r")
     trans = feffit_transform(kmin=3, kmax=17, kw=2, dk=4, window="kaiser", rmin=1.4, rmax=3.0, **APP_TRANSFORM)
-    dset = feffit_dataset(data=chi_data(cu_data), pathlist=[path1], transform=trans)
+    dset = feffit_dataset(data=reference_data(cu_data), pathlist=[path1], transform=trans)
     reference = feffit(pars, dset)
 
     project, group = import_columns(client, "cu_metal_rt.chi", cu_data.k, cu_data.chi, "chi")
-    app = app_feffit(client, project, group,
-                     parameters=[dict(name=name, kind="guess", value=value)
-                                 for name, value in (("amp", 1.0), ("del_e0", 0.0), ("sig2", 0.0), ("del_r", 0.0))],
+    app = app_feffit(client, project, group, parameters=guesses(amp=1.0, del_e0=0.0, sig2=0.0, del_r=0.0),
                      paths=[dict(id="path1", filename="feffcu01.dat", s02="amp", e0="del_e0",
                                  sigma2="sig2", deltar="del_r")],
                      transform=dict(fitspace="r", kmin=3, kmax=17, kweight=[2], dk=4, window="kaiser",
                                     rmin=1.4, rmax=3.0))
+    return app, reference, dset
 
+
+def test_feffit_ex1_cu_first_shell_matches_plain_larch(client):
+    app, reference, dset = run_ex1(client, chi_data)
+    assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "Genuine difference, kept visible: the script passes autobk's whole group to feffit_dataset, and "
+    "feffit adds autobk's chi(k) uncertainty (delta_chi, from autobk_details.covar) to its high-R noise "
+    "estimate. The app fits chi(k) alone, so its noise is the high-R estimate only. Measured on Ex1: "
+    "epsilon_k 1.5953e-4 (app) vs 3.1429e-4 mean (script); chi-square 848.50 vs 437.22; reduced "
+    "chi-square 75.353 vs 38.829; AIC 69.319 vs 59.201; BIC 72.220 vs 62.102. R-factor agrees to 3e-16. "
+    "Values agree to 5.0e-10 and uncertainties to 1.13e-9 relative (del_r), just outside 1e-9."))
+def test_feffit_ex1_literal_script_adds_autobk_uncertainty_the_app_does_not(client):
+    app, reference, dset = run_ex1(client, lambda autobk_group: autobk_group)
     assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
