@@ -17,8 +17,8 @@ import pytest
 PATCHES_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = PATCHES_DIR.parent
 
-# The seven XAScraft commits that touch Larch, in date order (decisions record,
-# notes/01-patch-queue.md section 3).
+# The seven XAScraft commits that changed the Larch copy XAScraft used to vendor, in date
+# order. Each team patch comes from one of them and names it in an XAScraft-commit trailer.
 TEAM_COMMITS = [
     "e47015166",
     "3ca0a9716",
@@ -29,12 +29,10 @@ TEAM_COMMITS = [
     "aee4bb5e6",
 ]
 
-# Temporary patches written for upstream regressions (decisions record, "Tracking upstream"),
-# after the team patches. They come from no XAScraft commit, so they carry no trailer.
-TEMPORARY_PATCHES = [
-    "0008",  # feffdat: c18a4ed63's path parameter names, path2chi and kmax (ticket 20)
-    "0009",  # fluo_corr: revert d6d27ccca, use the e0 it is given (ticket 21)
-]
+# Every patch after the team patches is temporary: written while tracking upstream, it undoes
+# an upstream regression, or keeps an app result that upstream changed on purpose until the
+# owner decides (README.md, "Patches"). It comes from no XAScraft commit, so it carries no
+# trailer.
 
 COMMITTER = {
     "GIT_COMMITTER_NAME": "XAScraft patch queue",
@@ -91,22 +89,26 @@ def patched(tmp_path_factory) -> Path:
 def test_pin_names_a_full_upstream_commit():
     pin = read_pin()
     assert len(pin["upstream-commit"]) == 40
-    assert pin["upstream-commit"].startswith("247278cef")
     assert pin["upstream-url"] == "https://github.com/xraypy/xraylarch.git"
+    # setuptools-scm's version of a commit ends in +g<9-character short sha>.
+    assert pin["upstream-version"].endswith(f"+g{pin['upstream-commit'][:9]}")
 
 
-def test_series_has_one_patch_per_team_commit_then_the_temporary_ones():
+def test_series_is_numbered_from_0001_and_starts_with_the_team_patches():
     names = [p.name for p in series()]
-    count = len(TEAM_COMMITS) + len(TEMPORARY_PATCHES)
-    assert [n[:5] for n in names] == [f"{i:04d}-" for i in range(1, count + 1)]
-    assert [n[:4] for n in names[len(TEAM_COMMITS):]] == TEMPORARY_PATCHES
+    assert len(names) >= len(TEAM_COMMITS)
+    assert [n[:5] for n in names] == [f"{i:04d}-" for i in range(1, len(names) + 1)]
 
 
 def applied_commits(cwd: Path) -> list[str]:
     upstream = read_pin()["upstream-commit"]
     applied = git("rev-list", "--reverse", f"{upstream}..HEAD", cwd=cwd).split()
-    assert len(applied) == len(TEAM_COMMITS) + len(TEMPORARY_PATCHES)
+    assert len(applied) == len(series())
     return applied
+
+
+def temporary_commits(cwd: Path) -> list[str]:
+    return applied_commits(cwd)[len(TEAM_COMMITS):]
 
 
 def test_series_reproduces_the_pinned_larch_tree(patched):
@@ -120,13 +122,15 @@ def test_series_reproduces_the_pinned_pyproject(patched):
     )
 
 
-def test_expected_hashes_in_pin_are_the_reviewed_ones():
-    """PIN's patched hashes on 247278cef: the seven team patches give larch deec1766f137
-    (ticket 18; notes/04 section 2 got the same), 0008 (ticket 20) then gives 2d4ee8af38a3,
-    and 0009 (ticket 21) the tree below.
-    At the previous pin 8d6cd41c2 they were the baseline tag's own (larch 72b7101ea9da,
-    pyproject c6445f212e24)."""
+def test_pin_is_the_reviewed_one():
+    """The one place outside PIN that names the pin and what the series gives on it, so that a
+    changed pin or patch needs a reviewed edit here too. A re-pin or a patch that changes
+    larch/ updates PIN and these values together (README.md, "Maintaining the queue").
+
+    Upstream 247278cef. The seven team patches give larch/ deec1766f137; with the temporary
+    patches 0008 (FEFF path parameters) and 0009 (self-absorption E0), the tree below."""
     pin = read_pin()
+    assert pin["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
     assert pin["patched-larch-tree"] == "50051233d1761bc8ecf24553bd4f50b81663c3b2"
     assert pin["patched-pyproject-blob"] == "14ccc10ed6f759cda9059d331e3c9139cfe7a8d2"
 
@@ -155,9 +159,9 @@ def test_each_applied_commit_makes_the_change_its_xascraft_commit_made(patched):
 
 
 def test_temporary_patches_change_only_larch_and_carry_no_xascraft_commit(patched):
-    """A temporary patch fixes an upstream regression in larch/ only; its regression tests
-    live in larch-patches/tests, not in upstream's tests/."""
-    for sha in applied_commits(patched)[len(TEAM_COMMITS):]:
+    """A temporary patch changes larch/ only; its regression tests live in larch-patches/tests,
+    not in upstream's tests/."""
+    for sha in temporary_commits(patched):
         changed = git("show", "--format=", "--name-only", sha, cwd=patched).split()
         assert changed and all(name.startswith("larch/") for name in changed), changed
         trailer = git("log", "-1", "--format=%(trailers:key=XAScraft-commit,valueonly)", sha,

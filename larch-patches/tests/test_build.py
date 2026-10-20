@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from test_series import TEAM_COMMITS
+
 PATCHES_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = PATCHES_DIR.parent
 BUILD = PATCHES_DIR / "build.py"
@@ -101,23 +103,19 @@ def test_full_build_larch_is_upstream_at_the_pin_except_the_patched_files(full, 
     assert all(patched[k] != upstream.get(k) for k in named)
 
 
-# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3);
-# None for a temporary patch, which comes from no XAScraft commit.
-XASCRAFT_COMMITS = {
-    "0001": "e47015166",
-    "0002": "3ca0a9716",
-    "0003": "ab60c3776",
-    "0004": "cc099c125",
-    "0005": "b334e57f8",
-    "0006": "8d37ac358",
-    "0007": "aee4bb5e6",
-    "0008": None,
-    "0009": None,
-}
+def expected_xascraft_commits() -> dict[str, str | None]:
+    """Each patch number and the XAScraft commit it came from: the team commits in order,
+    then None for every temporary patch, which comes from no XAScraft commit."""
+    numbers = [p.name[:4] for p in sorted((PATCHES_DIR / "series").glob("*.patch"))]
+    return {n: TEAM_COMMITS[i] if i < len(TEAM_COMMITS) else None
+            for i, n in enumerate(numbers)}
+
+
+XASCRAFT_COMMITS = expected_xascraft_commits()
 
 
 def series_id(patch_dir: Path, skip: tuple[str, ...] = ()) -> str:
-    """The patch-set id as the ticket defines it: sha256 of the patch files' bytes in order."""
+    """The patch-set id as README.md defines it: sha256 of the patch files' bytes in order."""
     files = sorted((patch_dir / "series").glob("*.patch"))
     data = b"".join(p.read_bytes() for p in files if p.name[:4] not in skip)
     return hashlib.sha256(data).hexdigest()[:12]
@@ -130,10 +128,10 @@ def identity(out: Path) -> dict:
 def test_identity_names_the_pin_the_patch_set_and_the_version(full):
     ident = identity(full)
     patch_set = series_id(PATCHES_DIR)
-    assert ident["pin"] == PIN["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
-    assert ident["upstream_version"] == "2026.3.1.post78+g247278cef"
+    assert ident["pin"] == PIN["upstream-commit"]
+    assert ident["upstream_version"] == PIN["upstream-version"]
     assert ident["patch_set_id"] == patch_set
-    assert ident["version"] == f"2026.3.1.post78+g247278cef.xascraft.{patch_set}"
+    assert ident["version"] == f"{PIN['upstream-version']}.xascraft.{patch_set}"
     assert ident["excluded"] == []
     assert ident["pure_upstream"] is False
     assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)
@@ -173,7 +171,7 @@ def installed_versions(wheel: Path, target: Path) -> list[str]:
 
 
 def test_installed_wheel_reports_the_version(full, tmp_path):
-    version = f"2026.3.1.post78+g247278cef.xascraft.{series_id(PATCHES_DIR)}"
+    version = f"{PIN['upstream-version']}.xascraft.{series_id(PATCHES_DIR)}"
     wheel = the_wheel(full)
     assert wheel.name == f"xraylarch-{version}-py3-none-any.whl"
     assert installed_versions(wheel, tmp_path / "site") == [version, version]
@@ -271,8 +269,19 @@ def test_a_corrupted_patch_stops_the_build_and_writes_nothing(tmp_path):
     assert not out.exists()
 
 
-# git rev-parse 247278cefbb16eda04c91f79fc1b43df000fa498:larch in the upstream clone.
-UPSTREAM_LARCH_TREE = "379dbb76c9bd3dcc315b403176deb2960ef27b6e"
+@pytest.fixture(scope="module")
+def upstream_larch_tree(tmp_path_factory) -> str:
+    """``git rev-parse <pin>:larch`` in upstream itself, without build.py."""
+    commit = PIN["upstream-commit"]
+    if Path(UPSTREAM).is_dir():
+        repo = Path(UPSTREAM)
+    else:
+        repo = tmp_path_factory.mktemp("upstream-git")
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(["git", "fetch", "-q", "--depth", "1", UPSTREAM, commit], cwd=repo,
+                       check=True)
+    return subprocess.run(["git", "rev-parse", f"{commit}:larch"], cwd=repo, check=True,
+                          capture_output=True, text=True).stdout.strip()
 
 
 @pytest.fixture(scope="module")
@@ -280,14 +289,14 @@ def pure(tmp_path_factory) -> Path:
     return build_ok(tmp_path_factory.mktemp("pure") / "out", "--pure-upstream")
 
 
-def test_pure_upstream_build_is_upstream_at_the_pin(pure, tmp_path):
+def test_pure_upstream_build_is_upstream_at_the_pin(pure, upstream_larch_tree, tmp_path):
     ident = identity(pure)
-    assert larch_tree_of(pure, tmp_path / "git") == ident["larch_tree"] == UPSTREAM_LARCH_TREE
+    assert larch_tree_of(pure, tmp_path / "git") == ident["larch_tree"] == upstream_larch_tree
     assert ident["pure_upstream"] is True
     assert ident["patch_set_id"] is None
     assert ident["patches"] == []
     assert ident["excluded"] == list(XASCRAFT_COMMITS)
-    assert ident["version"] == "2026.3.1.post78+g247278cef"
+    assert ident["version"] == PIN["upstream-version"]
     assert installed_versions(the_wheel(pure), tmp_path / "site") == [ident["version"]] * 2
 
 
@@ -296,7 +305,7 @@ def test_exclude_leaves_one_patch_out_and_says_so(full, pure, tmp_path):
     ident = identity(out)
     patch_set = series_id(PATCHES_DIR, skip=("0001",))
     assert ident["patch_set_id"] == patch_set != identity(full)["patch_set_id"]
-    assert ident["version"] == f"2026.3.1.post78+g247278cef.xascraft.{patch_set}.without0001"
+    assert ident["version"] == f"{PIN['upstream-version']}.xascraft.{patch_set}.without0001"
     assert ident["excluded"] == ["0001"]
     assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)[1:]
     assert the_wheel(out).name == f"xraylarch-{ident['version']}-py3-none-any.whl"
