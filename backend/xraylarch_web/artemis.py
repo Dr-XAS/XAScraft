@@ -21,6 +21,7 @@ from fastapi import APIRouter, Query
 from larch import Group
 from larch.fitting import ParameterGroup, param, param_group
 from larch.xafs import feffit, feffit_dataset, feffit_report, feffit_transform, feffpath
+from lmfit import Parameters
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 from .errors import WebInputError
@@ -782,6 +783,20 @@ def _preview_metrics(r, chir_mag, options: FitTransform, chi, k, weight) -> dict
                 chi_k_peak=float(np.max(np.abs(chi[inside] * k[inside] ** weight))) if inside.any() else 0.0)
 
 
+def _path_chi(path, k, values: dict) -> None:
+    """Fill path.chi on grid k at the given path parameter values.
+
+    The values become the path's own, its path parameters are rebuilt in fresh
+    Parameters, and _calc_chi reads them from there. Keyword values to _calc_chi
+    are dropped by Larch since upstream c18a4ed63; this form gives the same chi
+    bit for bit on both sides of that change.
+    """
+    for name, value in values.items():
+        setattr(path, name, value)
+    path.create_path_params(params=Parameters())
+    path._calc_chi(k=k)
+
+
 def preview_paths(request: PathPreviewRequest, *, display_kweight: int | None = None) -> dict:
     """Each enabled path's own chi(k) and chi(R) at the starting values.
 
@@ -823,7 +838,7 @@ def preview_paths(request: PathPreviewRequest, *, display_kweight: int | None = 
                 _fail(f"{name}: S0² and sigma² must be nonnegative, and Reff + ΔR must be positive.", "paths")
             try:
                 with np.errstate(over="raise", invalid="raise", divide="raise"):
-                    path._calc_chi(k=k, **resolved)
+                    _path_chi(path, k, resolved)
                 fourier = Group()
                 transform._xafsft(np.asarray(path.chi, dtype=float), group=fourier, rmax_out=10)
             except Exception as exc:
