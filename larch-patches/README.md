@@ -149,12 +149,19 @@ The patches also carry the team's changes to upstream test files: `tests/test_xa
 The subjects of 0001 to 0004 describe mostly app work, because those commits also changed the app.
 Their messages are kept as written; this ledger says what each patch does to Larch.
 
-0001 to 0007 come from the team's commits. Every later patch is **temporary**. It is written
-while tracking upstream, and either undoes an upstream bug or regression, or keeps an app result
-that upstream changed on purpose until the owner decides whether to adopt the change. A
-temporary patch comes from no XAScraft commit, so it has no `XAScraft-commit` trailer; its
-subject starts with `Temporary:`; it changes only `larch/`; and its regression tests are in
-`larch-patches/tests/` only. `tests/test_series.py` checks all of this.
+0001 to 0007 come from the team's commits, from the time XAScraft vendored Larch, and carry
+their `XAScraft-commit` trailers. Every later patch comes from no XAScraft commit, so it has no
+trailer. It is one of two kinds:
+
+- A **team patch**: a fix the team wants in Larch for good, to be offered upstream. Like 0005 to
+  0007, it may carry its regression test into upstream's `tests/`.
+- A **temporary** patch (all of them so far: 0008 and 0009). It is written while tracking
+  upstream, and either undoes an upstream bug or regression, or keeps an app result that upstream
+  changed on purpose until the owner decides whether to adopt the change. Its subject starts
+  with `Temporary:`; it changes only `larch/`; and its regression tests are in
+  `larch-patches/tests/` only.
+
+`tests/test_series.py` checks all of this, and that the table above matches the series.
 
 ## Ledger
 
@@ -361,16 +368,33 @@ GIT_COMMITTER_NAME="XAScraft patch queue" GIT_COMMITTER_EMAIL="patches@xascraft.
 
 ### Adding a patch
 
-1. Apply the series to the pin in a scratch clone. Commit the fix there with its author, date and
-   message, and add a regression test under that clone's `tests/`.
-2. Write it as the next numbered file with the `format-patch` command above. If the fix comes
-   from an XAScraft commit, add that commit's `XAScraft-commit` trailer.
-3. Copy the regression test into `larch-patches/tests/`. Check that it passes on the patched
-   build and fails without the patch.
-4. Add a ledger entry and a row in the Patches table.
+1. Apply the series to the pin in a scratch clone. Commit the fix there with its author and
+   message, dated after the last patch, so the series stays in date order.
+   - A **temporary** patch changes only `larch/`, and its subject starts with `Temporary:`. Say
+     in its message which upstream commit it undoes and when it can go.
+   - A **team** patch may also add its regression test to an upstream test file the series
+     already carries (`tests/test_xafs_defects.py` and the others in the `format-patch`
+     command). A new upstream test file also goes into that command, into `CARRIED_PATHS` in
+     `tests/test_series.py`, and, unless upstream's `tests/run_tests.sh` names it, into `FILES`
+     in `run-upstream-tests.sh`.
+2. Write it as the next numbered file with the `format-patch` command above (no trailer: only
+   0001 to 0007 come from XAScraft commits).
+3. Put its regression test in `larch-patches/tests/` (a team patch's test is a copy of the one
+   it adds upstream). Check that it passes on the patched build and fails with
+   `build.py --exclude <NNNN>`.
+4. Add a ledger entry (why, numeric effect, covering test, exit condition) and a row in the
+   Patches table.
 5. Update `patched-larch-tree` (and `patched-pyproject-blob`, if it changed) in `PIN` to
-   `git rev-parse HEAD:larch` (and `HEAD:pyproject.toml`) of the scratch clone. Update the commit
-   list in `tests/test_series.py`.
+   `git rev-parse HEAD:larch` (and `HEAD:pyproject.toml`) of the scratch clone, and the same
+   values in `test_pin_is_the_reviewed_one` in `tests/test_series.py`.
+6. Reinstall (`install-dev.sh`) and run all tests here and the backend tests. If the patch
+   changes a Larch file that a backend fixture manifest pins (`backend/tests/fixtures/athena-*-fixtures.json`),
+   those tests fail: review the change and add it to `REVIEWED_LARCH_CHANGES` in
+   `backend/tests/larch_source.py`, or record a new oracle. A patch that moves an app result
+   also changes the backend tests that pin it, and its ledger entry says by how much.
+
+Nothing else names the patch count or the version: the tests read them from `series/` and
+`PIN`.
 
 ### Retiring a patch
 
@@ -381,7 +405,8 @@ equivalent fix (the entry's exit condition).
 2. Move its ledger entry under a "Retired" heading, with the pin that made it unnecessary.
 3. Keep its regression test while it still guards upstream's fix; delete the test only if
    upstream carries an equivalent one.
-4. Update `PIN` and `tests/test_series.py` as for adding a patch.
+4. Update `PIN`, `test_pin_is_the_reviewed_one` and the Patches table as for adding a patch,
+   and run the same tests.
 
 ### Re-pinning
 
@@ -399,9 +424,12 @@ Re-pin only when the owner asks.
 3. Update `PIN`: `upstream-commit`; `upstream-version` from
    `git describe --tags --long --match '*[0-9]*' <commit>` (`2026.3.1-78-g247278cef` becomes
    `2026.3.1.post78+g247278cef`, with a 9-character short SHA); and the patched hashes.
-4. Update what encodes the pin in the tests: the commit prefix and the reviewed hashes in
-   `tests/test_series.py`, the pin, versions and `UPSTREAM_LARCH_TREE` in `tests/test_build.py`,
-   and `FILES` in `run-upstream-tests.sh` (upstream's `tests/run_tests.sh` list at the pin).
+4. Update what encodes the pin outside `PIN`: `test_pin_is_the_reviewed_one` in
+   `tests/test_series.py`, `FILES` in `run-upstream-tests.sh` (upstream's `tests/run_tests.sh`
+   list at the pin), and the expected counts under [Running the tests](#running-the-tests).
+   For every Larch file a backend fixture manifest pins that upstream changed, review the diff
+   and add it to `REVIEWED_LARCH_CHANGES` in `backend/tests/larch_source.py` (or record a new
+   oracle when the change matters).
 5. Run all tests here and the per-patch report. Retire patches that upstream made unnecessary.
    Give every other difference from the previous pin that the app could see a verdict:
    - an upstream bug or regression: a temporary patch that undoes it, until upstream fixes it;
