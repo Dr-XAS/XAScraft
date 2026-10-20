@@ -5,6 +5,7 @@ in the order they run. Every call is recorded as a step, so the captured file
 holds every response the scenario saw. Payloads follow the backend tests' and the
 UI dialogs' shapes.
 """
+import time
 from pathlib import Path
 
 ATHENA = "/api/athena"
@@ -231,6 +232,88 @@ def log_ratio(s):
     analyze(s, "log-ratio", project, "log_ratio", pair, kmin=3, kmax=7, array="norm")
 
 
+# --- FEFF paths: preview and theory simulation ---------------------------------------
+
+def _perturbed(parameters):
+    """Starting values moved off the example's, so the preview draws other numbers."""
+    return [dict(p, value=round(p["value"] * 0.9 + 0.003, 6)) if p.get("kind", "guess") in ("guess", "set") else p
+            for p in parameters]
+
+
+def path_preview(s):
+    """What the Artemis path preview draws before any fit, for one path and for four."""
+    source = EXAMPLES / "feffit/feffcu01.dat"
+    inspected = s.ok("inspect feffcu01.dat", "POST", f"{ARTEMIS}/paths/inspect",
+                     json={"filename": source.name, "content": source.read_text()})
+    cu = {"filename": inspected["filename"], "content": inspected["content"], "id": "cu1", "label": "Cu first shell"}
+    parameters = [{"name": "amp", "value": 1, "min": 0, "max": 2},
+                  {"name": "del_e0", "value": 0, "min": -30, "max": 30},
+                  {"name": "del_r", "value": 0, "min": -0.2, "max": 0.2},
+                  {"name": "sig2", "value": 0.008, "min": 0, "max": 0.05}]
+    transform = {"kmin": 3, "kmax": 12, "rmin": 1.4, "rmax": 3, "kweight": [2]}
+    copper = {"parameters": parameters, "paths": [cu], "transform": transform}
+    s.ok("preview copper", "POST", f"{ARTEMIS}/paths/preview", json=copper)
+    s.ok("preview copper, perturbed values", "POST", f"{ARTEMIS}/paths/preview",
+         json=copper | {"parameters": [dict(p, value=v) for p, v in zip(parameters, (0.9, 2.5, 0.012, 0.0102))]})
+    s.ok("preview copper, k weight 3 to k 20", "POST", f"{ARTEMIS}/paths/preview",
+         json=copper | {"transform": transform | {"kweight": [3], "kmax": 20}})
+    # A split shell: the same FEFF file twice with its own sigma2 each.
+    twice = [cu | {"sigma2": "sig2"}, cu | {"id": "cu2", "label": "Cu split", "s02": "amp/2", "sigma2": "sig2 + 0.003"}]
+    s.ok("preview copper twice, same FEFF content", "POST", f"{ARTEMIS}/paths/preview",
+         json=copper | {"paths": twice})
+
+    example = s.ok("Cu₂O example model", "GET", f"{ARTEMIS}/examples/cuprite")
+    paths = [{key: value for key, value in path.items() if key != "metadata"}
+             | settings | {"id": f"p{i}", "label": path["filename"]}
+             for i, (path, settings) in enumerate(zip(example["paths"], example["path_parameters"]), start=1)]
+    cuprite = {"parameters": example["parameters"], "paths": paths, "transform": example["transform"]}
+    s.ok("preview Cu₂O 4 paths", "POST", f"{ARTEMIS}/paths/preview", json=cuprite)
+    s.ok("preview Cu₂O 4 paths, perturbed values", "POST", f"{ARTEMIS}/paths/preview",
+         json=cuprite | {"parameters": _perturbed(example["parameters"])})
+    s.ok("preview Cu₂O 4 paths, k weight 1", "POST", f"{ARTEMIS}/paths/preview",
+         json=cuprite | {"transform": example["transform"] | {"kweight": [1]}})
+
+
+def theory_simulation(s):
+    """FEFF on the bundled Cu₂O CIF, simulated three ways, added as theory and replayed."""
+    project = new_project(s)
+    project = s.ok("attach the AMCSD 15851 Cu₂O structure", "POST",
+                   f"{ARTEMIS}/projects/{project['id']}/structures",
+                   json={"version": project["version"], "provider": "amcsd", "amcsd_id": 15851})
+    attachment = project["artemis_structures"][0]["id"]
+    # The job record carries wall-clock times and a process id, so starting and polling
+    # are not recorded as steps; the simulations below carry the job's request,
+    # provenance and path files.
+    response = s.client.post(f"{ARTEMIS}/feff/jobs", json={
+        "project_id": project["id"], "attachment_id": attachment, "version": project["version"],
+        "absorber": "Cu", "site_index": 1, "cluster_radius": 5, "path_radius": 4, "max_legs": 4})
+    job = response.json()
+    deadline = time.monotonic() + 120
+    while response.status_code < 400 and job["status"] == "running" and time.monotonic() < deadline:
+        time.sleep(0.2)
+        response = s.client.get(f"{ARTEMIS}/feff/jobs/{job['id']}", params={"view": "summary"})
+        job = response.json()
+    if response.status_code >= 400 or job["status"] != "complete":
+        raise RuntimeError(f"FEFF job: HTTP {response.status_code}: {job.get('status')} {job.get('message')}")
+    s.steps.append({"step": "FEFF job complete (start and polls not recorded)", "paths": job["total_paths"]})
+
+    url = f"{ARTEMIS}/feff/jobs/{job['id']}/simulate"
+    default = s.ok("simulate every path", "POST", url, json={})
+    s.ok("simulate with Debye disorder, k weight 3", "POST", url,
+         json={"s02": 0.9, "e0": 1.5, "deltar": 0.01, "disorder_model": "debye", "temperature": 80,
+               "debye_temperature": 343, "static_sigma2": 0.0005, "transform": {"kweight": [3], "kmax": 14}})
+    first_two = [path["id"] for path in default["paths"][:2]]
+    s.ok("simulate the first two paths, k weight 1", "POST", url,
+         json={"path_ids": first_two, "sigma2": 0.005, "transform": {"kweight": [1]}})
+
+    project = s.ok("add the simulation to the project", "POST", f"{ARTEMIS}/projects/{project['id']}/simulation",
+                   json={"version": project["version"], "feff_job_id": job["id"], "simulation": {}})
+    group = project["groups"][-1]["id"]
+    view = f"{ARTEMIS}/projects/{project['id']}/groups/{group}/simulation-view"
+    s.ok("replay the saved theory", "POST", view, json={"version": project["version"]})
+    s.ok("replay the saved theory, k weight 1", "POST", view, json={"version": project["version"], "kweight": 1})
+
+
 # --- persistence ---------------------------------------------------------------------
 
 def project_open_vs_import(s):
@@ -310,5 +393,7 @@ SCENARIOS = {
     "analysis--log-ratio": log_ratio,
     "project-open-vs-import": project_open_vs_import,
     "fit-history": fit_history,
+    "artemis-path-preview": path_preview,
+    "artemis-theory-simulation": theory_simulation,
     **{_bundled_name(path): bundled_project(path) for path in BUNDLED_PROJECTS},
 }
