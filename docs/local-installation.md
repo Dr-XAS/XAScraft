@@ -2,12 +2,21 @@
 
 The local edition uses the same interface and scientific code as the web service.
 It starts private services on `127.0.0.1` and opens your browser. You do not need to
-install Python, Node.js, Git, Docker, or a desktop GUI toolkit yourself.
+install Python, Node.js, Docker, or a desktop GUI toolkit yourself, nor Git when you
+install a release's `xascraft-source.zip`.
 
 ## Install from source
 
-Download and extract this repository, or use an existing checkout. Keep the entire
-source folder, including `examples/`, until installation finishes.
+Download and extract a release's `xascraft-source.zip`, or use a checkout of this
+repository. Keep the entire source folder, including `examples/`, until installation
+finishes.
+
+The release ZIP already contains the patched Larch: upstream xraylarch at a pinned
+commit plus the patches in `larch-patches/`, built as a wheel in `patched-larch/`.
+A checkout does not. There the installer first runs `larch-patches/build.py`, which
+needs Git and fetches the pinned xraylarch commit from GitHub. To build from a local
+xraylarch clone instead, set `XASCRAFT_LARCH_UPSTREAM=/path/to/xraylarch` (the clone
+is only read).
 
 | Platform | Entry point | Application icons |
 | --- | --- | --- |
@@ -17,7 +26,7 @@ source folder, including `examples/`, until installation finishes.
 
 The first installation needs internet access and several GB of free space. It
 downloads a checksum-pinned uv installer, private Python 3.12.14 and Node 24.21.0,
-installs the repository's Larch code with release-constrained dependencies, and
+installs the patched Larch wheel with release-constrained dependencies, and
 builds the production frontend. The optional Torch/JAX engines are not installed.
 System Python, Node, shell profiles and administrator-owned directories are not
 changed. Updating needs room for the old version, the new version and a data backup.
@@ -76,7 +85,9 @@ launch.py             Stable target used by the application icons
 The source checkout is copied; subsequent edits or deletion of the original source
 folder do not change an installed version. Each snapshot has its own content hash,
 source Git revision when available, exact installed Python package list, and
-installation check result. A working-tree build is labeled `local-<hash>` and is
+installation check result. Its Larch version is the patched build's version
+(`patched-larch/IDENTITY`), which changes only when the pinned upstream commit or a
+patch changes, not when only the app changes. A working-tree build is labeled `local-<hash>` and is
 not represented as an official release. The app's existing build badge and bug
 report diagnostics retain build metadata for identifying the installation.
 
@@ -141,7 +152,8 @@ Only after all platform checks pass does that tag workflow attach the source ZIP
 and checksum to a GitHub release in `Dr-XAS/XAScraft`. Creating a tag/release remains
 a separate publication action; adding these scripts does not publish anything.
 
-To build a source asset locally without publishing:
+To build a source asset locally without publishing (this builds the patched Larch, so
+it needs Git and GitHub, or `XASCRAFT_LARCH_UPSTREAM`):
 
 ```bash
 python installers/local/run.py package --source . --tag xascraft-v0.1.0 \
