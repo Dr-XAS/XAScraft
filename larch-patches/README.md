@@ -34,10 +34,11 @@ nothing, into `--out` (which must be absent or empty):
 | `dist/` | `xraylarch-<version>-py3-none-any.whl` and `xraylarch-<version>.tar.gz`. |
 | `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
 
-- **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`, today
-  `2026.3.1.post78+g247278cef.xascraft.ed2aca286fc2`. The patch-set id is the first 12 hex digits
-  of the sha256 of the applied patch files' bytes, in order (`cat series/*.patch | sha256sum`).
-  It changes only when the pin or a patch file changes; a reworded message counts.
+- **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`. The patch-set id is the
+  first 12 hex digits of the sha256 of the applied patch files' bytes, in order
+  (`cat series/*.patch | sha256sum`). It changes only when the pin or a patch file changes; a
+  reworded message counts. To print the version the current pin and series give, without
+  building: `python3 -I -c 'import sys; sys.path.insert(0, "larch-patches"); import build; print(build.expected_version())'`.
 - **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
   and marks the version, e.g. `….xascraft.<id of the rest>.without0003`. `--pure-upstream` applies
   nothing and gives upstream's own version, `2026.3.1.post78+g247278cef`.
