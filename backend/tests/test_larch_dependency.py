@@ -4,7 +4,7 @@ The patched build is upstream xraylarch at the pin in ``larch-patches/PIN`` plus
 in ``larch-patches/series/``; ``larch-patches/build.py`` builds it and names its version.
 """
 import ast
-from importlib.metadata import distributions
+from importlib.metadata import distributions, version
 from importlib.util import find_spec, module_from_spec, spec_from_file_location
 from io import StringIO
 from pathlib import Path
@@ -96,6 +96,15 @@ def test_requirements_declare_every_direct_import_at_the_baseline_pin_and_no_lar
         origin = Path(find_spec(module).origin).resolve()
         needed.setdefault(shipped_by.get(origin, f"? {origin}"), []).append(module)
     assert {name: modules for name, modules in needed.items() if name not in declared} == {}
+
+
+def test_larch_is_the_installed_patched_build_not_the_repository_copy():
+    import larch
+
+    where = Path(larch.__file__).resolve()
+    assert not where.is_relative_to(REPO / "larch")
+    assert owners().get(where) == "xraylarch"
+    assert larch.__version__ == version("xraylarch") == patched_build_version()
 
 
 @pytest.fixture
