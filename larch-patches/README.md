@@ -306,11 +306,18 @@ retired when **the owner adopts upstream's behavior**.
   patch keeps the old behavior until the owner decides. After the revert, an explicit `e0` wins,
   a group's own `e0` is used when none is passed (upstream `11448b7b3`), and `pre_edge()` finds
   one only when neither gives it. `nvict` is again forced to 0; the app never passes another value.
-- **Numeric effect:** with the patch, the app's numbers are step 1's, bit for bit. Without it, the
-  self-absorption preview's corrected curve and the saved group's `norm` move on Cu, Fe₃C and Ni
-  (`examples/xafsdata`) by up to 2.6% of the curve's height (Fe₃C with E0 at the tabulated
-  edge). The step 2 before/after report has the numbers for each case. Booth, and the FLUO branch
-  with a fixed step or `nvict`, use the app's own formula and do not change.
+- **Numeric effect:** with the patch, the app's numbers are those it had on the previous pin
+  (`8d6cd41c2` with the team patches), bit for bit. Without it, measured through the HTTP API on Cu, Fe₃C and Ni (`examples/xafsdata`),
+  FLUO at 45°/45°, each with the imported E0 and with E0 set to the tabulated edge:
+  - The normalized corrected curve (`norm_corr`: the preview's "Corrected" curve, and the saved
+    group's `norm`) moves in every case, because upstream's second `pre_edge()` finds an E0 5 to
+    14 eV above the group's. Its largest change is 3.7% of the edge step (Fe₃C, tabulated E0);
+    the other cases move by 0.7% to 2.1%.
+  - The corrected μ (`mu_corr`) moves only when the group's E0 differs from `find_e0`'s (here,
+    the tabulated E0): by up to 1.3% of its largest value (Ni). With the imported E0 it is
+    bit-identical.
+  - The measured curve and the reported E0 do not change. Booth, and the FLUO branch with a
+    fixed step or `nvict`, use the app's own formula and do not change.
 - **Covering test:** `test_xafs_fluo.py::test_fluo_corr_normalizes_around_the_e0_it_is_given`;
   through the HTTP API, `backend/tests/test_athena_self_absorption_step1_numbers.py`. Upstream's
   `tests/test_xafs_fluo.py` still passes with the patch.
