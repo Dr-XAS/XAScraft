@@ -89,3 +89,43 @@ def test_full_build_larch_equals_the_baseline_larch_byte_for_byte(full):
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         tar.extractall(baseline, filter="data")
     assert files_under(full / "xraylarch-src" / "larch") == files_under(baseline / "larch")
+
+
+# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3).
+XASCRAFT_COMMITS = {
+    "0001": "e47015166",
+    "0002": "3ca0a9716",
+    "0003": "ab60c3776",
+    "0004": "cc099c125",
+    "0005": "b334e57f8",
+    "0006": "8d37ac358",
+    "0007": "aee4bb5e6",
+}
+
+
+def series_id(patch_dir: Path, skip: tuple[str, ...] = ()) -> str:
+    """The patch-set id as the ticket defines it: sha256 of the patch files' bytes in order."""
+    files = sorted((patch_dir / "series").glob("*.patch"))
+    data = b"".join(p.read_bytes() for p in files if p.name[:4] not in skip)
+    return hashlib.sha256(data).hexdigest()[:12]
+
+
+def identity(out: Path) -> dict:
+    return json.loads((out / "IDENTITY").read_text())
+
+
+def test_identity_names_the_pin_the_patch_set_and_the_version(full):
+    ident = identity(full)
+    patch_set = series_id(PATCHES_DIR)
+    assert ident["pin"] == PIN["upstream-commit"] == "8d6cd41c2b2a19260dbc80519c3c95211331d4fc"
+    assert ident["upstream_version"] == "2026.3.1.post35+g8d6cd41c2"
+    assert ident["patch_set_id"] == patch_set
+    assert ident["version"] == f"2026.3.1.post35+g8d6cd41c2.xascraft.{patch_set}"
+    assert ident["excluded"] == []
+    assert ident["pure_upstream"] is False
+    assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)
+    for entry in ident["patches"]:
+        assert entry["xascraft_commit"].startswith(XASCRAFT_COMMITS[entry["number"]])
+        assert len(entry["xascraft_commit"]) == 40
+        assert (PATCHES_DIR / "series" / entry["file"]).is_file()
+    assert ident["larch_tree"] == PIN["patched-larch-tree"]

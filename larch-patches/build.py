@@ -17,7 +17,9 @@ Standard library only (Python 3.12+).  See README.md, "Building".
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -92,11 +94,44 @@ def apply_series(patches: list[Path], repo: Path) -> None:
 
 
 def export_tree(repo: Path, dest: Path) -> None:
-    archive = subprocess.run(
-        ["git", "archive", "--format=tar", "HEAD"], cwd=repo, capture_output=True, check=True
-    ).stdout
+    archive = git("archive", "--format=tar", "HEAD", cwd=repo, text=False)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         tar.extractall(dest, filter="data")
+
+
+def xascraft_commit(patch: Path) -> str | None:
+    """The ``XAScraft-commit:`` trailer of a patch file, if it has one."""
+    for line in patch.read_text(errors="replace").splitlines():
+        if line.startswith("XAScraft-commit:"):
+            return line.partition(":")[2].strip()
+        if line.startswith("---"):
+            break
+    return None
+
+
+def patch_set_id(patches: list[Path]) -> str:
+    """First 12 hex of sha256 over the patch files' bytes, in order (``cat | sha256sum``)."""
+    digest = hashlib.sha256()
+    for patch in patches:
+        digest.update(patch.read_bytes())
+    return digest.hexdigest()[:12]
+
+
+def make_identity(pin: dict[str, str], patches: list[Path], larch_tree: str) -> dict:
+    set_id = patch_set_id(patches)
+    return {
+        "pin": pin["upstream-commit"],
+        "upstream_version": pin["upstream-version"],
+        "patch_set_id": set_id,
+        "version": f"{pin['upstream-version']}.xascraft.{set_id}",
+        "pure_upstream": False,
+        "patches": [
+            {"number": p.name[:4], "file": p.name, "xascraft_commit": xascraft_commit(p)}
+            for p in patches
+        ],
+        "excluded": [],
+        "larch_tree": larch_tree,
+    }
 
 
 def build(args: argparse.Namespace) -> Path:
@@ -112,9 +147,11 @@ def build(args: argparse.Namespace) -> Path:
         repo = work / "xraylarch"
         checkout_upstream(args.upstream, pin["upstream-commit"], repo)
         apply_series(patches, repo)
+        ident = make_identity(pin, patches, git("rev-parse", "HEAD:larch", cwd=repo).strip())
         stage = work / "out"
         stage.mkdir()
         export_tree(repo, stage / "xraylarch-src")
+        (stage / "IDENTITY").write_text(json.dumps(ident, indent=2) + "\n")
         if out.exists():
             out.rmdir()
         shutil.move(str(stage), str(out))
