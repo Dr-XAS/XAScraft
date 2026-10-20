@@ -159,3 +159,31 @@ def test_feffit_ex1_cu_first_shell_matches_plain_larch(client):
 def test_feffit_ex1_literal_script_adds_autobk_uncertainty_the_app_does_not(client):
     app, reference, dset = run_ex1(client, lambda autobk_group: autobk_group)
     assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
+
+
+# --- feffit Ex2: Cu, three paths (examples/feffit/doc_feffit2.py) ------------------------
+# The app has no third-cumulant field, so both sides drop path1's third='c3_1' and
+# the c3_1 parameter with it.
+
+def test_feffit_ex2_cu_three_paths_without_third_cumulant_matches_plain_larch(client):
+    cu_data = read_ascii(str(XAFSDATA / "cu_metal_rt.xdi"))
+    cu_data.mu = cu_data.mutrans
+    autobk(cu_data, rbkg=1.1, kw=2)
+    pars = param_group(amp=param(1, vary=True), del_e0=param(3, vary=True),
+                       sig2_1=param(.002, vary=True), sig2_2=param(.002, vary=True),
+                       sig2_3=param(.002, vary=True), alpha=param(0, vary=True))
+    paths = [feffpath(str(FEFFIT / f"feff000{index}.dat"), s02="amp", e0="del_e0",
+                      sigma2=f"sig2_{index}", deltar="alpha*reff") for index in (1, 2, 3)]
+    trans = feffit_transform(kmin=3, kmax=17, kw=2, dk=4, window="kaiser", rmin=1.4, rmax=3.5, **APP_TRANSFORM)
+    dset = feffit_dataset(data=chi_data(cu_data), pathlist=paths, transform=trans)
+    reference = feffit(pars, dset)
+
+    project, group = import_columns(client, "cu_metal_rt.chi", cu_data.k, cu_data.chi, "chi")
+    app = app_feffit(client, project, group,
+                     parameters=guesses(amp=1, del_e0=3, sig2_1=.002, sig2_2=.002, sig2_3=.002, alpha=0),
+                     paths=[dict(id=f"path{index}", filename=f"feff000{index}.dat", s02="amp", e0="del_e0",
+                                 sigma2=f"sig2_{index}", deltar="alpha*reff") for index in (1, 2, 3)],
+                     transform=dict(fitspace="r", kmin=3, kmax=17, kweight=[2], dk=4, window="kaiser",
+                                    rmin=1.4, rmax=3.5))
+
+    assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2_1", "sig2_2", "sig2_3", "alpha"])
