@@ -30,7 +30,11 @@ python scripts/refactor-checks/per_patch/summarize.py <reference capture> <varia
   summary), `<variant>.log`, `<variant>-regression.xml`. It also gets `sections.md`, one Markdown
   section per variant.
 - Captures (about 430 MB each) and builds are deleted once summarized, unless `--keep-captures`.
-- A full run (9 variants) takes about 25 minutes.
+- Each variant takes about 2 minutes (build about 40 s, capture about 70 s), `full` about 3.
+- At pin `8d6cd41c2`, 0005 and 0006 cannot be left out alone: 0006 needs 0005's
+  `feffdat.py` context, and 0007 needs 0006's. The run for the report therefore used
+  `--variants 0001 0002 0003 0004 0005 0006 0007 0006+0007 0005+0006+0007 pure`. The effect of
+  0006 is `0006+0007` minus `0007`, and the effect of 0005 is `0005+0006+0007` minus `0006+0007`.
 - Tests: `backend/.venv/bin/python -m pytest scripts/refactor-checks/per_patch/tests`.
 
 ## What the summary measures (`summarize.py`)
@@ -49,6 +53,12 @@ one field.
 - `other`, `example`: differences that are not numbers (text, type, a missing key, a length, an
   HTTP status), and the first one.
 
-A scenario's status is `identical`, `differs`, or `fails`: a step that succeeded with the full
-patch set fails in the variant (HTTP ≥ 400), or the variant stops with an error the reference
-does not have. `missing` means a scenario is in only one capture.
+A scenario's status is `identical`, `differs`, or `fails`. It fails when:
+
+- a step that succeeded with the full patch set fails in the variant (HTTP ≥ 400);
+- a field whose name ends in `error` (e.g. a group's `processing_error`) holds a message in the
+  variant where the reference has none. The app reports a Larch failure this way, inside a 200
+  response; or
+- the variant stops with an error the reference does not have.
+
+`missing` means a scenario is in only one capture.
