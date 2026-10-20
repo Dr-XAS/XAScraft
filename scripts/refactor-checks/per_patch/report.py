@@ -36,8 +36,10 @@ def _sort_key(row):
     return -(row["max_rel_rms"] if row["max_rel_rms"] is not None else row["max_rel"] or 0.0)
 
 
-def variant_section(title, summary, tests):
+def variant_section(title, summary, tests, build_error=None):
     """One `##` section: counts, regression tests, failing scenarios, differing scenarios."""
+    if build_error:
+        return f"## {title}\n\nDoes not build: {build_error}\n"
     counts = {status: sum(1 for s in summary.values() if s["status"] == status)
               for status in ("identical", "differs", "fails", "missing")}
     lines = [f"## {title}", ""]

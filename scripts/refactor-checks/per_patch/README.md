@@ -10,7 +10,8 @@ tests. Each capture is then compared with the full patch set's capture.
 ```sh
 python3.12 scripts/refactor-checks/per_patch/run_variants.py \
     --work <scratch dir> --out <evidence dir> --upstream <local xraylarch clone or URL> \
-    [--python python3.12] [--variants full 0003 pure] [--baseline <baseline-match capture>] [--keep-captures]
+    [--python python3.12] [--variants 0003 0005+0006+0007 pure] [--baseline <baseline-match capture>] \
+    [--reference <existing full capture>] [--keep-captures]
 
 # one pair of captures, by hand
 python scripts/refactor-checks/per_patch/summarize.py <reference capture> <variant capture>
@@ -19,8 +20,12 @@ python scripts/refactor-checks/per_patch/summarize.py <reference capture> <varia
 - One scratch venv (`<work>/venv`) is made like the release env: the release constraints as
   requirements and constraints, then `backend/requirements.txt`. Each variant's wheel replaces
   the previous one, installed under the same constraints. `pip check` must pass.
-- `full` always runs first and is the reference. With `--baseline`, its capture is also
-  compared exactly with that capture (`compare.py`).
+- `full` runs first and is the reference, unless `--reference` names an existing `full`
+  capture. With `--baseline`, the `full` capture is also compared exactly with that capture
+  (`compare.py`).
+- A variant can leave out several patches (`0005+0006+0007`). This is needed when a later
+  patch does not apply without an earlier one. A selection that `build.py` refuses is recorded
+  as "does not build", with build.py's reason, and the run goes on.
 - The output folder gets, per variant: `<variant>.json` (IDENTITY, regression outcome, per-scenario
   summary), `<variant>.log`, `<variant>-regression.xml`. It also gets `sections.md`, one Markdown
   section per variant.

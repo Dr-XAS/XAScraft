@@ -4,7 +4,9 @@
         [--python PYTHON3.12] [--variants full 0003 pure ...] [--baseline CAPTURE] [--keep-captures]
 
 Variants: `full` (the whole series, the reference), each patch left out in turn (`0001`, ...,
-`build.py --exclude`), and `pure` (`build.py --pure-upstream`). For each variant:
+`build.py --exclude`), and `pure` (`build.py --pure-upstream`). `0005+0006+0007` leaves out
+several patches, for a patch that later patches need. A selection build.py refuses is recorded
+as not building. For each variant:
 
 1. build Larch with `larch-patches/build.py` into WORK/build-<variant>;
 2. install its wheel into one scratch venv (WORK/venv, made like the release env: the
@@ -13,7 +15,8 @@ Variants: `full` (the whole series, the reference), each patch left out in turn 
 4. run the team regression tests (`larch-patches/tests`, without test_series/test_build);
 5. summarize the capture against the `full` capture into OUT/<variant>.json.
 
-`full` runs first. Its capture is compared exactly with --baseline when given. Captures and
+`full` runs first, unless --reference names an existing `full` capture. Its capture is
+compared exactly with --baseline when given. Captures and
 builds are deleted once summarized (about 430 MB each), unless --keep-captures. OUT/sections.md
 gets one report section per variant.
 """
@@ -64,8 +67,9 @@ def title(variant):
         return "Full patch set (the reference)"
     if variant == "pure":
         return "Pure upstream (no patches)"
-    files = [p.name for p in _series() if p.name.startswith(variant)]
-    return f"Without {variant} (`{files[0] if files else variant}`)"
+    numbers = variant.split("+")
+    files = [p.name for p in _series() if p.name[:4] in numbers]
+    return f"Without {' + '.join(numbers)} ({', '.join(f'`{f}`' for f in files)})"
 
 
 def _run(cmd, log, **kwargs):
@@ -84,12 +88,27 @@ def make_venv(base_python, venv, log):
     return python
 
 
+class BuildFailed(Exception):
+    """build.py refused this selection of patches (e.g. a later patch needs the one left out)."""
+
+
 def run_variant(variant, python, args, log):
     build = args.work / f"build-{variant}"
     shutil.rmtree(build, ignore_errors=True)
-    selection = [] if variant == "full" else ["--pure-upstream"] if variant == "pure" else ["--exclude", variant]
-    _run([python, "-I", REPO / "larch-patches" / "build.py", "--out", build, "--upstream", args.upstream,
-          "--build-python", python, *selection], log, check=True)
+    if variant == "full":
+        selection = []
+    elif variant == "pure":
+        selection = ["--pure-upstream"]
+    else:
+        selection = [arg for number in variant.split("+") for arg in ("--exclude", number)]
+    built = _run([python, "-I", REPO / "larch-patches" / "build.py", "--out", build, "--upstream", args.upstream,
+                  "--build-python", python, *selection], log)
+    if built.returncode != 0:
+        log.flush()
+        errors = [line for line in (args.out / f"{variant}.log").read_text().splitlines()
+                  if line.startswith("build.py: error:")]
+        raise BuildFailed(errors[-1].removeprefix("build.py: error:").strip().rstrip(":")
+                          if errors else f"build.py exited {built.returncode}")
     identity = json.loads((build / "IDENTITY").read_text())
     [wheel] = (build / "dist").glob("*.whl")
     _run([python, "-m", "pip", "uninstall", "--yes", "xraylarch"], log)
@@ -119,6 +138,8 @@ def main(argv=None):
     parser.add_argument("--python", default=sys.executable, help="Python 3.12 to make the venv from")
     parser.add_argument("--variants", nargs="+", default=None, help="default: full, each patch, pure")
     parser.add_argument("--baseline", type=Path, default=None, help="capture to compare `full` with exactly")
+    parser.add_argument("--reference", type=Path, default=None,
+                        help="an existing `full` capture to use instead of running `full` again")
     parser.add_argument("--keep-captures", action="store_true")
     args = parser.parse_args(argv)
 
@@ -129,16 +150,22 @@ def main(argv=None):
     args.work, args.out = args.work.resolve(), args.out.resolve()
     args.work.mkdir(parents=True, exist_ok=True)
     args.out.mkdir(parents=True, exist_ok=True)
-    variants = args.variants or ["full", *patch_numbers(), "pure"]
-    if variants[0] != "full":
-        variants = ["full", *[v for v in variants if v != "full"]]
+    variants = [v for v in args.variants or [*patch_numbers(), "pure"] if v != "full"]
+    if args.reference is None:
+        variants.insert(0, "full")
 
     with open(args.out / "venv.log", "a") as log:
         python = make_venv(args.python, args.work / "venv", log)
-    reference = None
+    reference = args.reference.resolve() if args.reference else None
     for variant in variants:
-        with open(args.out / f"{variant}.log", "w") as log:
-            identity, capture, tests = run_variant(variant, python, args, log)
+        try:
+            with open(args.out / f"{variant}.log", "w") as log:
+                identity, capture, tests = run_variant(variant, python, args, log)
+        except BuildFailed as exc:
+            result = {"variant": variant, "title": title(variant), "build_error": str(exc)}
+            (args.out / f"{variant}.json").write_text(json.dumps(result, indent=1))
+            print(f"{variant}: does not build: {exc}", flush=True)
+            continue
         result = {"variant": variant, "title": title(variant), "identity": identity, "tests": tests}
         if variant == "full":
             reference = capture
@@ -154,14 +181,15 @@ def main(argv=None):
                   for s in ("identical", "differs", "fails", "missing")}
         print(f"{variant}: {counts}; regression {tests['passed']} passed, {len(tests['failed'])} failed",
               flush=True)
-    if reference and not args.keep_captures:
+    if reference and args.reference is None and not args.keep_captures:
         shutil.rmtree(reference, ignore_errors=True)
 
     results = [json.loads(p.read_text()) for p in sorted(args.out.glob("*.json"))]
     order = {v: i for i, v in enumerate(["full", *patch_numbers(), "pure"])}
-    results.sort(key=lambda r: order.get(r["variant"], len(order)))
+    results.sort(key=lambda r: (order.get(r["variant"].split("+")[0], len(order)), r["variant"]))
     (args.out / "sections.md").write_text("\n".join(
-        variant_section(r["title"], r["summary"], r["tests"]) for r in results))
+        variant_section(r["title"], r.get("summary", {}), r.get("tests"), r.get("build_error"))
+        for r in results))
     return 0
 
 

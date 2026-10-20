@@ -18,6 +18,13 @@ def test_a_variant_identical_everywhere_says_so():
     assert "Team regression tests: 12 passed, 0 failed." in text
 
 
+def test_a_variant_that_does_not_build_says_why():
+    text = variant_section("Without 0005", {}, tests=None,
+                           build_error="patch 0006-x.patch does not apply")
+
+    assert text == "## Without 0005\n\nDoes not build: patch 0006-x.patch does not apply\n"
+
+
 def test_failing_and_differing_scenarios_are_listed_worst_first():
     summary = {
         "copper": {"status": "identical", "fields": []},
