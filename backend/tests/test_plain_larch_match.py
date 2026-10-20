@@ -12,6 +12,7 @@ removals. The scripts' transforms use the app's fixed settings (kstep 0.05,
 nfft 2048, Hanning R window), which the app does not let a user change.
 """
 from pathlib import Path
+import re
 
 import numpy as np
 import pytest
@@ -61,10 +62,25 @@ def import_columns(client, name, x, y, data_type):
     return project, project["groups"][-1]
 
 
+def feff_text(filename, degen=None):
+    """A FEFF path file's text, optionally with its degeneracy edited in the header.
+
+    The app has no per-path degeneracy field; a user who wants Larch's
+    feffpath(degen=N) edits the `nleg, deg, reff` header line instead.
+    """
+    text = (FEFFIT / filename).read_text()
+    if degen is None:
+        return text
+    edited, count = re.subn(r"^(\s*\d+\s+)\S+(\s+\S+.*nleg, deg, reff.*)$",
+                            lambda match: f"{match[1]}{degen:.3f}{match[2]}", text, flags=re.MULTILINE)
+    assert count == 1, filename
+    return edited
+
+
 def app_feffit(client, project, group, parameters, paths, transform):
     """POST the fit the Artemis page sends, with each FEFF file's text."""
     body = dict(version=project["version"], parameters=parameters, transform=transform,
-                paths=[dict(path, content=(FEFFIT / path["filename"]).read_text())
+                paths=[dict(path, content=path.get("content") or feff_text(path["filename"]))
                        for path in paths])
     reply = client.post(f"/api/artemis/projects/{project['id']}/groups/{group['id']}/fit", json=body)
     assert reply.status_code == 200, reply.text
@@ -187,3 +203,52 @@ def test_feffit_ex2_cu_three_paths_without_third_cumulant_matches_plain_larch(cl
                                     rmin=1.4, rmax=3.5))
 
     assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2_1", "sig2_2", "sig2_3", "alpha"])
+
+
+# --- feffit Ex4: FeO coordination numbers (examples/feffit/doc_feffit4.py) ---------------
+# The script sets degen=1 on each path and fits N through s02='s02*n1'. The app has no
+# per-path degeneracy field, so its FEFF files carry degeneracy 1 in their headers.
+# (The other workaround, s02='s02*n1/degen' on the file's degeneracy, is the same model
+# but rounds differently: it moved the de0-n1 correlation by 6.0e-9 relative.)
+
+FEO_NAMES = ["n1", "n2", "s02", "de0", "sig2_1", "delr_1", "sig2_2", "delr_2"]
+FEO_PATHS = [dict(id="feo", filename="feff_feo01.dat", content=feff_text("feff_feo01.dat", degen=1),
+                  s02="s02*n1", e0="de0", sigma2="sig2_1", deltar="delr_1"),
+             dict(id="fefe", filename="feff_feo02.dat", content=feff_text("feff_feo02.dat", degen=1),
+                  s02="s02*n2", e0="de0", sigma2="sig2_2", deltar="delr_2")]
+
+
+def feo_ex4_reference():
+    """doc_feffit4.py up to its fit, on the chi(k) its autobk made."""
+    feo_dat = read_ascii(str(XAFSDATA / "feo_xafs.dat"), labels="energy mu")
+    autobk(feo_dat, kweight=2, rbkg=1.05, clamp_hi=300)
+    pars = Group(n1=param(6, vary=True), n2=param(12, vary=True), s02=param(0.700, vary=False),
+                 de0=guess(0.1), sig2_1=param(0.002, vary=True), delr_1=guess(0.),
+                 sig2_2=param(0.002, vary=True), delr_2=guess(0.))
+    path_feo = feffpath(str(FEFFIT / "feff_feo01.dat"), degen=1, s02="s02*n1", e0="de0",
+                        sigma2="sig2_1", deltar="delr_1")
+    path_fefe = feffpath(str(FEFFIT / "feff_feo02.dat"), degen=1, s02="s02*n2", e0="de0",
+                         sigma2="sig2_2", deltar="delr_2")
+    trans = feffit_transform(kmin=2.0, kmax=13.5, kweight=3, dk=3, window="kaiser",
+                             rmin=1.0, rmax=3.2, fitspace="r", **APP_TRANSFORM)
+    dset = feffit_dataset(data=chi_data(feo_dat), pathlist=[path_feo, path_fefe], transform=trans)
+    out = feffit(pars, dset)
+    return feo_dat, pars, dset, out
+
+
+def feo_parameters(values):
+    return [dict(name=name, kind="set" if name == "s02" else "guess", value=values[name]) for name in FEO_NAMES]
+
+
+def test_feffit_ex4_feo_coordination_numbers_matches_plain_larch(client):
+    feo_dat, _, dset, reference = feo_ex4_reference()
+
+    project, group = import_columns(client, "feo_xafs.chi", feo_dat.k, feo_dat.chi, "chi")
+    app = app_feffit(client, project, group,
+                     parameters=feo_parameters(dict(n1=6, n2=12, s02=0.7, de0=0.1, sig2_1=0.002, delr_1=0.,
+                                                    sig2_2=0.002, delr_2=0.)),
+                     paths=FEO_PATHS,
+                     transform=dict(fitspace="r", kmin=2.0, kmax=13.5, kweight=[3], dk=3, window="kaiser",
+                                    rmin=1.0, rmax=3.2))
+
+    assert_same_feffit(app, reference, dset, FEO_NAMES)
