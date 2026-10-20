@@ -19,7 +19,7 @@
     "backend/tests/reference/smoothing_preferences_native_reference.py": "234bdd1c423e89d6c8647dae65af41539326642b5a3e84ec03b731a29b6bcb00",
     "backend/tests/fixtures/athena-smoothing-preferences-native.json.gz": "65a3f5dc1b37a4723056a91a4899fc9ccf2fadfead2e94e3da8c91496ef04325",
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
-    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467"
+    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061"
   },
   "reference_packages": [
     {

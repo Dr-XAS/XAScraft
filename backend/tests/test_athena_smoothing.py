@@ -24,6 +24,9 @@ METHODS = [dict(method='boxcar', window=8), dict(method='gaussian', window=11, s
 
 
 def test_recorded_reference_provenance():
+    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
+    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
+    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root = Path(__file__).resolve().parents[2]
     manifest = json.loads((FIXTURES/'athena-smoothing-fixtures.json').read_text())
     catalog = {row['file']:row['sha256'] for row in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
