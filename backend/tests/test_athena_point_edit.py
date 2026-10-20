@@ -39,6 +39,10 @@ def test_original_perl_methods_and_larch_templates_match_retained_measurements(r
 
 
 def test_reference_inputs_methods_and_runtime_are_hash_pinned():
+    # larch/math/utils.py and larch/xafs/xafsutils.py pinned at xraylarch 247278cef (was 8d6cd41c2).
+    # Upstream 98650acff only swapped builtin min/max for ndarray .min()/.max() in remove_dups (bit-identical
+    # on every call in the backend suite and check 1); xafsutils only made gfmt return str input unchanged,
+    # and KTOE, the name used here, is unchanged (import-larch ticket 22).
     root = FIX.parents[2]
     manifest = json.loads((FIX / 'athena-point-edit-fixtures.json').read_text())
     catalog = {r['file']: r['sha256'] for r in json.loads((root / 'docs/athena-primary-sources.json').read_text())['files']}
