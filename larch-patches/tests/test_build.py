@@ -101,7 +101,8 @@ def test_full_build_larch_is_upstream_at_the_pin_except_the_patched_files(full, 
     assert all(patched[k] != upstream.get(k) for k in named)
 
 
-# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3).
+# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3);
+# None for a temporary patch, which comes from no XAScraft commit.
 XASCRAFT_COMMITS = {
     "0001": "e47015166",
     "0002": "3ca0a9716",
@@ -110,6 +111,7 @@ XASCRAFT_COMMITS = {
     "0005": "b334e57f8",
     "0006": "8d37ac358",
     "0007": "aee4bb5e6",
+    "0008": None,
 }
 
 
@@ -135,8 +137,12 @@ def test_identity_names_the_pin_the_patch_set_and_the_version(full):
     assert ident["pure_upstream"] is False
     assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)
     for entry in ident["patches"]:
-        assert entry["xascraft_commit"].startswith(XASCRAFT_COMMITS[entry["number"]])
-        assert len(entry["xascraft_commit"]) == 40
+        expected = XASCRAFT_COMMITS[entry["number"]]
+        if expected is None:
+            assert entry["xascraft_commit"] is None
+        else:
+            assert entry["xascraft_commit"].startswith(expected)
+            assert len(entry["xascraft_commit"]) == 40
         assert (PATCHES_DIR / "series" / entry["file"]).is_file()
     assert ident["larch_tree"] == PIN["patched-larch-tree"]
 
