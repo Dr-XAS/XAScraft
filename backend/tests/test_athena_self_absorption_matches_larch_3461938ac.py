@@ -11,6 +11,12 @@ Upstream Larch `d6d27ccca` ("fluo: force recalculation of e0") made `fluo_corr` 
 it is given and normalize around its own, which moves the normalized corrected curve by up to
 3.7% of the edge step on these spectra. Temporary patch 0009 keeps the E0 the app passes until
 the owner decides (larch-patches/README.md, ledger "Self-absorption E0").
+
+The comparison is exact, so BLAS runs single-threaded here and in the reference script
+(`single_threaded_blas`): a multi-threaded BLAS may sum in another order from run to run.
+The reference was recorded on macOS arm64, where numpy and scipy use Accelerate, which
+threadpoolctl cannot limit; there the numbers are the same with VECLIB_MAXIMUM_THREADS=1 and
+unset. On Linux, numpy and scipy use OpenBLAS, which it does limit.
 """
 import gzip
 import json
@@ -19,6 +25,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
+from threadpoolctl import threadpool_limits
 
 from xraylarch_web.config import Settings
 from xraylarch_web.main import create_app
@@ -40,6 +47,12 @@ CASES = [(name, e0) for name in SPECTRA for e0 in E0_CHOICES]
 
 def case_key(case):
     return "-".join(case)
+
+
+def single_threaded_blas():
+    """Every BLAS and OpenMP pool threadpoolctl finds, at one thread, for the whole process
+    (OpenBLAS's limit is global, so it holds in the thread TestClient runs the app in)."""
+    return threadpool_limits(limits=1)
 
 
 def ok(response):
@@ -92,7 +105,8 @@ def recorded():
 
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
-    with TestClient(create_app(Settings(data_root=tmp_path_factory.mktemp("data")))) as client:
+    with single_threaded_blas(), \
+            TestClient(create_app(Settings(data_root=tmp_path_factory.mktemp("data")))) as client:
         yield client
 
 

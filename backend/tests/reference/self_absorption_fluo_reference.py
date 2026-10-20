@@ -7,9 +7,9 @@ Larch is the reference, pointing at that tree's backend and at this tree's test 
     <3461938ac checkout>/backend/.venv/bin/python -I backend/tests/reference/self_absorption_fluo_reference.py \
         --backend <3461938ac checkout>/backend
 
-with OPENBLAS_NUM_THREADS=OMP_NUM_THREADS=MKL_NUM_THREADS=1 and XRAYLARCH_DATA_ROOT set to a
-scratch folder. The cases and the HTTP calls come from the test module, so the reference and
-the test make the same requests.
+It runs BLAS single-threaded and uses a scratch data root. The cases, the HTTP calls and the
+thread limit come from the test module, so the reference and the test make the same requests
+under the same conditions.
 """
 import argparse
 import gzip
@@ -33,7 +33,7 @@ def main():
     from xraylarch_web.main import create_app
     import test_athena_self_absorption_matches_larch_3461938ac as pinned
 
-    with tempfile.TemporaryDirectory() as root, \
+    with tempfile.TemporaryDirectory() as root, pinned.single_threaded_blas(), \
             TestClient(create_app(Settings(data_root=Path(root)))) as client:
         cases = {pinned.case_key(case): pinned.fluo_outputs(client, case) for case in pinned.CASES}
     record = {"reference": f"larch {larch.__version__}", "cases": cases}
