@@ -304,3 +304,33 @@ def test_bad_selections_are_refused(tmp_path, args, message):
     assert result.returncode != 0
     assert message in result.stderr
     assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("key", ["upstream-url", "upstream-commit", "upstream-version"])
+def test_a_pin_without_a_key_the_build_uses_stops_with_a_message(tmp_path, key):
+    queue = copy_of_the_queue(tmp_path / "queue")
+    pin = queue / "PIN"
+    pin.write_text("".join(line for line in pin.read_text().splitlines(keepends=True)
+                           if not line.startswith(key)))
+    result = subprocess.run([sys.executable, str(queue / "build.py"), "--out", str(tmp_path / "out"),
+                             "--build-python", sys.executable], capture_output=True, text=True)
+    assert result.returncode == 1
+    assert f"missing '{key} = ...'" in result.stderr and "Traceback" not in result.stderr
+    assert not (tmp_path / "out").exists()
+
+
+def test_expected_version_is_the_version_of_a_full_build(full, tmp_path):
+    """``build.expected_version()`` names the build of PIN plus the whole series without
+    building it; the deploy script and the backend test check the installed Larch with it."""
+    queue = copy_of_the_queue(tmp_path / "queue")
+    code = "import sys; sys.path.insert(0, sys.argv[1]); import build; print(build.expected_version())"
+
+    def expected(folder: Path) -> str:
+        return subprocess.run([sys.executable, "-I", "-c", code, str(folder)], check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    assert expected(PATCHES_DIR) == identity(full)["version"]
+    # It follows the series: a changed patch file changes it, as it changes a build's id.
+    patch = next((queue / "series").glob("0007-*.patch"))
+    patch.write_bytes(patch.read_bytes() + b"\n")
+    assert expected(queue) == f"{PIN['upstream-version']}.xascraft.{series_id(queue)}"

@@ -99,7 +99,7 @@ run_larch_install() (
       *'pip install --requirement requirements.txt '*) stage=backend ;;
       *'import larch, xraylarch_web'*) stage=import ;;
       *'from xraylarch_web.main import app'*) stage=app ;;
-      *'patched-larch-tree'*) stage=larch_check ;;
+      *'expected_version'*) stage=larch_check ;;
       *'pip check'*) stage=check ;;
       *'pip freeze'*) stage=freeze ;;
       *) stage="unexpected: $*" ;;
@@ -192,7 +192,7 @@ for failure in constraints larch_build larch_install backend app larch_check che
       *'pip install --constraint '*'xraylarch-test.whl') stage=larch_install ;;
       *'pip install --requirement requirements.txt '*) stage=backend ;;
       *'from xraylarch_web.main import app'*) stage=app ;;
-      *'patched-larch-tree'*) stage=larch_check ;;
+      *'expected_version'*) stage=larch_check ;;
       *'pip check'*) stage=check ;;
       *'pip freeze'*) stage=freeze ;;
       *'pytest '*--collect-only*) stage=collection ;;

@@ -28,9 +28,7 @@ def patched_build_version() -> str:
     spec = spec_from_file_location("larch_patches_build", PATCHES / "build.py")
     build = module_from_spec(spec)
     spec.loader.exec_module(build)
-    pin = build.read_pin(PATCHES / "PIN")
-    series = sorted((PATCHES / "series").glob("*.patch"))
-    return build.make_identity(pin, series, series, False, pin["patched-larch-tree"])["version"]
+    return build.expected_version(PATCHES)
 
 
 def canonical(name: str) -> str:

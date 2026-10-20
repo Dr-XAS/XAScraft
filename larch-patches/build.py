@@ -59,6 +59,11 @@ def git(*args: str, cwd: Path, text: bool = True):
     return result.stdout
 
 
+# The PIN keys the build reads; patched-larch-tree and patched-pyproject-blob are checks
+# (the first by the build, both by tests/test_series.py) and may be absent.
+PIN_KEYS = ("upstream-url", "upstream-commit", "upstream-version")
+
+
 def read_pin(path: Path) -> dict[str, str]:
     pin: dict[str, str] = {}
     for line in path.read_text().splitlines():
@@ -66,10 +71,20 @@ def read_pin(path: Path) -> dict[str, str]:
         if line and not line.startswith("#"):
             key, _, value = line.partition("=")
             pin[key.strip()] = value.strip()
-    for key in ("upstream-commit", "upstream-version"):
+    for key in PIN_KEYS:
         if not pin.get(key):
             raise BuildError(f"{path}: missing '{key} = ...'")
     return pin
+
+
+def read_series(patches_dir: Path = HERE) -> list[Path]:
+    """The series, in the order it is applied."""
+    return sorted((patches_dir / "series").glob("*.patch"))
+
+
+def patch_number(patch: Path) -> str:
+    """A patch file's number, ``NNNN``: the start of its name (``NNNN-subject.patch``)."""
+    return patch.name[:4]
 
 
 def checkout_upstream(upstream: str, commit: str, dest: Path) -> None:
@@ -123,14 +138,14 @@ def select_patches(series: list[Path], exclude: list[str], pure: bool) -> list[P
     """The patches to apply: all, all but ``exclude``, or none for ``pure``."""
     if pure and exclude:
         raise BuildError("--exclude is not allowed with --pure-upstream")
-    numbers = {p.name[:4] for p in series}
+    numbers = {patch_number(p) for p in series}
     wanted = [n.zfill(4) for n in exclude]
     for number in wanted:
         if number not in numbers:
             raise BuildError(f"--exclude: there is no patch {number} in series/")
     if pure:
         return []
-    return [p for p in series if p.name[:4] not in wanted]
+    return [p for p in series if patch_number(p) not in wanted]
 
 
 def make_identity(pin: dict[str, str], series: list[Path], patches: list[Path],
@@ -138,7 +153,7 @@ def make_identity(pin: dict[str, str], series: list[Path], patches: list[Path],
     """What was built.  A leave-one-out build gets the id of the patches it applied plus a
     ``.withoutNNNN`` mark per excluded patch; a pure build gets the bare upstream version.
     (``withoutNNNN`` is one PEP 440 local segment, so setuptools leaves it as written.)"""
-    excluded = [p.name[:4] for p in series if p not in patches]
+    excluded = [patch_number(p) for p in series if p not in patches]
     set_id = None if pure else patch_set_id(patches)
     version = pin["upstream-version"]
     if not pure:
@@ -150,12 +165,20 @@ def make_identity(pin: dict[str, str], series: list[Path], patches: list[Path],
         "version": version,
         "pure_upstream": pure,
         "patches": [
-            {"number": p.name[:4], "file": p.name, "xascraft_commit": xascraft_commit(p)}
+            {"number": patch_number(p), "file": p.name, "xascraft_commit": xascraft_commit(p)}
             for p in patches
         ],
         "excluded": excluded,
         "larch_tree": larch_tree,
     }
+
+
+def expected_version(patches_dir: Path = HERE) -> str:
+    """The version a build of PIN plus the whole series gets (IDENTITY's ``version``),
+    without building it: what the installed patched Larch must report."""
+    series = read_series(patches_dir)
+    pin = read_pin(patches_dir / "PIN")
+    return make_identity(pin, series, series, False, pin.get("patched-larch-tree", ""))["version"]
 
 
 def build_requirements() -> list[str]:
@@ -249,7 +272,7 @@ def build(args: argparse.Namespace) -> Path:
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise BuildError(f"--out {out} exists and is not empty")
     pin = read_pin(HERE / "PIN")
-    series = sorted((HERE / "series").glob("*.patch"))
+    series = read_series()
     patches = select_patches(series, args.exclude, args.pure_upstream)
 
     out.parent.mkdir(parents=True, exist_ok=True)

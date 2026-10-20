@@ -962,9 +962,7 @@ patches = release / "larch-patches"
 spec = spec_from_file_location("larch_patches_build", patches / "build.py")
 build = module_from_spec(spec)
 spec.loader.exec_module(build)
-pin = build.read_pin(patches / "PIN")
-series = sorted((patches / "series").glob("*.patch"))
-expected = build.make_identity(pin, series, series, False, pin["patched-larch-tree"])["version"]
+expected = build.expected_version(patches)
 import larch
 where = Path(larch.__file__).resolve()
 metadata = version("xraylarch")
