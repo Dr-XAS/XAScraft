@@ -12,8 +12,7 @@ on:
       - 'backend/xraylarch_web/**'
       - 'backend/requirements.txt'
       - 'frontend/**'
-      - 'larch/**'
-      - 'pyproject.toml'
+      - 'larch-patches/**'
       - 'deploy/python-release-constraints.txt'
       - '.github/workflows/local-install.yml'
   pull_request:

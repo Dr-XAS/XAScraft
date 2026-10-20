@@ -13,7 +13,7 @@ import uuid
 from .common import (NODE_HASHES, NODE_VERSION, available_port, exclusive_lock,
                      prepare_root, python_in, read_json, require_free_port, run, runtime_env, write_json)
 from .services import ServicePair, science_smoke
-from .source import download, extract_zip, latest_release, snapshot
+from .source import download, extract_zip, larch_wheel, latest_release, snapshot
 
 
 def ensure_node(root: Path) -> Path:
@@ -49,22 +49,24 @@ def build_release(root: Path, release: Path, metadata: dict, uv: Path):
     scratch = release / "verification-data"
     env = runtime_env(root, source, metadata, scratch)
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
-    env.update({"SETUPTOOLS_SCM_PRETEND_VERSION_FOR_XRAYLARCH": metadata["larch_version"],
-                "UV_CACHE_DIR": str(root / "cache/uv"), "UV_NO_CONFIG": "1"})
+    env.update({"UV_CACHE_DIR": str(root / "cache/uv"), "UV_NO_CONFIG": "1"})
     log_path = root / "logs/install.log"
     print(f"Installing dependencies and building XAScraft. Details: {log_path}", flush=True)
-    requirements = release / "web-requirements.txt"
-    requirements.write_text("\n".join(line for line in (source / "backend/requirements.txt").read_text().splitlines()
-                                     if line.strip() != "-e ..") + "\n")
+    _, larch = larch_wheel(source)
     py = python_in(release / ".venv")
     with log_path.open("ab") as log:
         run([uv, "venv", "--python", sys.executable, release / ".venv"], env=env, log=log)
         constraints = source / "deploy/python-release-constraints.txt"
         run([uv, "pip", "install", "--python", py, "--constraint", constraints,
-             "--build-constraint", constraints, "--requirement", requirements, source],
+             "--build-constraint", constraints, "--requirement", source / "backend/requirements.txt", larch],
             cwd=source / "backend", env=env, log=log)
         run([uv, "pip", "check", "--python", py], env=env, log=log)
         import subprocess
+        installed = subprocess.check_output(
+            [str(py), "-I", "-c", "from importlib.metadata import version; print(version('xraylarch'))"],
+            cwd=release, env=env, text=True).strip()
+        if installed != metadata["larch_version"]:
+            raise RuntimeError(f"Installed Larch {installed} is not the snapshot's Larch {metadata['larch_version']}.")
         frozen = subprocess.check_output([str(uv), "pip", "freeze", "--python", str(py)], env=env)
         (release / "python-packages.txt").write_bytes(frozen)
         npm = node.parent / ("node_modules/npm/bin/npm-cli.js" if os.name == "nt" else "../lib/node_modules/npm/bin/npm-cli.js")
