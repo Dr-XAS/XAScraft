@@ -11,6 +11,7 @@ way a user would import it, so what is compared is the fit, not two background
 removals. The scripts' transforms use the app's fixed settings (kstep 0.05,
 nfft 2048, Hanning R window), which the app does not let a user change.
 """
+from copy import copy
 from pathlib import Path
 import re
 
@@ -249,6 +250,29 @@ def test_feffit_ex4_feo_coordination_numbers_matches_plain_larch(client):
                                                     sig2_2=0.002, delr_2=0.)),
                      paths=FEO_PATHS,
                      transform=dict(fitspace="r", kmin=2.0, kmax=13.5, kweight=[3], dk=3, window="kaiser",
+                                    rmin=1.0, rmax=3.2))
+
+    assert_same_feffit(app, reference, dset, FEO_NAMES)
+
+
+# --- feffit Ex5: FeO in other fitting spaces (examples/feffit/doc_feffit5.py) ------------
+# The script saves Ex4's fit as its R-space result, so R space is the Ex4 test above. The
+# app fits only in k and R, so the q- and wavelet-space fits are skipped by design. The
+# script runs its k-space fit after the q-space one, on copy(pars) and the same dataset.
+# feffit does not write fitted values back into pars, so skipping the q fit leaves the
+# k fit's starting point unchanged: the script's own initial values, which the app is sent.
+
+def test_feffit_ex5_feo_in_k_space_matches_plain_larch(client):
+    feo_dat, pars, dset, _ = feo_ex4_reference()
+    pars3 = copy(pars)
+    dset.transform.kweight = 2
+    dset.transform.fitspace = "k"
+    starting = {name: float(getattr(pars3, name).value) for name in FEO_NAMES}
+    reference = feffit(pars3, dset)
+
+    project, group = import_columns(client, "feo_xafs.chi", feo_dat.k, feo_dat.chi, "chi")
+    app = app_feffit(client, project, group, parameters=feo_parameters(starting), paths=FEO_PATHS,
+                     transform=dict(fitspace="k", kmin=2.0, kmax=13.5, kweight=[2], dk=3, window="kaiser",
                                     rmin=1.0, rmax=3.2))
 
     assert_same_feffit(app, reference, dset, FEO_NAMES)
