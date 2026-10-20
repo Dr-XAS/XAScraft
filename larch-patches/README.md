@@ -7,17 +7,60 @@ plus the patches in this folder. Nothing else in the repository changes Larch.
 | --- | --- |
 | `PIN` | The upstream URL and commit, the upstream version string at that commit, and the `larch/` tree and `pyproject.toml` blob that applying the series must give. |
 | `series/NNNN-*.patch` | `git format-patch` files, applied in order with `git am`. Each keeps the original author, date and message, and carries an `XAScraft-commit: <sha>` trailer naming the XAScraft commit it came from. |
+| `build.py` | Builds the patched Larch: source tree, wheel, sdist and `IDENTITY`. See [Building](#building). |
 | `tests/test_series.py` | Applies the series to the pin in a scratch clone and checks the result against `PIN` and the original commits. |
+| `tests/test_build.py` | Runs `build.py` and checks its output, its version and its failure modes. |
 | `tests/test_*.py` (others) | The team's Larch regression tests. They run against whatever Larch is installed. |
+
+## Building
+
+```sh
+python3 larch-patches/build.py --out build/larch                      # fetches the pin from GitHub
+python3 larch-patches/build.py --out build/larch --upstream ~/xraylarch  # or reads a local clone
+```
+
+`build.py` needs Python 3.12 and git, nothing else. It checks out upstream at the pin (a
+one-commit fetch, or `git clone --shared` of a local clone, which is only read), applies the
+series with `git am --committer-date-is-author-date` and a fixed committer, and writes, all or
+nothing, into `--out` (which must be absent or empty):
+
+| Output | What it is |
+| --- | --- |
+| `xraylarch-src/` | The patched upstream tree, without `.git` and without a generated `larch/_version.py`. Installing from it needs `SETUPTOOLS_SCM_PRETEND_VERSION_FOR_XRAYLARCH` set to the version in `IDENTITY`. |
+| `dist/` | `xraylarch-<version>-py3-none-any.whl` and `xraylarch-<version>.tar.gz`. |
+| `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
+
+- **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`, today
+  `2026.3.1.post35+g8d6cd41c2.xascraft.9b231a511159`. The patch-set id is the first 12 hex digits
+  of the sha256 of the applied patch files' bytes, in order (`cat series/*.patch | sha256sum`).
+  It changes only when the pin or a patch file changes; a reworded message counts.
+- **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
+  and marks the version, e.g. `….xascraft.<id of the rest>.without0003`. `--pure-upstream` applies
+  nothing and gives upstream's own version, `2026.3.1.post35+g8d6cd41c2`.
+- **Stops** with a non-zero exit, and writes nothing, when a patch does not apply, when the full
+  series gives another `larch/` tree than `patched-larch-tree` in `PIN`, or when setuptools would
+  change the version string.
+- **Build backend**: by default a fresh venv with `setuptools`, `wheel` and `setuptools-scm` at the
+  versions pinned in `deploy/python-release-constraints.txt` (needs PyPI or a pip cache).
+  `--build-python PYTHON` uses an interpreter that already has them, e.g. a venv made from the
+  release constraints; this is what the tests and offline builds use.
+- **Reproducible**: two builds from the same inputs give the same tree, `IDENTITY`, wheel and
+  sdist, byte for byte. File times come from the last applied commit (`SOURCE_DATE_EPOCH`).
+  setuptools does not make the sdist reproducible by itself (build-time stamps on the generated
+  files, the builder's uid and gid, the gzip time), so `build.py` rewrites it with those fixed.
 
 ## Running the tests
 
 ```sh
 # Regression tests, against the Larch installed in the active environment:
-pytest larch-patches/tests -k "not test_series"
+pytest larch-patches/tests -k "not test_series and not test_build"
 
 # The series check. It needs git, this repository's history, and upstream:
 XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_series.py
+
+# The build script (about 1.5 minutes; the test interpreter is the build backend, so it must
+# have the pinned setuptools, wheel and setuptools-scm, as a release-constraints venv has):
+XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_build.py
 ```
 
 - Use the `pytest` command, not `python -m pytest` from the repository root. While the root
