@@ -7,7 +7,7 @@ const testDirectory = fileURLToPath(new URL(".", import.meta.url))
 const fixturePath = path.resolve(testDirectory, "../fixtures/cu_rt01.xmu")
 const duplicateFixturePath = path.resolve(testDirectory, "../fixtures/cu_rt01-duplicate-signals.csv")
 const secondFixturePath = path.resolve(testDirectory, "../../../examples/xafsdata/cu_50k.xmu")
-const xdiFixturePath = path.resolve(testDirectory, "../../../dylibs/XDI/cu_metal_rt.xdi")
+const xdiFixturePath = path.resolve(testDirectory, "../../../backend/tests/fixtures/xdi-official-cu_metal_rt.xdi")
 
 async function mapUploadedSpectrum(page: Page) {
   const mapping = page.getByTestId("column-mapping")

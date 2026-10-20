@@ -203,7 +203,7 @@ def test_workspace_api_processes_upload_without_preview_mutation(
 def test_inspection_accepts_browser_mime_fallbacks_for_supported_suffixes(tmp_path):
     async def exercise() -> None:
         xdi_fixture = (
-            Path(__file__).parents[2] / "dylibs" / "XDI" / "cu_metal_rt.xdi"
+            Path(__file__).parent / "fixtures" / "xdi-official-cu_metal_rt.xdi"
         ).read_bytes()
         async with _client(_app(tmp_path)) as client:
             workspace_id = (await client.post("/api/workspaces")).json()["workspace_id"]
