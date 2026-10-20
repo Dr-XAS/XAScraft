@@ -47,10 +47,16 @@ jobs:
       - name: Build the patched Larch from GitHub and install it
         shell: bash
         run: bash larch-patches/install-dev.sh --python "$(command -v python)" --keep "$RUNNER_TEMP/larch"
-      - name: Patch series and build script
-        run: pytest -p no:cacheprovider -q larch-patches/tests/test_series.py larch-patches/tests/test_build.py
+      - name: Patch series, build script and upstream-suite runner
+        run: pytest -p no:cacheprovider -q larch-patches/tests -m "not regression"
       - name: Team regression tests
         run: pytest -p no:cacheprovider -q larch-patches/tests -m regression
       - name: Upstream test suite
         shell: bash
         run: bash larch-patches/run-upstream-tests.sh "$RUNNER_TEMP/larch/xraylarch-src" --python "$(command -v python)"
+      # Runs the 11 upstream tests the step above leaves out, which fail without wxPython (on
+      # plain upstream too). Passes, listing them, while exactly those fail; fails if one starts
+      # passing or fails differently, so the list in run-upstream-tests.sh stays true.
+      - name: Upstream tests known to fail without wxPython (pre-existing, listed)
+        shell: bash
+        run: bash larch-patches/run-upstream-tests.sh "$RUNNER_TEMP/larch/xraylarch-src" --python "$(command -v python)" --known-failures

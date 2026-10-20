@@ -11,7 +11,7 @@ from pathlib import Path
 from examples_path import examples_dir
 
 HERE = Path(__file__).resolve().parent
-QUEUE_CHECKS = {"test_series.py", "test_build.py"}
+QUEUE_CHECKS = {"test_series.py", "test_build.py", "test_upstream_suite.py"}
 
 
 def pytest_configure(config):

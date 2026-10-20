@@ -11,6 +11,7 @@ plus the patches in this folder. Nothing else in the repository changes Larch.
 | `run-upstream-tests.sh` | Runs upstream's own test suite, from a built source tree, against the installed Larch. See [Running the tests](#running-the-tests). |
 | `tests/test_series.py` | Applies the series to the pin in a scratch clone and checks the result against `PIN` and the original commits. |
 | `tests/test_build.py` | Runs `build.py` and checks its output, its version and its failure modes. |
+| `tests/test_upstream_suite.py` | Runs `run-upstream-tests.sh` on a built tree: the main run, and the known pre-existing failures. |
 | `tests/test_*.py` (others) | The team's Larch regression tests. They run against whatever Larch is installed. |
 
 ## Building
@@ -82,6 +83,12 @@ XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/test
 # The build script (about 1.5 minutes; the test interpreter is the build backend, so it must
 # have the pinned setuptools, wheel and setuptools-scm, as a release-constraints venv has):
 XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_build.py
+
+# run-upstream-tests.sh, both modes (builds a tree first, like test_build.py; about 1 minute):
+XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests/test_upstream_suite.py
+
+# All three queue checks at once:
+XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/tests -m "not regression"
 ```
 
 ```sh
@@ -89,15 +96,26 @@ XASCRAFT_LARCH_UPSTREAM=/path/to/local/xraylarch/clone pytest larch-patches/test
 # environment (runs in a scratch copy of the tree; about 10 seconds):
 larch-patches/install-dev.sh --python PYTHON --keep build/larch
 larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON
+# The known pre-existing failures (below) alone; succeeds while exactly those fail:
+larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --known-failures
 ```
 
 - The upstream suite runs the files upstream's `tests/run_tests.sh` names at the pin, plus
-  `test_xrf_model.py`. It deselects 11 `test_larchexamples_xafs.py` scripts: they call wx
-  plotting commands (`plot_bkg`, `plot_chifit`, ...), which do not exist without wxPython, and
-  they fail the same way on plain upstream. XAScraft's environments have no wxPython. Expected:
-  180 passed, 1 skipped (`test_plot_rixsdata_import.py` needs `wx`), 11 deselected.
+  `test_xrf_model.py`. Expected: 180 passed, 1 skipped (`test_plot_rixsdata_import.py` needs
+  `wx`), 11 deselected.
+- **Known pre-existing failures.** The 11 deselected tests are `test_larchexamples_xafs.py`
+  scripts that call wx plotting commands (`plot_bkg`, `plot_chifit`, ...), which do not exist
+  without wxPython; they fail the same way on plain upstream, and XAScraft's environments have
+  no wxPython: `test02_autobk`, `test03_autobk2`, `test05_autobk_with_std`, `test07_xafsft1`,
+  `test08_xafsft2`, `test09_xafsft3`, `test10_xafsft3`, `test13_feffit1`, `test15_feffit2`,
+  `test16_feffit3`, `test18_feffit_save_fit_stale_paths` (`KNOWN_FAILURES` in
+  `run-upstream-tests.sh`). They are recorded, not hidden: `--known-failures` runs only them,
+  lists them, and succeeds while exactly they fail. It fails, naming the test, when one passes,
+  errors, is skipped or does not run; then update `KNOWN_FAILURES` and this list.
 - The CI workflow `.github/workflows/larch-patches.yml` runs all of the above: build from
-  GitHub, the series and build tests, the regression tests and the upstream suite.
+  GitHub, the queue checks (`-m "not regression"`), the regression tests, the upstream suite,
+  and, as its own step, the known pre-existing failures, so every run shows them (also as a
+  warning annotation) without failing on them.
 - The pytest session header names the Larch that was tested.
 - `XASCRAFT_LARCH_UPSTREAM` takes a local clone path or a URL. Unset, the test fetches the
   pinned commit from the URL in `PIN`. A local clone is only read (`git clone --shared`).
