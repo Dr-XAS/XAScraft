@@ -50,9 +50,10 @@ def variant_section(title, summary, tests, build_error=None):
         if counts["missing"]:
             text += f" {counts['missing']} missing."
         lines.append(text)
-    failed = tests["failed"]
-    lines += ["", f"Team regression tests: {tests['passed']} passed, {len(failed)} failed"
-              + (f" ({', '.join(failed)})." if failed else ".")]
+    if tests is not None:
+        failed = tests["failed"]
+        lines += ["", f"Team regression tests: {tests['passed']} passed, {len(failed)} failed"
+                  + (f" ({', '.join(failed)})." if failed else ".")]
 
     failing = {n: s for n, s in summary.items() if s["status"] in ("fails", "missing")}
     if failing:

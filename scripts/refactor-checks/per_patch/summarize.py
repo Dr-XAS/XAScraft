@@ -1,6 +1,8 @@
 """How far a variant capture moves from a reference capture.
 
-    python summarize.py <reference capture dir> <variant capture dir> [--json OUT]
+    python summarize.py <reference capture dir> <variant capture dir>
+
+Prints the Markdown section (`report.variant_section`) and writes nothing.
 
 Both folders are baseline-match captures (`baseline_match/run.py`). For each scenario,
 every differing value is grouped into a field: the step's name plus the JSON path inside
@@ -9,6 +11,7 @@ the step, with list indices written `[*]`, so an array is one field.
 import json
 import math
 import re
+import sys
 from pathlib import Path
 
 _NUMBER = re.compile(r"([-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)")
@@ -154,3 +157,19 @@ def summarize_dirs(reference, variant):
         else:
             out[name] = summarize_documents(json.loads(a.read_text()), json.loads(b.read_text()))
     return out
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 2:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from report import variant_section
+    summary = summarize_dirs(*args)
+    print(variant_section(f"{args[1]} against {args[0]}", summary, tests=None))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -18,6 +18,12 @@ def test_a_variant_identical_everywhere_says_so():
     assert "Team regression tests: 12 passed, 0 failed." in text
 
 
+def test_without_a_test_outcome_there_is_no_test_line():
+    text = variant_section("b against a", {"copper": {"status": "identical", "fields": []}}, tests=None)
+
+    assert "Team regression tests" not in text
+
+
 def test_a_variant_that_does_not_build_says_why():
     text = variant_section("Without 0005", {}, tests=None,
                            build_error="patch 0006-x.patch does not apply")
