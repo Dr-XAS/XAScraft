@@ -1,6 +1,7 @@
-"""The queue's regression test added to upstream's tests/test_xafs_fluo.py (patch 0009).
+"""Regression test for temporary patch 0009 (``fluo_corr`` uses the e0 it is given).
 
-Only this test is the queue's; the rest of that upstream file stays upstream's.
+Like every temporary patch's test, it lives here only; 0009 changes nothing in upstream's
+tests/, and upstream's own tests/test_xafs_fluo.py still passes with the patch.
 """
 
 import numpy as np
