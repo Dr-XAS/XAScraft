@@ -1,0 +1,139 @@
+"""Larch's own fitting examples, run as plain Larch and through the app's HTTP API.
+
+Each example runs twice on the same Larch build: once as the example script
+does it (the reference run, written out below with plain Larch calls), and once
+through the routes the UI uses. The reference is the rerun, never the numbers
+printed in Larch's documentation, which are static text.
+
+The two runs share their data. The reference script reduces the measured
+spectrum with plain Larch; the app is then handed that result as a file, the
+way a user would import it, so what is compared is the fit, not two background
+removals. The scripts' transforms use the app's fixed settings (kstep 0.05,
+nfft 2048, Hanning R window), which the app does not let a user change.
+"""
+from pathlib import Path
+
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+from larch import Group
+from larch.fitting import guess, param, param_group
+from larch.io import read_ascii
+from larch.xafs import autobk, feffit, feffit_dataset, feffit_transform, feffpath
+
+from xraylarch_web.config import Settings
+from xraylarch_web.main import create_app
+
+EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
+FEFFIT = EXAMPLES / "feffit"
+XAFSDATA = EXAMPLES / "xafsdata"
+
+# xafs_feffit examples: the app and plain Larch run the same feffit on the same
+# numbers, so anything beyond rounding is a difference in how the app reads the
+# model it was sent.
+FEFFIT_RTOL = 1e-9
+APP_TRANSFORM = dict(kstep=0.05, nfft=2048, rwindow="hanning")
+STATISTICS = ("n_independent", "chi_square", "reduced_chi_square", "r_factor", "aic", "bic", "epsilon_k")
+
+
+@pytest.fixture
+def client(tmp_path):
+    with TestClient(create_app(Settings(data_root=tmp_path))) as client:
+        yield client
+
+
+def import_columns(client, name, x, y, data_type):
+    """Upload two columns as a file and import them as one group, as the UI does."""
+    project = client.post("/api/athena/projects")
+    assert project.status_code == 200, project.text
+    project = project.json()
+    content = "# x y\n" + "".join(f"{float(a)!r} {float(b)!r}\n" for a, b in zip(x, y))
+    inspected = client.post(f"/api/athena/projects/{project['id']}/inspect",
+                            files={"file": (name, content.encode())})
+    assert inspected.status_code == 200, inspected.text
+    inspected = inspected.json()
+    columns = [column["column_id"] for column in inspected["columns"]]
+    imported = client.post(f"/api/athena/projects/{project['id']}/import", json={
+        "version": project["version"], "upload_id": inspected["upload_id"],
+        "energy_column": columns[0], "numerator": [columns[1]], "data_type": data_type})
+    assert imported.status_code == 200, imported.text
+    project = imported.json()
+    return project, project["groups"][-1]
+
+
+def app_feffit(client, project, group, parameters, paths, transform):
+    """POST the fit the Artemis page sends, with each FEFF file's text."""
+    body = dict(version=project["version"], parameters=parameters, transform=transform,
+                paths=[dict(path, content=(FEFFIT / path["filename"]).read_text())
+                       for path in paths])
+    reply = client.post(f"/api/artemis/projects/{project['id']}/groups/{group['id']}/fit", json=body)
+    assert reply.status_code == 200, reply.text
+    return reply.json()
+
+
+def chi_data(group):
+    """The chi(k) a script's autobk made, alone: the data the app is given."""
+    return Group(k=group.k, chi=group.chi)
+
+
+def assert_same_feffit(app, reference, dataset, names):
+    """Parameters, uncertainties, correlations and statistics agree to FEFFIT_RTOL."""
+    assert app["success"] is True
+    rows = {row["name"]: row for row in app["parameters"]}
+    assert set(rows) == set(names)
+    for name in names:
+        expected = reference.params[name]
+        np.testing.assert_allclose(rows[name]["value"], expected.value, rtol=FEFFIT_RTOL, atol=0,
+                                   err_msg=f"{name} value")
+        if expected.stderr is None:
+            assert rows[name]["stderr"] is None, name
+        else:
+            np.testing.assert_allclose(rows[name]["stderr"], expected.stderr, rtol=FEFFIT_RTOL, atol=0,
+                                       err_msg=f"{name} stderr")
+    correlations = {(row["left"], row["right"]): row["value"] for row in app["correlations"]}
+    expected_correlations = {tuple(sorted((name, other))): value
+                             for name in names for other, value in (reference.params[name].correl or {}).items()
+                             if other in names}
+    assert set(correlations) == set(expected_correlations)
+    for pair, value in expected_correlations.items():
+        np.testing.assert_allclose(correlations[pair], value, rtol=FEFFIT_RTOL, atol=0, err_msg=f"correlation {pair}")
+    statistics = app["statistics"]
+    assert statistics["n_varys"] == reference.nvarys
+    assert statistics["n_data"] == reference.ndata
+    assert statistics["errorbars"] == reference.errorbars
+    epsilon_k = dataset.epsilon_k
+    expected_statistics = dict(n_independent=reference.n_independent, chi_square=reference.chi_square,
+                               reduced_chi_square=reference.chi2_reduced, r_factor=reference.rfactor,
+                               aic=reference.aic, bic=reference.bic,
+                               epsilon_k=np.mean(epsilon_k[0] if isinstance(epsilon_k, (list, tuple)) else epsilon_k))
+    for key in STATISTICS:
+        np.testing.assert_allclose(statistics[key], expected_statistics[key], rtol=FEFFIT_RTOL, atol=0, err_msg=key)
+
+
+# --- feffit Ex1: Cu first shell (examples/feffit/doc_feffit1.py) -------------------------
+
+def cu_metal_chi(rbkg):
+    data = read_ascii(str(XAFSDATA / "cu_metal_rt.xdi"))
+    autobk(data.energy, data.mutrans, group=data, rbkg=rbkg, kw=2)
+    return data
+
+
+def test_feffit_ex1_cu_first_shell_matches_plain_larch(client):
+    cu_data = cu_metal_chi(rbkg=1.0)
+    pars = param_group(amp=param(1.0, vary=True), del_e0=param(0.0, vary=True),
+                       sig2=param(0.0, vary=True), del_r=guess(0.0, vary=True))
+    path1 = feffpath(str(FEFFIT / "feffcu01.dat"), s02="amp", e0="del_e0", sigma2="sig2", deltar="del_r")
+    trans = feffit_transform(kmin=3, kmax=17, kw=2, dk=4, window="kaiser", rmin=1.4, rmax=3.0, **APP_TRANSFORM)
+    dset = feffit_dataset(data=chi_data(cu_data), pathlist=[path1], transform=trans)
+    reference = feffit(pars, dset)
+
+    project, group = import_columns(client, "cu_metal_rt.chi", cu_data.k, cu_data.chi, "chi")
+    app = app_feffit(client, project, group,
+                     parameters=[dict(name=name, kind="guess", value=value)
+                                 for name, value in (("amp", 1.0), ("del_e0", 0.0), ("sig2", 0.0), ("del_r", 0.0))],
+                     paths=[dict(id="path1", filename="feffcu01.dat", s02="amp", e0="del_e0",
+                                 sigma2="sig2", deltar="del_r")],
+                     transform=dict(fitspace="r", kmin=3, kmax=17, kweight=[2], dk=4, window="kaiser",
+                                    rmin=1.4, rmax=3.0))
+
+    assert_same_feffit(app, reference, dset, ["amp", "del_e0", "sig2", "del_r"])
