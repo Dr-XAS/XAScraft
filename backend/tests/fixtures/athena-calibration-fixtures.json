@@ -14,8 +14,8 @@
     "backend/tests/fixtures/athena-calibration-native.json.gz": "e1c6fdd1dd173868ec91ef60165d58ffb7516a14a625e81bcb39b02f9e3e3f35",
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
     "backend/tests/fixtures/xdi-official-fe2o3_rt.xdi": "4a1c4cec3e00d62734406a872d8a114ebd7d7c1b66050a61ec4017b03abd2a5a",
-    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061",
-    "larch/xafs/pre_edge.py": "b2a6c033e83e998fa921357e0997548a15b1874253dd42a1fb6d9c5c196825aa"
+    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467",
+    "larch/xafs/pre_edge.py": "0a49d5cfb4b465580cb3ba17079df97e36d40c994d7e4b02cf2b8ec9a437e02d"
   },
   "fortran_library_sha256": "9e3b75b93645d446037763b14a1ab3744efec9c8cad86f6ec0449942263c09ab",
   "basis": "Unchanged Calibrate plot/Pluck/OnFindZeroCrossing/OnCalibrate, E0 zero-crossing and Data::Plot suffix methods, original Larch raw-derivative and smoothed templates, plus compiled Ifeffit f1mth smooth opcode. Explicit widget/data/normalization bridges, not a full native GUI or normalization-pipeline replay."

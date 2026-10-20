@@ -14,8 +14,16 @@ from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
 
+from tests.larch_source import assert_recorded_sources
+
 FIXTURES = Path(__file__).parent / 'fixtures'
 NATIVE = json.loads(gzip.decompress((FIXTURES / 'athena-mee-native.json.gz').read_bytes()))
+
+
+def test_native_reference_manifest_pins_its_sources():
+    manifest = json.loads((FIXTURES / 'athena-mee-fixtures.json').read_text())
+    assert manifest['case_count'] == len(NATIVE['cases'])
+    assert_recorded_sources(FIXTURES.parents[2], manifest['sha256'])
 
 
 @pytest.mark.parametrize('case', NATIVE['cases'], ids=lambda c: c['id'])

@@ -15,8 +15,8 @@
     "backend/tests/fixtures/athena-point-edit-native.json.gz": "b56a1c54898e465b0f3c91747687cf1b4fb3f5c4ed8e7d81cc09ce7a55bc0ac5",
     "backend/tests/fixtures/demeter-deglitch-ORP5.000": "14ba29646a27fc92dd707776df6396d7c14f1d5f39aeff1dae99f64eacab47ab",
     "backend/tests/fixtures/demeter-deglitch-ZT20.000": "d67ce7a091d4a0c5d7e9160cb081987e8a4a51597d06feb7cd38f1fa3e6702dc",
-    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061",
-    "larch/xafs/xafsutils.py": "dae14a66d9b1893659353bb9e6fe690857a0d627954417524de731b9aef1b67c"
+    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467",
+    "larch/xafs/xafsutils.py": "d21f079b44a20ad6584427b4b521b03a67983869108f88c54f6da2749db36eed"
   },
   "basis": "Unchanged Data::Process deglitch, deglitch_margins and Truncate methods, rendered by Text::Template and executed in Larch. Explicit data/config accessor and normalization-line bridges. Two measured CLS files and one constructed boundary probe; not a full native GUI or normalization pipeline replay. Native detector template corruption is captured rather than copied into the web implementation."
 }

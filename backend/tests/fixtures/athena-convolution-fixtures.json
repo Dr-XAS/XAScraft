@@ -12,7 +12,7 @@
     "backend/tests/fixtures/athena-convolution-native.json.gz": "5cc8383b01bed602fc00ff10a433d93d8f7dd391c29d5165ec52e7ab5df81d76",
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
     "backend/tests/fixtures/xdi-official-fe2o3_rt.xdi": "4a1c4cec3e00d62734406a872d8a114ebd7d7c1b66050a61ec4017b03abd2a5a",
-    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061"
+    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467"
   },
   "basis": "Original ConvoluteNoise::get_values/plot, Data::Process::convolve/noise and Text::Template rendered Larch templates. Explicit bridges for wx widgets/plot/clone and a supplied normalization edge step; not a full desktop-normalization or GUI replay. Actual NumPy MT19937 normal stream seeded through Larch, with global state restored after the harness."
 }

@@ -21,7 +21,7 @@
     "backend/tests/fixtures/demeter-merge-fe.060": "92f698464e3f27390ed554ce65ebb3aa7734cce0844fc1cd7fd7c8d04aae85b4",
     "backend/tests/fixtures/demeter-merge-fe.061": "79ec765bcb1b71969fc364cf1b0d6b2045b193c3d7268c06e3fe5bd6a69e4abb",
     "backend/tests/fixtures/demeter-merge-fe.062": "f37c416977164943cdea96b8d57c0dc319915221e7ddd997920b90dcac503f28",
-    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061",
+    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467",
     "larch/xafs/estimate_noise.py": "592dba47539012c84b76f6a2ae52badde6ebe5ed24281d051be284552e3db2df"
   }
 }

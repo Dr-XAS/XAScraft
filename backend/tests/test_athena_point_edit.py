@@ -15,7 +15,7 @@ from xraylarch_web.athena_point_edit import PointEditOptions, select_points, sel
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
-from tests.larch_source import source_path
+from tests.larch_source import assert_recorded_sources
 
 FIX = Path(__file__).parent / 'fixtures'
 NATIVE = json.loads(gzip.decompress((FIX / 'athena-point-edit-native.json.gz').read_bytes()))
@@ -39,15 +39,10 @@ def test_original_perl_methods_and_larch_templates_match_retained_measurements(r
 
 
 def test_reference_inputs_methods_and_runtime_are_hash_pinned():
-    # larch/math/utils.py and larch/xafs/xafsutils.py pinned at xraylarch 247278cef (was 8d6cd41c2).
-    # Upstream 98650acff only swapped builtin min/max for ndarray .min()/.max() in remove_dups (bit-identical
-    # on every call in the backend suite and check 1); xafsutils only made gfmt return str input unchanged,
-    # and KTOE, the name used here, is unchanged (import-larch ticket 22).
     root = FIX.parents[2]
     manifest = json.loads((FIX / 'athena-point-edit-fixtures.json').read_text())
     catalog = {r['file']: r['sha256'] for r in json.loads((root / 'docs/athena-primary-sources.json').read_text())['files']}
-    for path, sha in manifest['sha256'].items():
-        assert hashlib.sha256(source_path(root, path).read_bytes()).hexdigest() == sha
+    assert_recorded_sources(root, manifest['sha256'])
     for path, sha in manifest['source_sha256'].items():
         assert sha == catalog['demeter-' + manifest['demeter_revision'] + '/' + path]
     assert len(NATIVE['rows']) == manifest['case_count'] == 30

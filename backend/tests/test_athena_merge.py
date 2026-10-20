@@ -1,7 +1,6 @@
 """Original Demeter merge arithmetic, filtering, references and native exchange."""
 import copy
 import gzip
-import hashlib
 import json
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from xraylarch_web.athena_science import AthenaParameters
 from xraylarch_web.config import Settings
 from xraylarch_web.errors import WebInputError
 from xraylarch_web.main import create_app
-from tests.larch_source import source_path
+from tests.larch_source import assert_recorded_sources
 
 FIX=Path(__file__).parent/'fixtures'
 NATIVE=json.loads(gzip.decompress((FIX/'athena-merge-native.json.gz').read_bytes()))
@@ -136,9 +135,6 @@ def test_http_preview_preferences_validation_stale_revision_and_native_scatter_c
 
 
 def test_native_merge_hash_manifest():
-    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
-    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
-    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root=FIX.parents[2];manifest=json.loads((FIX/'athena-merge-fixtures.json').read_text())
-    for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest()==sha
+    assert_recorded_sources(root,manifest['sha256'])
     assert manifest['case_count']==len(NATIVE['rows'])==30

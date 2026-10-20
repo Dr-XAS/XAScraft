@@ -1,7 +1,6 @@
 """Measured native normalization dispatch, effective limits and project exchange."""
 import copy
 import gzip
-import hashlib
 import json
 from pathlib import Path
 
@@ -11,7 +10,7 @@ import pytest
 from xraylarch_web.athena import AthenaStore, Command
 from xraylarch_web.athena_science import process_spectrum
 from xraylarch_web.config import Settings
-from tests.larch_source import source_path
+from tests.larch_source import assert_recorded_sources
 
 FIX=Path(__file__).parent/'fixtures'
 ORACLE=json.loads(gzip.decompress((FIX/'athena-normalization-limits-native.json.gz').read_bytes()))
@@ -35,13 +34,10 @@ def test_all_fit_arrays_and_effective_bounds_match_original_template_dispatch(ro
 
 
 def test_native_limit_reference_sources_inputs_and_harness_hashes():
-    # larch/xafs/pre_edge.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream changed preedge only by
-    # 98650acff's builtin min/max -> ndarray .min()/.max() swap (bit-identical on every call in the backend
-    # suite and check 1) and rewrote energy_align, which neither the app nor this oracle calls (ticket 22).
     manifest=json.loads((FIX/'athena-normalization-limits-fixtures.json').read_text());root=FIX.parents[2]
     catalog={r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
     assert len(ORACLE['rows'])==manifest['cases']==54 and sum(len(r['phases']) for r in ORACLE['rows'])==108
-    for path,sha in manifest['sha256'].items():assert hashlib.sha256(source_path(root,path).read_bytes()).hexdigest()==sha
+    assert_recorded_sources(root,manifest['sha256'])
     for path,sha in ORACLE['sources'].items():assert catalog['demeter-'+ORACLE['demeter_revision']+'/'+path]==sha
 
 

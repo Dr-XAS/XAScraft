@@ -15,7 +15,7 @@ from xraylarch_web.athena_smoothing import SmoothOptions, smooth
 from reference.native_larch_replay import replay_smoothing
 from xraylarch_web.config import Settings
 from xraylarch_web.main import create_app
-from tests.larch_source import source_path
+from tests.larch_source import assert_recorded_sources
 
 FIXTURES = Path(__file__).parent / 'fixtures'
 NATIVE = json.loads(gzip.decompress((FIXTURES/'athena-smoothing-native.json.gz').read_bytes()))
@@ -24,14 +24,10 @@ METHODS = [dict(method='boxcar', window=8), dict(method='gaussian', window=11, s
 
 
 def test_recorded_reference_provenance():
-    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
-    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
-    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root = Path(__file__).resolve().parents[2]
     manifest = json.loads((FIXTURES/'athena-smoothing-fixtures.json').read_text())
     catalog = {row['file']:row['sha256'] for row in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
-    for path, sha in manifest['sha256'].items():
-        assert hashlib.sha256(source_path(root, path).read_bytes()).hexdigest() == sha
+    assert_recorded_sources(root, manifest['sha256'])
     for path, sha in NATIVE['sources'].items():
         assert catalog['demeter-'+manifest['demeter_revision']+'/'+path] == sha
     assert NATIVE['fortran_sources'] == manifest['fortran_sources']

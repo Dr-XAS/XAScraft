@@ -90,7 +90,7 @@
   },
   "sha256": {
     "backend/tests/reference/smoothing_native_reference.py": "61ebcdae32bc28b84690ad80bf5446e119881bbda88d2971cd317b6879afc2e3",
-    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061",
+    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467",
     "backend/tests/fixtures/athena-smoothing-native.json.gz": "e014379479bf8782d3774e04c096512eb2026bfaf776bd810c5d00a31fb25518",
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
     "backend/tests/fixtures/xdi-official-fe2o3_rt.xdi": "4a1c4cec3e00d62734406a872d8a114ebd7d7c1b66050a61ec4017b03abd2a5a"
