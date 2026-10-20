@@ -13,7 +13,7 @@
     "backend/tests/fixtures/xdi-official-cu_metal_rt.xdi": "3dc0b56597bd8452519fbc1c52a0327390abe3b80e3bc7b4c163aac4917db11e",
     "backend/tests/fixtures/demeter-fe.300.xmu": "495d5a23c27be69391473bb6aa17b854f7beda04c812e82ec67f74ba3afa9815",
     "backend/tests/fixtures/demeter-fe.060.xmu": "2484a64ae71299c17a530a9ad191a49510b53e8515279dfc8163bf56221a1c80",
-    "larch/math/utils.py": "9f7f776459925b66974205328698ef271be3bda5be3a25d9d38d1f37dbc54467",
+    "larch/math/utils.py": "15655e0fdb6b32886cf8efc307aaf015076bb9b490124beb00c8eab22b446061",
     "larch/fitting/__init__.py": "2d4cede1b72829a05c09dc4b2437ad619b0778883c9d2206e4d49c90de7b9547"
   }
 }

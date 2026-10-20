@@ -152,6 +152,9 @@ def test_http_preference_contract_and_restart_session_guard(tmp_path):
 
 
 def test_native_manifest_and_sources():
+    # larch/math/utils.py pinned at xraylarch 247278cef (was 8d6cd41c2). Upstream 98650acff only swapped
+    # builtin min/max for ndarray .min()/.max() in remove_dups; old and new remove_dups were bit-identical
+    # on every call in the backend suite and check 1 (import-larch ticket 22).
     root = Path(__file__).resolve().parents[2]
     manifest = json.loads((FIXTURES/'athena-smoothing-preferences-fixtures.json').read_text())
     catalog = {r['file']:r['sha256'] for r in json.loads((root/'docs/athena-primary-sources.json').read_text())['files']}
