@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState, type FocusEvent } from "react"
 
 type NumberDisplayValue = number | string | null | undefined
 type NumberDisplayConstraints = { min?: number; max?: number; step?: number | string }
@@ -38,12 +38,25 @@ export function compactNumberDisplay(raw: NumberDisplayValue, { min, max, step =
  */
 export function useCompactNumberDisplay(raw: NumberDisplayValue, constraints?: NumberDisplayConstraints) {
   const [focused, setFocused] = useState(false)
+  const reselect = useRef<HTMLInputElement | null>(null)
   const exact = raw == null ? "" : String(raw)
   const compact = compactNumberDisplay(raw, constraints)
+  useLayoutEffect(() => {
+    const input = reselect.current
+    reselect.current = null
+    // Swapping in the exact text drops the selection a Tab focus made, so the
+    // next keystrokes would append to it. Select it again so typing replaces.
+    if (input && input === document.activeElement) input.select()
+  }, [focused])
   return {
-    value: focused ? exact : compact,
+    // A number while editing: React compares it loosely with the input's text,
+    // so "10." and "10.0" survive instead of collapsing to "10" mid-typing.
+    value: focused && typeof raw === "number" ? raw : focused ? exact : compact,
     title: compact !== exact ? exact : undefined,
-    onFocus: () => setFocused(true),
+    onFocus: (event?: FocusEvent<HTMLInputElement>) => {
+      if (event && compact !== exact) reselect.current = event.currentTarget
+      setFocused(true)
+    },
     onBlur: () => setFocused(false),
   }
 }
