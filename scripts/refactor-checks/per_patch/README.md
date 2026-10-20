@@ -25,7 +25,11 @@ python scripts/refactor-checks/per_patch/summarize.py <reference capture> <varia
   (`compare.py`).
 - A variant can leave out several patches (`0005+0006+0007`). This is needed when a later
   patch does not apply without an earlier one. A selection that `build.py` refuses is recorded
-  as "does not build", with build.py's reason, and the run goes on.
+  as "does not build", with build.py's reason, and the run goes on. If `full` itself does not
+  build, the run stops with build.py's reason: there is nothing to compare the others with.
+- The team regression tests are `larch-patches/tests -m regression`, run with the capture's
+  single-thread settings (`DETERMINISM_ENV` in `../baseline_match/run.py`). A pytest run that
+  leaves no readable JUnit report is recorded as crashed, with its exit status.
 - The output folder gets, per variant: `<variant>.json` (IDENTITY, regression outcome, per-scenario
   summary), `<variant>.log`, `<variant>-regression.xml`. It also gets `sections.md`, one Markdown
   section per variant.

@@ -24,6 +24,15 @@ def test_without_a_test_outcome_there_is_no_test_line():
     assert "Team regression tests" not in text
 
 
+def test_a_crashed_regression_run_says_so_instead_of_counting():
+    tests = {"passed": 0, "failed": [], "skipped": [], "crashed": "pytest exit -11, no JUnit report"}
+
+    text = variant_section("Without 0002", {"copper": {"status": "identical", "fields": []}}, tests)
+
+    assert "Team regression tests: crashed (pytest exit -11, no JUnit report)." in text
+    assert "0 passed" not in text
+
+
 def test_a_variant_that_does_not_build_says_why():
     text = variant_section("Without 0005", {}, tests=None,
                            build_error="patch 0006-x.patch does not apply")

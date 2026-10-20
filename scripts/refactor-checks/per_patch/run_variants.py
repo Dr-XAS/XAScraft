@@ -33,17 +33,28 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 HARNESS = HERE.parent / "baseline_match"
 CONSTRAINTS = REPO / "deploy" / "python-release-constraints.txt"
-DETERMINISM_ENV = {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
-                   "VECLIB_MAXIMUM_THREADS": "1", "XRAYLARCH_XRF_WORKERS": "1"}
 
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HARNESS))
 
+from run import DETERMINISM_ENV  # noqa: E402  (baseline_match/run.py: the capture's own)
+from variant import Variant  # noqa: E402
 
-def regression_outcome(junit_xml):
-    """{passed, failed, skipped} from a pytest JUnit XML file; failures and errors are named."""
+# The team regression tests, as larch-patches/tests/conftest.py marks them.
+REGRESSION_TESTS = ["larch-patches/tests", "-m", "regression"]
+
+
+def regression_outcome(junit_xml, returncode=None):
+    """{passed, failed, skipped} from a pytest JUnit XML file; failures and errors are named.
+    A run that left no readable report (pytest crashed or was killed) is recorded as
+    `crashed`, with its exit status, and counts nothing."""
+    try:
+        cases = list(ET.parse(junit_xml).iter("testcase"))
+    except (OSError, ET.ParseError) as exc:
+        return {"passed": 0, "failed": [], "skipped": [],
+                "crashed": f"pytest exit {returncode}, no readable JUnit report ({type(exc).__name__})"}
     passed, failed, skipped = 0, [], []
-    for case in ET.parse(junit_xml).iter("testcase"):
+    for case in cases:
         name = f"{case.get('classname', '').rsplit('.', 1)[-1]}::{case.get('name')}"
         if case.find("failure") is not None or case.find("error") is not None:
             failed.append(name)
@@ -54,22 +65,16 @@ def regression_outcome(junit_xml):
     return {"passed": passed, "failed": failed, "skipped": skipped}
 
 
-def _series():
-    return sorted((REPO / "larch-patches" / "series").glob("[0-9][0-9][0-9][0-9]-*.patch"))
+def series_names():
+    return [p.name for p in sorted((REPO / "larch-patches" / "series").glob("[0-9][0-9][0-9][0-9]-*.patch"))]
 
 
 def patch_numbers():
-    return [p.name[:4] for p in _series()]
+    return [name[:4] for name in series_names()]
 
 
 def title(variant):
-    if variant == "full":
-        return "Full patch set (the reference)"
-    if variant == "pure":
-        return "Pure upstream (no patches)"
-    numbers = variant.split("+")
-    files = [p.name for p in _series() if p.name[:4] in numbers]
-    return f"Without {' + '.join(numbers)} ({', '.join(f'`{f}`' for f in files)})"
+    return Variant.parse(variant).title(series_names())
 
 
 def _run(cmd, log, **kwargs):
@@ -95,12 +100,7 @@ class BuildFailed(Exception):
 def run_variant(variant, python, args, log):
     build = args.work / f"build-{variant}"
     shutil.rmtree(build, ignore_errors=True)
-    if variant == "full":
-        selection = []
-    elif variant == "pure":
-        selection = ["--pure-upstream"]
-    else:
-        selection = [arg for number in variant.split("+") for arg in ("--exclude", number)]
+    selection = Variant.parse(variant).build_args()
     built = _run([python, "-I", REPO / "larch-patches" / "build.py", "--out", build, "--upstream", args.upstream,
                   "--build-python", python, *selection], log)
     if built.returncode != 0:
@@ -124,10 +124,11 @@ def run_variant(variant, python, args, log):
     shutil.rmtree(capture, ignore_errors=True)
     _run([python, HARNESS / "run.py", "--backend", REPO / "backend", "--out", capture], log, check=True, env=env)
     junit = args.out / f"{variant}-regression.xml"
-    _run([python, "-m", "pytest", "-p", "no:cacheprovider", "-q", "larch-patches/tests",
-          "-m", "regression", f"--junitxml={junit}"], log, env=env, cwd=REPO)
+    junit.unlink(missing_ok=True)
+    tested = _run([python, "-m", "pytest", "-p", "no:cacheprovider", "-q", *REGRESSION_TESTS,
+                   f"--junitxml={junit}"], log, env=env, cwd=REPO)
     shutil.rmtree(build, ignore_errors=True)
-    return identity, capture, regression_outcome(junit)
+    return identity, capture, regression_outcome(junit, tested.returncode)
 
 
 def main(argv=None):
@@ -144,13 +145,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     from compare import compare_dirs
-    from report import variant_section
+    from report import status_counts, variant_section
     from summarize import summarize_dirs
 
     args.work, args.out = args.work.resolve(), args.out.resolve()
     args.work.mkdir(parents=True, exist_ok=True)
     args.out.mkdir(parents=True, exist_ok=True)
     variants = [v for v in args.variants or [*patch_numbers(), "pure"] if v != "full"]
+    for variant in variants:
+        try:
+            Variant.parse(variant)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.reference is None:
         variants.insert(0, "full")
 
@@ -162,6 +168,11 @@ def main(argv=None):
             with open(args.out / f"{variant}.log", "w") as log:
                 identity, capture, tests = run_variant(variant, python, args, log)
         except BuildFailed as exc:
+            if variant == "full":
+                # Every other variant is measured against this one: stop, do not record
+                # them all as differing from nothing.
+                raise SystemExit(f"run_variants.py: the reference build `full` failed: {exc}. "
+                                 f"See {args.out / 'full.log'}.") from None
             result = {"variant": variant, "title": title(variant), "build_error": str(exc)}
             (args.out / f"{variant}.json").write_text(json.dumps(result, indent=1))
             print(f"{variant}: does not build: {exc}", flush=True)
@@ -177,16 +188,15 @@ def main(argv=None):
         (args.out / f"{variant}.json").write_text(json.dumps(result, indent=1, allow_nan=True))
         if variant != "full" and not args.keep_captures:
             shutil.rmtree(capture, ignore_errors=True)
-        counts = {s: sum(1 for x in result["summary"].values() if x["status"] == s)
-                  for s in ("identical", "differs", "fails", "missing")}
-        print(f"{variant}: {counts}; regression {tests['passed']} passed, {len(tests['failed'])} failed",
-              flush=True)
+        regression = (f"crashed ({tests['crashed']})" if tests.get("crashed")
+                      else f"{tests['passed']} passed, {len(tests['failed'])} failed")
+        print(f"{variant}: {status_counts(result['summary'])}; regression {regression}", flush=True)
     if reference and args.reference is None and not args.keep_captures:
         shutil.rmtree(reference, ignore_errors=True)
 
     results = [json.loads(p.read_text()) for p in sorted(args.out.glob("*.json"))]
-    order = {v: i for i, v in enumerate(["full", *patch_numbers(), "pure"])}
-    results.sort(key=lambda r: (order.get(r["variant"].split("+")[0], len(order)), r["variant"]))
+    names = series_names()
+    results.sort(key=lambda r: Variant.parse(r["variant"]).sort_key(names))
     (args.out / "sections.md").write_text("\n".join(
         variant_section(r["title"], r.get("summary", {}), r.get("tests"), r.get("build_error"))
         for r in results))

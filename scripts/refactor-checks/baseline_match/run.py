@@ -21,7 +21,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-# Bit-for-bit runs need single-threaded BLAS and XRF; set before numpy loads.
+# Bit-for-bit runs need single-threaded BLAS and XRF; set before numpy loads. The per-patch
+# runner (../per_patch/run_variants.py) runs its regression tests with the same settings.
 DETERMINISM_ENV = {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
                    "VECLIB_MAXIMUM_THREADS": "1", "XRAYLARCH_XRF_WORKERS": "1"}
 

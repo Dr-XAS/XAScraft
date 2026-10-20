@@ -1,7 +1,15 @@
 """Markdown for the per-patch report, from `summarize.summarize_dirs` summaries."""
 
 
-def _g(value):
+STATUSES = ("identical", "differs", "fails", "missing")
+
+
+def status_counts(summary):
+    """How many scenarios of a `summarize_dirs` summary have each status."""
+    return {status: sum(1 for s in summary.values() if s["status"] == status) for status in STATUSES}
+
+
+def _three_figures(value):
     return "–" if value is None else f"{value:.3g}"
 
 
@@ -40,8 +48,7 @@ def variant_section(title, summary, tests, build_error=None):
     """One `##` section: counts, regression tests, failing scenarios, differing scenarios."""
     if build_error:
         return f"## {title}\n\nDoes not build: {build_error}\n"
-    counts = {status: sum(1 for s in summary.values() if s["status"] == status)
-              for status in ("identical", "differs", "fails", "missing")}
+    counts = status_counts(summary)
     lines = [f"## {title}", ""]
     if counts["identical"] == len(summary):
         lines.append(f"Identical to the full patch set in all {len(summary)} scenarios.")
@@ -50,7 +57,9 @@ def variant_section(title, summary, tests, build_error=None):
         if counts["missing"]:
             text += f" {counts['missing']} missing."
         lines.append(text)
-    if tests is not None:
+    if tests is not None and tests.get("crashed"):
+        lines += ["", f"Team regression tests: crashed ({tests['crashed']})."]
+    elif tests is not None:
         failed = tests["failed"]
         lines += ["", f"Team regression tests: {tests['passed']} passed, {len(failed)} failed"
                   + (f" ({', '.join(failed)})." if failed else ".")]
@@ -66,6 +75,6 @@ def variant_section(title, summary, tests, build_error=None):
         lines += ["", "Scenarios that differ (worst relative RMS first):", "",
                   "| Scenario | Values differing | Other changes | Max abs | Max rel | Max rel RMS | Field |",
                   "| --- | --- | --- | --- | --- | --- | --- |"]
-        lines += [f"| {r['scenario']} | {r['values']} | {r['other']} | {_g(r['max_abs'])} | "
-                  f"{_g(r['max_rel'])} | {_g(r['max_rel_rms'])} | `{r['worst_field']}` |" for r in rows]
+        lines += [f"| {r['scenario']} | {r['values']} | {r['other']} | {_three_figures(r['max_abs'])} | "
+                  f"{_three_figures(r['max_rel'])} | {_three_figures(r['max_rel_rms'])} | `{r['worst_field']}` |" for r in rows]
     return "\n".join(lines) + "\n"
