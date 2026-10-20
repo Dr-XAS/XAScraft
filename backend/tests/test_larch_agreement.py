@@ -232,3 +232,212 @@ def test_xrf_scatter_column_is_larchs_scatter_component(case):
         native = model.comps[name]
         assert native.max() > 0
         np.testing.assert_allclose(column, native, rtol=1e-10, atol=1e-12 * native.max(), err_msg=name)
+
+
+# ----------------------------------------------------------------------------
+# Private or undocumented Larch API the backend relies on. Each test names the
+# site and checks that the symbol is there and answers the call the backend
+# makes, so a Larch upgrade that moves or reshapes it fails here, by name.
+
+
+@pytest.fixture(scope="module")
+def copper_path():
+    from larch.xafs import feffpath
+
+    from xraylarch_web import artemis
+
+    return feffpath(str(artemis._EXAMPLE), s02=0.9, e0=3, deltar=0.01, sigma2=0.008)
+
+
+@pytest.fixture
+def copper_dataset(copper_path):
+    """A one-path Larch feffit dataset on synthetic Cu chi(k), kweight as the backend passes it."""
+    from larch.fitting import param, param_group
+    from larch.xafs import feffit_dataset, feffit_transform, feffpath, ff2chi
+
+    from xraylarch_web import artemis
+
+    data = Group()
+    ff2chi([copper_path], group=data, k=np.arange(301) * 0.05)
+    data.chi = data.chi + np.random.default_rng(7).normal(0, 5e-5, data.k.size)
+    params = param_group(amp=param(0.9, vary=True), de0=param(3.0, vary=True))
+    path = feffpath(str(artemis._EXAMPLE), s02="amp", e0="de0", deltar=0.01, sigma2=0.008)
+    transform = feffit_transform(kmin=3, kmax=12, kweight=2, dk=1, rmin=1.4, rmax=3, fitspace="r",
+                                 kstep=0.05, nfft=2048, rwindow="hanning")
+    return feffit_dataset(data=data, paths=[path], transform=transform), params
+
+
+def test_private_finde0_takes_an_explicit_step(bundled_groups):
+    """Site 1: backend/xraylarch_web/athena_science.py:21 imports larch.xafs.pre_edge._finde0,
+    called at :222-224 as _finde0(x, y, estep=..., use_smooth=...)[0] for 50-99 point scans."""
+    import inspect
+
+    from larch.xafs.pre_edge import _finde0
+
+    assert {"estep", "use_smooth"} <= set(inspect.signature(_finde0).parameters)
+    group = next(g for g in bundled_groups if g["label"] == "Cu foil · 10 K")
+    energy, mu = np.asarray(group["energy"]), np.asarray(group["mu"])
+    e0 = float(_finde0(energy, mu, estep=0.5, use_smooth=True)[0])
+    assert e0 == pytest.approx(group["result"]["effective"]["e0"], abs=5)
+
+
+def test_private_feffdat_carries_the_arrays_and_geometry_read_from_it(copper_path):
+    """Sites 2, 5, 6, 7: path._feffdat read at backend/xraylarch_web/artemis.py:363-370,
+    artemis_disorder.py:64 (geom, rnorman), artemis_fast.py:453; its filename is set at
+    artemis_export.py:227."""
+    native = copper_path._feffdat
+    arrays = [native.k, native.real_phc, native.mag_feff, native.pha_feff, native.red_fact, native.lam, native.rep]
+    assert len({np.asarray(a).size for a in arrays}) == 1 and np.asarray(native.k).size >= 8
+    assert native.reff == pytest.approx(2.5478, abs=1e-3)
+    assert native.degen == 12 and native.nleg == 2 and len(native.geom) == native.nleg
+    assert all(len(atom) >= 4 for atom in native.geom)
+    assert float(native.rnorman) > 0
+    native.filename = "artemis/feff0000.dat"
+    assert native.filename == "artemis/feff0000.dat"
+
+
+def test_private_calc_chi_takes_resolved_path_values(copper_path):
+    """Site 3: backend/xraylarch_web/artemis.py:826 path._calc_chi(k=k, s02=, e0=, deltar=, sigma2=),
+    the preview; the upstream 'expected 7, got 3' break lived here."""
+    k = np.arange(241) * 0.05
+    copper_path._calc_chi(k=k, s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
+    assert np.asarray(copper_path.chi).shape == k.shape
+    assert np.isfinite(copper_path.chi).all() and np.ptp(copper_path.chi) > 0
+
+
+def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
+    """Site 4: backend/xraylarch_web/artemis.py:828,841 transform._xafsft(chi, group=, rmax_out=10)."""
+    from larch.xafs import feffit_transform
+
+    k = np.arange(241) * 0.05
+    copper_path._calc_chi(k=k, s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
+    transform = feffit_transform(kmin=3, kmax=12, kweight=2, dk=1, rmin=1.4, rmax=3,
+                                 kstep=0.05, nfft=2048, rwindow="hanning")
+    out = Group()
+    transform._xafsft(np.asarray(copper_path.chi, dtype=float), group=out, rmax_out=10)
+    assert out.r[-1] == pytest.approx(10, abs=0.05)
+    assert np.asarray(out.chir).shape == np.asarray(out.r).shape == np.asarray(out.chir_mag).shape
+    # The first shell, 2.55 Å less the phase shift, is where |chi(R)| peaks.
+    assert 1.8 < out.r[np.argmax(out.chir_mag)] < 2.6
+
+
+def test_internal_sigma2_models_used_for_disorder(copper_path):
+    """Site 5: backend/xraylarch_web/artemis_disorder.py:9 imports EINS_FACTOR and
+    sigma2_correldebye_py from larch.xafs.sigma2_models; :34-37 copies Larch's Einstein formula."""
+    import inspect
+
+    from larch.xafs.sigma2_models import EINS_FACTOR, sigma2_correldebye_py, sigma2_eins
+
+    from xraylarch_web.artemis_disorder import evaluate_disorder
+
+    assert isinstance(EINS_FACTOR, float) and EINS_FACTOR > 0
+    assert list(inspect.signature(sigma2_correldebye_py).parameters) == [
+        "natoms", "tk", "theta", "rnorm", "x", "y", "z", "atwt"]
+    assert 0.002 < evaluate_disorder("debye", 300.0, 315.0, copper_path) < 0.02
+    # The copied Einstein formula is Larch's sigma2_eins.
+    assert evaluate_disorder("eins", 300.0, 230.0, copper_path) == pytest.approx(
+        sigma2_eins(300.0, 230.0, copper_path), rel=1e-12)
+
+
+def test_private_session_symbols_survive_save_session(tmp_path, copper_path):
+    """Site 6: backend/xraylarch_web/artemis_export.py:252 save_session(fname, symbols=[...,
+    '_feffcache', '_feffpaths'], histbuff=[], _larch=<object with .symtable>), storing paths
+    through the app's FeffPathGroup adapter (:164-177)."""
+    from types import SimpleNamespace
+
+    from larch.io import read_session, save_session
+
+    from xraylarch_web.artemis_export import FeffPathGroup
+
+    stored = {"cu1": FeffPathGroup(copper_path)}
+    data = Group(groupname="g1", filename="cu.dat", k=np.arange(5) * 0.5)
+    symbols = Group(_sys=Group(core_groups=["_sys"], config=Group()), _xasgroups={"cu.dat": "g1"},
+                    _feffcache={"paths": stored, "runs": {}}, _feffpaths=stored, g1=data)
+    output = tmp_path / "model.larix"
+    save_session(str(output), symbols=["g1", "_feffcache", "_feffpaths"], histbuff=[],
+                 _larch=SimpleNamespace(symtable=symbols))
+    restored = read_session(str(output)).symbols
+    assert {"g1", "_feffcache", "_feffpaths"} <= set(restored)
+    assert set(restored["_feffpaths"]) == {"cu1"}
+    # The app's adapter picks Larch's stateful path decoder: FEFF arrays come back without disk access.
+    assert restored["_feffpaths"]["cu1"]._feffdat.reff == pytest.approx(copper_path._feffdat.reff)
+
+
+def test_private_dataset_chi_and_residual(copper_dataset):
+    """Sites 7, 8: backend/xraylarch_web/artemis_fast.py:338 reads dataset._chi and :508 calls
+    dataset._residual(params) for the engine parity check."""
+    dataset, params = copper_dataset
+    dataset.prepare_fit(params)
+    assert np.asarray(dataset._chi).shape == np.asarray(dataset.model.k).shape
+    residual = dataset._residual(params)
+    assert residual.ndim == 1 and residual.size > 0 and np.isfinite(residual).all()
+
+
+def test_one_element_kweight_list_collapses_the_noise_estimate(copper_dataset):
+    """Site 11: backend/xraylarch_web/artemis.py:608-612 (also artemis_export.py:232-233) pass
+    a scalar kweight because this Larch collapses a one-element list's noise estimate
+    to a scalar, which its residual then indexes per weight. If Larch stops doing
+    so, the workaround can go."""
+    dataset, _ = copper_dataset
+    dataset.transform.kweight = [2]
+    dataset.estimate_noise()
+    assert np.ndim(dataset.epsilon_k) == 0
+    dataset.transform.kweight = [1, 2]
+    dataset.estimate_noise()
+    assert np.ndim(dataset.epsilon_k) == 1 and len(dataset.epsilon_k) == 2
+
+
+def test_xrf_model_internals_read_and_written():
+    """Site 9: backend/xraylarch_web/athena_xrf_xas.py:1486-1515 and :849-934 read and write
+    XRF_Model internals (efano, use_escape, detector.material, escape_energy, escape_scale,
+    atten, count_time, det_sigma, params) and call calc_spectrum with a valuesdict-only
+    params object (:864-872, :891-897)."""
+    import inspect
+
+    from larch.xrf.xrf_model import XRF_Model
+
+    from xraylarch_web import athena_xrf_xas as engine
+
+    model = engine.build_model(["Fe"], 8.0, (1.0, 8.0), material="Si", thickness=0.5, det_noise=0.06,
+                               peak_step=1e-3, peak_tail=0.05, escape_amp=1.0, det_variance_slope=4e-4)
+    assert isinstance(model, XRF_Model)
+    assert model.efano == 4e-4 and model.use_escape is True and model.detector.material == "Si"
+    assert list(inspect.signature(model.det_sigma).parameters) == ["energy", "noise"]
+    assert {"det_noise", "peak_step", "peak_tail", "peak_gamma", "peak_beta", "escape_amp", "amp_fe"} <= set(model.params)
+    energy = np.linspace(1.0, 8.0, 201)
+    pars = {name: value for name, value in model.params.valuesdict().items() if not name.startswith("amp_")}
+    model.calc_spectrum(energy, params=engine._Values(pars))
+    assert model.comps == {}  # no element amplitude given: no element drawn
+    assert np.asarray(model.atten).shape == energy.shape and model.count_time > 0
+    assert model.escape_energy == pytest.approx(1.74, abs=0.05)
+    assert np.asarray(model.escape_scale).shape == energy.shape
+    model.detector.calc_mu(energy)
+    assert np.asarray(model.detector.mu_total).shape == energy.shape
+
+
+def test_autobk_resid_subtracts_the_standard_before_dividing_by_edge_step():
+    """Site 10: backend/xraylarch_web/athena_science.py:431-433 (_standard_arguments) scales
+    chi_std by edge_step because larch.xafs.autobk._resid subtracts chi_std before
+    dividing by edge_step."""
+    import importlib
+    import inspect
+
+    from scipy.interpolate import splrep
+
+    autobk_module = importlib.import_module("larch.xafs.autobk")
+    resid = autobk_module._resid
+    assert list(inspect.signature(resid).parameters) == [
+        "vcoefs", "ncoef", "kraw", "mu", "chi_std", "knots", "order", "kout",
+        "ftwin", "nfft", "irbkg", "nclamp", "clamp_lo", "clamp_hi", "edge_step"]
+
+    kraw = np.linspace(0, 12, 400)
+    kout = np.arange(241) * 0.05
+    mu = 1 + 0.2 * np.sin(2 * kraw) + 0.01 * kraw
+    knots, coefs, order = splrep(np.linspace(0, 12, 9), np.ones(9))
+    unscaled_chi = autobk_module.spline_eval(kraw, mu, knots, coefs, order, kout)[1]
+    common = dict(ncoef=len(coefs), kraw=kraw, mu=mu, knots=knots, order=order, kout=kout,
+                  ftwin=np.ones_like(kout), nfft=2048, irbkg=10, nclamp=0, clamp_lo=0, clamp_hi=0)
+    # A standard equal to mu - bkg, in mu's own units, cancels whatever edge_step is;
+    # one already divided by edge_step does not.
+    assert np.allclose(resid(coefs, chi_std=unscaled_chi, edge_step=2.0, **common), 0, atol=1e-12)
+    assert not np.allclose(resid(coefs, chi_std=unscaled_chi / 2.0, edge_step=2.0, **common), 0, atol=1e-6)
