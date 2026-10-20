@@ -39,7 +39,7 @@ nothing, into `--out` (which must be absent or empty):
   (`cat series/*.patch | sha256sum`). It changes only when the pin or a patch file changes; a
   reworded message counts. To print the version the current pin and series give, without
   building: `python3 -I -c 'import sys; sys.path.insert(0, "larch-patches"); import build; print(build.expected_version())'`.
-- **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
+- **Per-patch builds** (for the per-patch report, `scripts/refactor-checks/per_patch/`): `--exclude 0003` (repeatable) leaves patches out
   and marks the version, e.g. `….xascraft.<id of the rest>.without0003`. `--pure-upstream` applies
   nothing and gives upstream's own version, `2026.3.1.post78+g247278cef`.
 - **Stops** with a non-zero exit, and writes nothing, when a patch does not apply, when the full
@@ -126,8 +126,8 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
   pinned commit from the URL in `PIN`. A local clone is only read (`git clone --shared`).
 - The FEFF tests read `examples/feffit/Feff_Cu` from this repository's `examples/` folder.
   `XASCRAFT_EXAMPLES_DIR` points them at another `examples/` copy.
-- On the patched build at this pin, all 16 regression items pass. On plain upstream
-  `247278cef`, all 16 fail.
+- On the patched build, every regression item passes. On plain upstream at the pin
+  (`build.py --pure-upstream`), every one fails: each tests a behavior a patch gives.
 
 ## Patches
 
@@ -163,7 +163,7 @@ exit condition. "Gap" means no Larch-level test exists; the backend tests named 
 the behavior only indirectly.
 
 Every entry has the same exit condition: **upstream contains an equivalent fix**. The per-patch
-report proves this: on the new pin, a build without the patch gives the same outputs as a build
+report (`scripts/refactor-checks/per_patch/`) proves this: on the new pin, a build without the patch gives the same outputs as a build
 with it, and the entry's covering test passes without the patch. Then the patch is retired (see
 below). The exception is entry 10, which keeps an intentional upstream change out: it is
 retired when **the owner adopts upstream's behavior**.
@@ -189,7 +189,7 @@ retired when **the owner adopts upstream's behavior**.
   - 0006: `delta_chi` was in the units of mu, but feffit takes it as dimensionless, like chi.
     Now it is in edge-step units.
 - **Numeric effect:** none without clamps (round-off). With clamps, χ moves where the edge
-  step differs from 1. Measured as k²χ relative RMS over k = 3–12 (per-patch report, check 3):
+  step differs from 1. Measured as k²χ relative RMS over k = 3–12 (per-patch report):
   the app's copper examples move by ≤1e-5 and the curated demo by ≤4e-4. On the 82 bundled
   Athena projects (clamp_hi 24) the median is 7e-4, the 90th percentile 0.11 and the maximum
   1.4; raw-count spectra move by 10–140%. The Cu₂O 4-path fit's parameters move by ≤3e-5
@@ -403,8 +403,12 @@ Re-pin only when the owner asks.
    `tests/test_series.py`, the pin, versions and `UPSTREAM_LARCH_TREE` in `tests/test_build.py`,
    and `FILES` in `run-upstream-tests.sh` (upstream's `tests/run_tests.sh` list at the pin).
 5. Run all tests here and the per-patch report. Retire patches that upstream made unnecessary.
-   Give every other difference from the previous pin a verdict, as the decisions record
-   describes.
+   Give every other difference from the previous pin that the app could see a verdict:
+   - an upstream bug or regression: a temporary patch that undoes it, until upstream fixes it;
+   - a change to a private Larch API the app calls: an adapter in the app that works on both pins;
+   - an intentional upstream change to an app result: a temporary patch that keeps the old
+     result, with before/after numbers for the owner, until the owner adopts the change;
+   - a change with no effect on the app's results, shown and not assumed: adopted.
 
 At `247278cef` (from `8d6cd41c2`), 0001 to 0006 applied with offsets only. 0007 failed on
 `tests/run_tests.sh`, whose last lines upstream rewrote (`34be3ef37`); its hunk was redone on
