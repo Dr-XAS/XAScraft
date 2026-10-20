@@ -232,7 +232,7 @@ def log_ratio(s):
     analyze(s, "log-ratio", project, "log_ratio", pair, kmin=3, kmax=7, array="norm")
 
 
-# --- FEFF paths: preview and theory simulation ---------------------------------------
+# --- FEFF paths: preview, theory simulation and a split-shell fit --------------------
 
 def _perturbed(parameters):
     """Starting values moved off the example's, so the preview draws other numbers."""
@@ -312,6 +312,23 @@ def theory_simulation(s):
     view = f"{ARTEMIS}/projects/{project['id']}/groups/{group}/simulation-view"
     s.ok("replay the saved theory", "POST", view, json={"version": project["version"]})
     s.ok("replay the saved theory, k weight 1", "POST", view, json={"version": project["version"], "kweight": 1})
+
+
+def split_shell_fit(s):
+    """A fit with the same FEFF file as two enabled paths, each with its own S0² and sigma²."""
+    project = copper(s)
+    source = EXAMPLES / "feffit/feffcu01.dat"
+    cu = {"filename": source.name, "content": source.read_text(), "id": "cu1", "label": "Cu first shell"}
+    paths = [cu | {"s02": "0.65 * amp"},
+             cu | {"id": "cu2", "label": "Cu split", "s02": "0.35 * amp", "sigma2": "sig2 + 0.003"}]
+    parameters = [{"name": "amp", "value": 1, "min": 0, "max": 2},
+                  {"name": "del_e0", "value": 0, "min": -30, "max": 30},
+                  {"name": "del_r", "value": 0, "min": -0.2, "max": 0.2},
+                  {"name": "sig2", "value": 0.008, "min": 0, "max": 0.05}]
+    s.ok("fit copper split shell, same FEFF content", "POST",
+         f"{ARTEMIS}/projects/{project['id']}/groups/{ids(project)[F10]}/fit",
+         json={"version": project["version"], "parameters": parameters, "paths": paths,
+               "transform": {"kmin": 3, "kmax": 12, "rmin": 1.4, "rmax": 3, "kweight": [2]}})
 
 
 # --- persistence ---------------------------------------------------------------------
@@ -395,5 +412,6 @@ SCENARIOS = {
     "fit-history": fit_history,
     "artemis-path-preview": path_preview,
     "artemis-theory-simulation": theory_simulation,
+    "artemis-split-shell-fit": split_shell_fit,
     **{_bundled_name(path): bundled_project(path) for path in BUNDLED_PROJECTS},
 }

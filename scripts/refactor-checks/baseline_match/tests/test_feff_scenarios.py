@@ -1,4 +1,4 @@
-"""The FEFF path preview and theory simulation scenarios record what the Artemis routes drew."""
+"""The FEFF path preview, theory simulation and split-shell fit scenarios record what the Artemis routes returned."""
 import json
 import os
 import subprocess
@@ -11,15 +11,21 @@ HERE = Path(__file__).resolve().parents[1]
 BACKEND = HERE.parents[2] / "backend"
 
 
-@pytest.fixture(scope="module")
-def captured(tmp_path_factory):
-    out = tmp_path_factory.mktemp("capture")
+def capture(out, *names):
     env = {key: value for key, value in os.environ.items() if not key.startswith("XRAYLARCH_")}
     subprocess.run([sys.executable, str(HERE / "run.py"), "--backend", str(BACKEND), "--out", str(out),
-                    "--only", "artemis-path-preview", "artemis-theory-simulation"],
-                   check=True, env=env, cwd=out)
-    return {name: json.loads((out / f"{name}.json").read_text())
-            for name in ("artemis-path-preview", "artemis-theory-simulation")}
+                    "--only", *names], check=True, env=env, cwd=out)
+    return {name: json.loads((out / f"{name}.json").read_text()) for name in names}
+
+
+@pytest.fixture(scope="module")
+def captured(tmp_path_factory):
+    return capture(tmp_path_factory.mktemp("capture"), "artemis-path-preview", "artemis-theory-simulation")
+
+
+@pytest.fixture(scope="module")
+def split_shell(tmp_path_factory):
+    return capture(tmp_path_factory.mktemp("capture"), "artemis-split-shell-fit")["artemis-split-shell-fit"]
 
 
 def steps(document, prefix):
@@ -67,3 +73,22 @@ def test_a_feff_calculation_is_simulated_added_as_theory_and_replayed(captured):
     replays = steps(document, "replay the saved theory")
     assert [step["status"] for step in replays] == [200, 200]
     assert replays[1]["body"]["k"]["weight"] == 1
+
+
+def test_two_paths_with_the_same_feff_content_are_fitted_with_their_own_parameters(split_shell):
+    assert "error" not in split_shell
+    fit = steps(split_shell, "fit copper split shell")[0]
+    assert fit["status"] == 200
+    result = fit["body"]
+    assert result["success"]
+    first, second = result["paths"]
+    assert [first["id"], second["id"]] == ["cu1", "cu2"]
+    assert first["filename"] == second["filename"] == "feffcu01.dat"
+    values = {row["name"]: row["value"] for row in result["parameters"]}
+    # Each path keeps its own S0² and sigma²: shared names would give both the last path's values.
+    assert first["values"]["s02"] == pytest.approx(0.65 * values["amp"])
+    assert second["values"]["s02"] == pytest.approx(0.35 * values["amp"])
+    assert first["values"]["sigma2"] == pytest.approx(values["sig2"])
+    assert second["values"]["sigma2"] == pytest.approx(values["sig2"] + 0.003)
+    assert first["k"]["chi"] != second["k"]["chi"]
+    assert first["r"]["re"] != second["r"]["re"]
