@@ -43,16 +43,22 @@ export async function seedProject(request: APIRequestContext, dataset: Dataset):
   return project.id
 }
 
-/** Pin the browser clock and open a page of the app. */
-export async function openPage(page: Page, path: string) {
+/** Pin the browser clock and start counting requests; call before the first navigation. */
+export async function preparePage(page: Page) {
   await page.clock.setFixedTime(fixedTime)
+  watchTraffic(page)
+}
+
+/** Open a page of the app. */
+export async function openPage(page: Page, path: string) {
+  await preparePage(page)
   await page.goto(`${basePath()}${path}`)
   await settle(page)
 }
 
 /** Open the workbench on a project, or on a new one. */
 export async function openWorkbench(page: Page, projectId?: string) {
-  await page.clock.setFixedTime(fixedTime)
+  await preparePage(page)
   if (projectId) await page.addInitScript(id => localStorage.setItem("athena.project", id), projectId)
   await page.goto(`${basePath()}/`)
   await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled()
@@ -70,32 +76,69 @@ export async function selectSpectrum(page: Page, spectrum: Spectrum) {
   await settle(page)
 }
 
+type Traffic = { inFlight: number; last: number }
+const traffic = new WeakMap<Page, Traffic>()
+
+/** Count the page's requests from now on (done by every open* helper before navigating). */
+function watchTraffic(page: Page) {
+  if (traffic.has(page)) return
+  const state: Traffic = { inFlight: 0, last: Date.now() }
+  traffic.set(page, state)
+  page.on("request", () => { state.inFlight += 1; state.last = Date.now() })
+  const done = () => { state.inFlight = Math.max(0, state.inFlight - 1); state.last = Date.now() }
+  page.on("requestfinished", done)
+  page.on("requestfailed", done)
+}
+
+/**
+ * Wait until no request has been in flight for `quietMs`. Previews in the tool
+ * dialogs fetch after a debounce longer than "networkidle"'s 500 ms, so that
+ * alone can catch a dialog before its plot.
+ */
+async function quiet(page: Page, quietMs = 1500, timeoutMs = 90_000) {
+  const state = traffic.get(page)
+  if (!state) { await page.waitForLoadState("networkidle"); return }
+  const deadline = Date.now() + timeoutMs
+  while (state.inFlight > 0 || Date.now() - state.last < quietMs) {
+    if (Date.now() > deadline) throw new Error(`requests still running after ${timeoutMs} ms`)
+    await page.waitForTimeout(100)
+  }
+}
+
 /** Wait until requests, fonts, busy regions and plots have finished. */
 export async function settle(page: Page) {
-  await page.waitForLoadState("networkidle")
+  await quiet(page)
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   // The project bar reads "Working…" (or "Connecting", "Saving …", "… pending") while a task runs.
   await page.waitForFunction(() => !document.querySelector("[aria-busy='true']") &&
     !/^(Working|Connecting|Saving|Parameter changes pending)/.test(document.querySelector(".ath-autosaved")?.textContent ?? ""),
   undefined, { timeout: 60_000 })
-  await page.waitForLoadState("networkidle")
+  await quiet(page)
 }
 
 /**
- * Fields that change on their own between runs, masked in every screenshot.
- * This is the only list; everything else is compared pixel for pixel.
+ * Compare the viewport, or one element, with its snapshot. Soft: the test goes on
+ * to the next screen. Fields that change on their own are masked by
+ * volatile-fields.css, which the config applies to every screenshot.
  */
-export function volatileFields(page: Page): Locator[] {
-  return [
-    // Open a project › Recent local projects: "<n> data items · <save time>", one text run.
-    page.locator(".ath-recent small"),
-  ]
+export async function shoot(target: Page | Locator, name: string) {
+  await steady(target)
+  await expect.soft(target).toHaveScreenshot(`${name}.png`)
 }
 
-/** Compare the viewport, or one element, with its snapshot. Soft: the test goes on to the next screen. */
-export async function shoot(target: Page | Locator, name: string) {
-  const page = "page" in target ? target.page() : target
-  await expect.soft(target).toHaveScreenshot(`${name}.png`, { mask: volatileFields(page) })
+/**
+ * Wait until three screenshots 250 ms apart are identical. toHaveScreenshot only
+ * needs two frames in a row, and right after a menu closes the compositor has
+ * shown a stale tile (a piece of a plot where the menu was) for that long.
+ */
+async function steady(target: Page | Locator, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs
+  const frames: Buffer[] = []
+  while (Date.now() < deadline) {
+    frames.push(await target.screenshot({ animations: "disabled", caret: "hide", scale: "css" }))
+    if (frames.length >= 3 && frames.slice(-3).every(frame => frame.equals(frames.at(-1)!))) return
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
 }
 
 export function mainMenu(page: Page) {

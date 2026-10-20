@@ -1,0 +1,22 @@
+/*
+ * Fields that change on their own between runs. Applied to every screenshot of
+ * the screenshot suite (playwright.screens.config.ts, expect.toHaveScreenshot.stylePath);
+ * this is the only list, everything else is compared pixel for pixel.
+ *
+ * Each field is painted as a solid box of fixed width, so text of another length
+ * moves nothing around it. Playwright's own `mask` option draws its boxes under a
+ * modal <dialog> (the browser's top layer), so it cannot hide these.
+ */
+
+/* Open a project › Recent local projects: "<n> data items · <save time>", one text run. */
+.ath-recent small,
+/* Project journal › Processing history: the time of each step. */
+.ath-history small {
+  display: inline-block !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  color: transparent !important;
+  background: #ff00ff !important;
+}
+.ath-recent small { width: 16em !important; }
+.ath-history small { width: 7em !important; }

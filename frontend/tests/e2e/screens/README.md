@@ -28,9 +28,15 @@ Set in `playwright.screens.config.ts`:
 - **WebGL**: through SwiftShader, Chromium's CPU renderer
   (`--use-angle=swiftshader --enable-unsafe-swiftshader`), because the headless
   shell has no WebGL and the 3Dmol viewers and the 3D wavelet surface need it.
-  `--disable-gpu-rasterization` keeps the page itself on the software rasteriser:
-  rasterised on the SwiftShader GPU path, a blurred dialog backdrop changes by a
-  few levels from one frame to the next. The same flags are used for every run.
+- **Repeatable raster**: `--disable-gpu-rasterization --num-raster-threads=1
+  --disable-partial-raster`. Without them, some pixels (blurred dialog
+  backdrops, rounded borders, form controls) changed by one or two levels between
+  runs, and stale tiles from the page once showed through a plot and a panel.
+  The same flags are used for every run.
+- **Settled screens**: before each screenshot the page has had no request in
+  flight for 1.5 s (tool previews fetch after a debounce longer than Playwright's
+  `networkidle`), fonts are loaded, nothing is `aria-busy`, and the project bar
+  no longer reads "Working…".
 - **Comparison**: `toHaveScreenshot` with `threshold: 0`, `maxDiffPixels: 0`,
   animations disabled, caret hidden. Each screen is a soft assertion, so one diff
   does not hide the rest of a test.
@@ -38,9 +44,12 @@ Set in `playwright.screens.config.ts`:
   `APP_BUILD_SHA` (the version badge), the browser clock
   (`page.clock.setFixedTime`, 2026-01-02 03:04:05 UTC), the backend's
   `XRAYLARCH_GIT_REVISION`, and single-threaded numerics.
-- **Masked** (the one list is `volatileFields()` in `screens.ts`): the line under
-  each name in Open a project › Recent local projects, "5 data items · <save
-  time>", which is a single text run.
+- **Masked** (the one list is `volatile-fields.css`), painted as a magenta box by
+  that stylesheet, which the config applies to every screenshot (Playwright's own
+  `mask` is drawn under modal dialogs):
+  - Open a project › Recent local projects: the line under each name, "5 data
+    items · <save time>", a single text run
+  - Project journal › Processing history: the time of each step
 - **Filtered**: in the Open a project dialog, Recent local projects is cut down to
   the project that is open, because the list holds every project the run created.
 

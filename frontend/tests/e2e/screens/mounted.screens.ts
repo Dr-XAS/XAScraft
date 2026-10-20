@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 
 import { expect, test, type APIRequestContext } from "@playwright/test"
 
-import { basePath, fixedTime, openDialog, openMenu, settle, shoot } from "./screens"
+import { basePath, openDialog, openMenu, preparePage, settle, shoot } from "./screens"
 
 /**
  * The Dr.XAS launch, which only the mounted build serves: a project created and
@@ -49,7 +49,7 @@ test("Dr.XAS launch · linked project", async ({ page, request }) => {
   const project = await signed(request, "/api/integration/v2/projects", { contract_version: 2, name: "Screens · linked project", persistent: true }) as { project_id: string; capability: string }
   const { handle } = await signed(request, `/api/integration/v2/projects/${project.project_id}/launch`, { capability: project.capability }, project.capability) as { handle: string }
 
-  await page.clock.setFixedTime(fixedTime)
+  await preparePage(page)
   await page.goto(`${basePath()}/integration?launch=${encodeURIComponent(handle)}&return=%2Fadvanced-xas`)
   await expect(page.getByText("Linked project", { exact: true })).toBeVisible()
   await settle(page)

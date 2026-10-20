@@ -76,15 +76,21 @@ const serve = (port: string) => `npm run build && npm run start -- --hostname 12
 
 // Playwright's headless shell has no WebGL, so the 3Dmol viewers and Plotly's 3D
 // surface would not render. SwiftShader, Chromium's CPU implementation, gives WebGL
-// without a GPU. Rasterising the page on that same GPU path is not deterministic (a
-// blurred dialog backdrop differs by a few levels from one frame to the next), so the
-// page itself is rasterised in software.
+// without a GPU. The rest of the flags make the page's own rasterisation repeatable:
+// on the GPU path, or with several raster threads, or re-rastering only the damaged
+// part of a tile, some pixels (blurred dialog backdrops, form controls) change by a
+// level or two from run to run, and a stale tile once showed through a plot.
 const chromium = {
   ...devices["Desktop Chrome"],
   deviceScaleFactor: 1,
   locale: "en-US",
   timezoneId: "UTC",
-  launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu-rasterization"] },
+  launchOptions: {
+    args: [
+      "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+      "--disable-gpu-rasterization", "--num-raster-threads=1", "--disable-partial-raster",
+    ],
+  },
 }
 const desktop = { width: 1440, height: 1000 }
 const phone = { width: 390, height: 844 }
@@ -101,7 +107,10 @@ export default defineConfig({
   timeout: 300_000,
   expect: {
     timeout: 20_000,
-    toHaveScreenshot: { threshold: 0, maxDiffPixels: 0, animations: "disabled", caret: "hide", scale: "css" },
+    toHaveScreenshot: {
+      threshold: 0, maxDiffPixels: 0, animations: "disabled", caret: "hide", scale: "css",
+      stylePath: path.join(frontendRoot, "tests/e2e/screens/volatile-fields.css"),
+    },
   },
   use: { trace: "retain-on-failure", screenshot: "only-on-failure" },
   // The four standalone projects run the workbench specs; the mounted build runs them
