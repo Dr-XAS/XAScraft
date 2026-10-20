@@ -19,10 +19,32 @@ import pytest
 from xascraft_local import common, install, manager, services, source
 
 
+# What the stand-in for larch-patches/build.py reports; build.py's own tests cover the real one.
+PATCHED_LARCH = '2026.3.1.post35+g8d6cd41c2.xascraft.0123456789ab'
+FAKE_BUILD = f"""
+import argparse, json, pathlib, sys, zipfile
+parser = argparse.ArgumentParser()
+parser.add_argument('--out', required=True)
+parser.add_argument('--upstream')
+args = parser.parse_args()
+here = pathlib.Path(__file__).parent
+(here / 'calls.json').write_text(json.dumps(sys.argv[1:]))
+if (here / 'fail').exists():
+    sys.exit('patch 0003-x.patch does not apply')
+out = pathlib.Path(args.out)
+(out / 'dist').mkdir(parents=True)
+(out / 'IDENTITY').write_text(json.dumps({{'version': '{PATCHED_LARCH}', 'patch_set_id': '0123456789ab'}}))
+with zipfile.ZipFile(out / 'dist' / 'xraylarch-{PATCHED_LARCH}-py3-none-any.whl', 'w') as wheel:
+    wheel.writestr('larch/__init__.py', '__version__ = "{PATCHED_LARCH}"')
+"""
+
+
 def distribution(path):
+    """A checkout: app sources plus the Larch patch queue with its build script."""
     for directory in source.SOURCE_DIRS:
         (path / directory).mkdir(parents=True)
-    (path / "larch/version.py").write_text("__release_version__ = '2026.3.1'\n")
+    (path / "larch-patches/series").mkdir(parents=True)
+    (path / "larch-patches/build.py").write_text(FAKE_BUILD)
     (path / "backend/xraylarch_web/app.py").write_text("print('application')\n")
     (path / "frontend/package.json").write_text('{}')
     (path / "installers/local/run.py").write_text('pass')
@@ -43,7 +65,7 @@ def installed(root):
 def test_snapshot_separates_user_data_secrets_and_generated_dependencies(tmp_path):
     original = distribution(tmp_path / "original")
     for name in ('frontend/.env.local', 'frontend/node_modules/secret.js',
-                 'backend/data/project.json', 'frontend/.next/server.js', 'larch/__pycache__/x.pyc'):
+                 'backend/data/project.json', 'frontend/.next/server.js', 'backend/xraylarch_web/__pycache__/x.pyc'):
         file = original / name
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text('private')
@@ -60,17 +82,59 @@ def test_snapshot_separates_user_data_secrets_and_generated_dependencies(tmp_pat
     assert metadata['content_sha256'] != second['content_sha256']
 
 
+def test_larch_version_is_the_patch_queue_build_and_ignores_app_only_changes(tmp_path):
+    original = distribution(tmp_path / 'original')
+    first = source.snapshot(original, tmp_path / 'first')
+    (original / 'backend/xraylarch_web/app.py').write_text('changed backend')
+    (original / 'frontend/package.json').write_text('{"changed": "frontend"}')
+    second = source.snapshot(original, tmp_path / 'second')
+    assert first['protocol'] == second['protocol'] == 2
+    assert first['larch_version'] == second['larch_version'] == PATCHED_LARCH
+    assert first['content_sha256'] != second['content_sha256']
+    shipped = tmp_path / 'first' / source.LARCH_DIR
+    assert (shipped / f'xraylarch-{PATCHED_LARCH}-py3-none-any.whl').is_file()
+    assert json.loads((shipped / 'IDENTITY').read_text())['version'] == PATCHED_LARCH
+    assert not (tmp_path / 'first/larch').exists()
+    assert not (tmp_path / 'first/larch-patches').exists()
+
+
 def test_source_package_roundtrip_and_tamper_detection(tmp_path):
     original = distribution(tmp_path / 'source')
     archive = tmp_path / 'xascraft-source.zip'
     source.package_source(original, archive, 'xascraft-v0.1.0')
     unpacked = tmp_path / 'unpacked'
     source.extract_zip(archive, unpacked)
+    assert not (unpacked / 'larch-patches').exists()  # installing a zip never builds Larch
     metadata = source.snapshot(unpacked, tmp_path / 'roundtrip')
     assert metadata['label'] == 'xascraft-v0.1.0'
+    assert metadata['larch_version'] == PATCHED_LARCH
+    assert (tmp_path / 'roundtrip' / source.LARCH_DIR / f'xraylarch-{PATCHED_LARCH}-py3-none-any.whl').is_file()
     (unpacked / 'frontend/package.json').write_text('{"changed":true}')
     with pytest.raises(RuntimeError, match='manifest'):
         source.snapshot(unpacked, tmp_path / 'bad')
+
+
+def test_checkout_builds_larch_from_the_chosen_upstream_and_reports_a_failed_build(tmp_path, monkeypatch):
+    original = distribution(tmp_path / 'checkout')
+    monkeypatch.setenv('XASCRAFT_LARCH_UPSTREAM', str(tmp_path / 'xraylarch clone'))
+    source.snapshot(original, tmp_path / 'first')
+    calls = json.loads((original / 'larch-patches/calls.json').read_text())
+    assert calls[calls.index('--upstream') + 1] == str(tmp_path / 'xraylarch clone')
+    (original / 'larch-patches/fail').write_text('')
+    with pytest.raises(RuntimeError, match='patched Larch failed:\n.*0003-x.patch does not apply'):
+        source.snapshot(original, tmp_path / 'second')
+
+
+def test_protocol_1_source_is_refused(tmp_path):
+    unpacked = tmp_path / 'protocol-1'
+    for directory in source.SOURCE_DIRS:
+        (unpacked / directory).mkdir(parents=True)
+    (unpacked / 'larch/version.py').parent.mkdir()
+    (unpacked / 'larch/version.py').write_text("__release_version__ = '2026.3.1'\n")
+    common.write_json(unpacked / 'xascraft-release.json', {'protocol': 1, 'content_sha256': 'a' * 64})
+    with pytest.raises(RuntimeError, match='protocol 1.*protocol 2'):
+        source.snapshot(unpacked, tmp_path / 'snapshot')
+    assert not (tmp_path / 'snapshot').exists()
 
 
 def test_archive_inside_an_unrelated_git_tree_keeps_examples(tmp_path):
