@@ -177,8 +177,12 @@ below).
     other units gave another background. Now the clamps act on chi in edge-step units.
   - 0006: `delta_chi` was in the units of mu, but feffit takes it as dimensionless, like chi.
     Now it is in edge-step units.
-- **Numeric effect:** small on normal spectra: k²χ RMS changes by 8e-8 to 1.5e-4. When mu is
-  in raw counts, chi changes by 1 to 6%. `delta_chi` is divided by the edge step.
+- **Numeric effect:** none without clamps (round-off). With clamps, χ moves where the edge
+  step differs from 1. Measured as k²χ relative RMS over k = 3–12 (per-patch report, check 3):
+  the app's copper examples move by ≤1e-5 and the curated demo by ≤4e-4. On the 82 bundled
+  Athena projects (clamp_hi 24) the median is 7e-4, the 90th percentile 0.11 and the maximum
+  1.4; raw-count spectra move by 10–140%. The Cu₂O 4-path fit's parameters move by ≤3e-5
+  relative. `delta_chi` is divided by the edge step, but no app output carries it.
 - **Covering test:** `test_xafs_defects.py::test_autobk_chi_does_not_depend_on_the_units_of_mu`
   covers the clamps and `delta_chi`. Gap: the missing-covariance path (0003) has no test.
 - **App needs it:** yes.
