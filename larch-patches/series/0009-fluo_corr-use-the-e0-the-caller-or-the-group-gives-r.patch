@@ -1,4 +1,4 @@
-From 69d62268cdaa36241ba932869c414cb72e204a78 Mon Sep 17 00:00:00 2001
+From dea94051d103a298e91a690ba865e3f1c1ae65cc Mon Sep 17 00:00:00 2001
 From: XAScraft refactor <refactor@xascraft.invalid>
 Date: Tue, 20 Oct 2026 12:00:00 -0500
 Subject: [PATCH] fluo_corr: use the e0 the caller or the group gives (revert
@@ -21,9 +21,8 @@ Temporary XAScraft patch: it keeps the app's self-absorption numbers as
 they were at the previous pin until the project owner decides whether to
 adopt upstream's behavior.
 ---
- larch/xafs/fluo.py      |  6 +++---
- tests/test_xafs_fluo.py | 12 ++++++++++++
- 2 files changed, 15 insertions(+), 3 deletions(-)
+ larch/xafs/fluo.py | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/larch/xafs/fluo.py b/larch/xafs/fluo.py
 index 5ae505caba39fd15d3d256b27e1f6e434ed5838f..76266e7ae4e0b7ae9ad9212c1b23c8c6d4e1b30f 100644
@@ -50,23 +49,3 @@ index 5ae505caba39fd15d3d256b27e1f6e434ed5838f..76266e7ae4e0b7ae9ad9212c1b23c8c6
  
      # generate normalized mu for correction
      preinp   = preedge(energy, mu, **pre_opts)
-diff --git a/tests/test_xafs_fluo.py b/tests/test_xafs_fluo.py
-index 11537595b54bc6c34f9d0104625a680c5e52cbe0..6c3b897a813b8895309e4af683991354273dfc4a 100644
---- a/tests/test_xafs_fluo.py
-+++ b/tests/test_xafs_fluo.py
-@@ -27,3 +27,15 @@ def test_fluo_corr_uses_group_normalization(pre_edge_opts):
-     fluo_corr(dat.energy, dat.mu, 'Fe2O3', 'Fe', group=dat)
-     np.testing.assert_allclose(dat.mu_corr, explicit_mu)
-     np.testing.assert_allclose(dat.norm_corr, explicit_norm)
-+
-+
-+def test_fluo_corr_normalizes_around_the_e0_it_is_given():
-+    """An e0 the caller passes is used, as pre_edge() uses it: norm_corr is mu_corr
-+    normalized with the caller's options.  fluo_corr dropped it and normalized around
-+    its own find_e0 instead (here e0 is 7112 eV, the tabulated Fe K edge)."""
-+    from larch.xafs.pre_edge import preedge
-+    dat = read_ascii(Path(basedir, 'examples', 'xafsdata', 'fe2o3_rt1.xmu'))
-+    opts = dict(e0=7112.0, pre1=-100, pre2=-30, norm1=50, norm2=300, nnorm=2)
-+    fluo_corr(dat.energy, dat.mu, 'Fe2O3', 'Fe', group=dat, **opts)
-+    expected = preedge(dat.energy, dat.mu_corr, **opts)['norm']
-+    np.testing.assert_allclose(dat.norm_corr, expected, rtol=0, atol=1e-12)

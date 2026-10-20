@@ -101,8 +101,8 @@ def test_full_build_larch_is_upstream_at_the_pin_except_the_patched_files(full, 
     assert all(patched[k] != upstream.get(k) for k in named)
 
 
-# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3), or
-# None for the queue's own temporary patches, which no XAScraft commit made.
+# The XAScraft commit each patch came from (README.md, "Patches"; notes/01 section 3);
+# None for a temporary patch, which comes from no XAScraft commit.
 XASCRAFT_COMMITS = {
     "0001": "e47015166",
     "0002": "3ca0a9716",
@@ -111,6 +111,7 @@ XASCRAFT_COMMITS = {
     "0005": "b334e57f8",
     "0006": "8d37ac358",
     "0007": "aee4bb5e6",
+    "0008": None,
     "0009": None,
 }
 

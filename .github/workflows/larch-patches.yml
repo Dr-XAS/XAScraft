@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # test_series.py compares each patch with the XAScraft commit it came from.
+          # test_series.py compares each team patch with the XAScraft commit it came from.
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:

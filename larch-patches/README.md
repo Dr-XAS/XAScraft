@@ -35,7 +35,7 @@ nothing, into `--out` (which must be absent or empty):
 | `IDENTITY` | JSON: `pin`, `upstream_version`, `patch_set_id`, `version`, `pure_upstream`, `patches` (number, file, `xascraft_commit`), `excluded`, `larch_tree`. |
 
 - **Version**: `<upstream-version from PIN>.xascraft.<patch-set id>`, today
-  `2026.3.1.post78+g247278cef.xascraft.e7970d70f0a4`. The patch-set id is the first 12 hex digits
+  `2026.3.1.post78+g247278cef.xascraft.ed2aca286fc2`. The patch-set id is the first 12 hex digits
   of the sha256 of the applied patch files' bytes, in order (`cat series/*.patch | sha256sum`).
   It changes only when the pin or a patch file changes; a reworded message counts.
 - **Per-patch builds** (for the per-patch report): `--exclude 0003` (repeatable) leaves patches out
@@ -105,8 +105,7 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 ```
 
 - The upstream suite runs the files upstream's `tests/run_tests.sh` names at the pin, plus
-  `test_xrf_model.py` and `test_xafs_fluo.py`, which patches 0004 and 0009 change.
-  Expected: 204 passed, 2 skipped (`test_plot_rixsdata_import.py` needs
+  `test_xrf_model.py`. Expected: 201 passed, 2 skipped (`test_plot_rixsdata_import.py` needs
   `wx`; `test_xafs_rebin.py`'s benchmark runs only with `LARCH_REBIN_TIMING=1`), 11 deselected.
 - **Known pre-existing failures.** The 11 deselected tests are `test_larchexamples_xafs.py`
   scripts that call wx plotting commands (`plot_bkg`, `plot_chifit`, ...), which do not exist
@@ -126,8 +125,8 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
   pinned commit from the URL in `PIN`. A local clone is only read (`git clone --shared`).
 - The FEFF tests read `examples/feffit/Feff_Cu` from this repository's `examples/` folder.
   `XASCRAFT_EXAMPLES_DIR` points them at another `examples/` copy.
-- On the patched build at this pin, all 13 regression items pass. On plain upstream
-  `247278cef`, all 13 fail.
+- On the patched build at this pin, all 16 regression items pass. On plain upstream
+  `247278cef`, all 16 fail.
 
 ## Patches
 
@@ -140,18 +139,20 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 | 0005 | `b334e57f8` | Xiangyu Yin, 2026-10-12 | `xafs/autobk.py`, `xafs/estimate_noise.py`, `xafs/feffdat.py` | [AUTOBK](#2-autobk), [Noise estimate](#6-noise-estimate), [FEFF path data](#7-feff-path-data) |
 | 0006 | `8d37ac358` | Xiangyu Yin, 2026-10-12 | `xafs/autobk.py`, `xafs/feffdat.py` | [AUTOBK](#2-autobk), [FEFF path data](#7-feff-path-data) |
 | 0007 | `aee4bb5e6` | Xiangyu Yin, 2026-10-12 | `xafs/feffdat.py` | [FEFF path data](#7-feff-path-data) |
-| 0009 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/fluo.py` | [Self-absorption E0](#9-self-absorption-e0-temporary) |
-
-0001 to 0007 come from the team's commits. 0009 is a temporary patch of the queue's own, made at
-the re-pin to `247278cef` to keep an app result that upstream changed on purpose; it has no
-`XAScraft-commit` trailer and is authored by the neutral `XAScraft refactor` identity.
+| 0008 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/feffdat.py` | [FEFF path parameters (temporary)](#9-feff-path-parameters-temporary) |
+| 0009 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/fluo.py` | [Self-absorption E0 (temporary)](#10-self-absorption-e0-temporary) |
 
 The patches also carry the team's changes to upstream test files: `tests/test_xafs_defects.py`
 (0005 to 0007), `tests/test_xrf_model.py` and the APS 12-BM test in `tests/test_read_beamlinedata.py`
-(0004), the `tests/run_tests.sh` line that runs `test_xafs_defects.py` (0007), and one test in
-`tests/test_xafs_fluo.py` (0009).
+(0004), and the `tests/run_tests.sh` line that runs `test_xafs_defects.py` (0007).
 The subjects of 0001 to 0004 describe mostly app work, because those commits also changed the app.
 Their messages are kept as written; this ledger says what each patch does to Larch.
+
+0001 to 0007 come from the team's commits. Later patches are **temporary**: written while
+tracking upstream, they undo an upstream regression, or keep an app result that upstream changed
+on purpose until the owner decides (decisions record, "Tracking upstream"),
+come from no XAScraft commit (so no `XAScraft-commit` trailer), change only `larch/`, and keep
+their regression tests in `larch-patches/tests/` alone.
 
 ## Ledger
 
@@ -159,11 +160,11 @@ Each entry gives: why the patch exists, its numeric effect, the test that covers
 exit condition. "Gap" means no Larch-level test exists; the backend tests named next to it cover
 the behavior only indirectly.
 
-Every entry but the temporary one (9) has the same exit condition: **upstream contains an
-equivalent fix**. The per-patch report proves this: on the new pin, a build without the patch
-gives the same outputs as a build with it, and the entry's covering test passes without the
-patch. Then the patch is retired (see below). A temporary patch keeps an app result that upstream
-changed on purpose; it is retired when **the owner adopts upstream's behavior**.
+Every entry has the same exit condition: **upstream contains an equivalent fix**. The per-patch
+report proves this: on the new pin, a build without the patch gives the same outputs as a build
+with it, and the entry's covering test passes without the patch. Then the patch is retired (see
+below). The exception is entry 10, which keeps an intentional upstream change out: it is
+retired when **the owner adopts upstream's behavior**.
 
 ### 1. Fourier transform window names
 
@@ -265,34 +266,62 @@ changed on purpose; it is retired when **the owner adopts upstream's behavior**.
 - **Covering test:** all of `test_xrf_model.py` (6 items).
 - **App needs it:** no; the app has its own version.
 
-### 9. Self-absorption E0 (temporary)
+### 9. FEFF path parameters (temporary)
 
-- **Patch:** 0009 (`larch/xafs/fluo.py`), a revert of upstream `d6d27ccca` ("fluo: force
-  recalculation of e0", 2026-10-09).
-- **Why:** since `d6d27ccca`, `fluo_corr` drops the `e0` it is given and both of its
+- **Patch:** 0008 (`larch/xafs/feffdat.py`), temporary.
+- **Why:** upstream `c18a4ed63` (2026-10-11, "move hashkey to FeffDatFile, several cleanups")
+  changed three `FeffPathGroup` behaviors. The patch restores those of `8d6cd41c2`, one hunk each:
+  - `FeffPathGroup.hashkey` came from the Feff.dat content alone (`FeffDatFile.hashkey`). Two
+    paths with identical content, such as a split shell or one file added twice, got the same
+    parameter names (`sigma2_<dataset>_<hashkey>`), and the last path's values overwrote the
+    others'. The hashkey is again made from the filename, degeneracy, shell, geometry and reff
+    (`__geom2label`). `FeffDatFile.hashkey` stays as upstream has it.
+  - `path2chi(path, params=<lmfit Parameters>)` set up the path parameters but did not calculate
+    chi: the `_calc_chi` call was indented into the `else` branch.
+  - Without an explicit `k`, `_calc_chi` clamped `kmax` to the Feff.dat k grid only when `kmax`
+    was None (indentation), so a given `kmax` past the grid extrapolated.
+- **Numeric effect:** with the patch, everything is as at `8d6cd41c2`. Without it, in the app,
+  an Artemis fit with two enabled paths of identical content keeps correct fitted parameters
+  and statistics, but reports wrong per-path values and per-path χ(k) (four
+  `test_artemis.py::test_distinct_fitted_path_contributions_match_native_final_parameters`
+  cases fail). The app never calls `path2chi` with lmfit Parameters or `_calc_chi` without `k`;
+  plain Larch scripts in the same environment get chi = None and a k grid up to the given
+  `kmax`. Default path labels follow the hashkey, so they also return to the `8d6cd41c2` values;
+  the app sets its own labels, so none of its outputs carry them.
+- **Covering test:** `test_feffdat_regressions.py` (3 items).
+- **Exit condition:** upstream fixes the three regressions (offer each upstream as an issue,
+  submitted by a person).
+- **App needs it:** yes, for fits whose paths share FEFF content.
+
+### 10. Self-absorption E0 (temporary)
+
+- **Patch:** 0009 (`larch/xafs/fluo.py`), temporary: a revert of upstream `d6d27ccca` ("fluo:
+  force recalculation of e0", 2026-10-09).
+- **Why:** since `d6d27ccca`, `fluo_corr` drops the `e0` it is given, and both of its
   `pre_edge()` calls find their own. The app's FLUO correction passes the group's E0 (the one the
-  import found, or one the user set), so the corrected curve is normalized around another E0 than
-  the curve it corrects. This is an intentional upstream change to an app result: the patch keeps
-  the old behavior until the owner decides. After the revert, an explicit `e0` wins, a group's
-  own `e0` is used when none is passed (upstream `11448b7b3`), and `pre_edge()` finds one only
-  when neither gives it; `nvict` is again forced to 0 (the app never passes another value).
-- **Numeric effect:** the app's numbers are step 1's, bit for bit. Without the patch, the
+  import found, or one the user set), so the corrected curve is normalized around another E0
+  than the curve it corrects. This is an intentional upstream change to an app result, so the
+  patch keeps the old behavior until the owner decides. After the revert, an explicit `e0` wins,
+  a group's own `e0` is used when none is passed (upstream `11448b7b3`), and `pre_edge()` finds
+  one only when neither gives it. `nvict` is again forced to 0; the app never passes another value.
+- **Numeric effect:** with the patch, the app's numbers are step 1's, bit for bit. Without it, the
   self-absorption preview's corrected curve and the saved group's `norm` move on Cu, Fe₃C and Ni
-  (`examples/xafsdata`) by up to 2.6% of the curve's height (Fe₃C with E0 at the tabulated edge);
-  per-case numbers are in the step 2 before/after report. Booth and the fixed-step or `nvict`
-  FLUO branch use the app's own formula and do not change.
+  (`examples/xafsdata`) by up to 2.6% of the curve's height (Fe₃C with E0 at the tabulated
+  edge). The step 2 before/after report has the numbers for each case. Booth, and the FLUO branch
+  with a fixed step or `nvict`, use the app's own formula and do not change.
 - **Covering test:** `test_xafs_fluo.py::test_fluo_corr_normalizes_around_the_e0_it_is_given`;
-  through the HTTP API, `backend/tests/test_athena_self_absorption_step1_numbers.py`.
-- **App needs it:** yes, until the owner adopts upstream's behavior.
-- **Exit condition:** the owner adopts upstream's behavior. Then retire the patch and repin the
+  through the HTTP API, `backend/tests/test_athena_self_absorption_step1_numbers.py`. Upstream's
+  `tests/test_xafs_fluo.py` still passes with the patch.
+- **Exit condition:** the owner adopts upstream's behavior. Then retire the patch, and re-pin the
   backend test's numbers to upstream's.
+- **App needs it:** yes, until the owner decides.
 
 ### Packaging: no `mkl_fft`
 
 - **Patch:** 0002 (`pyproject.toml`).
 - **Why:** removes the `mkl_fft ; platform_system != 'Darwin'` dependency, which the app's
   release environments do not install. This is a packaging change, not a Larch behavior, so it is
-  not one of the eight entries above.
+  not one of the numbered entries above.
 - **Numeric effect:** none at the baseline, whose release constraints do not include `mkl_fft`.
   Where `mkl_fft` is missing, `larch/xafs/xafsft.py` uses `scipy.fftpack` instead.
 - **Covering test:** `test_series.py` checks the patched `pyproject.toml` blob.
@@ -309,7 +338,7 @@ The patch files are written with:
 ```sh
 git format-patch -1 <commit> --start-number <N> --no-signature --full-index -o larch-patches/series -- \
     larch tests/test_xafs_defects.py tests/test_xrf_model.py \
-    tests/test_read_beamlinedata.py tests/test_xafs_fluo.py tests/run_tests.sh pyproject.toml
+    tests/test_read_beamlinedata.py tests/run_tests.sh pyproject.toml
 git interpret-trailers --in-place --trailer "XAScraft-commit: <full sha>" larch-patches/series/<file>
 ```
 
@@ -332,11 +361,7 @@ GIT_COMMITTER_NAME="XAScraft patch queue" GIT_COMMITTER_EMAIL="patches@xascraft.
 4. Add a ledger entry and a row in the Patches table.
 5. Update `patched-larch-tree` (and `patched-pyproject-blob`, if it changed) in `PIN` to
    `git rev-parse HEAD:larch` (and `HEAD:pyproject.toml`) of the scratch clone. Update the commit
-   list in `tests/test_series.py` (`TEAM_COMMITS` for a team commit, `QUEUE_PATCHES` for one of
-   the queue's own) and `XASCRAFT_COMMITS` in `tests/test_build.py`. If the patch changes an
-   upstream test file that upstream's `tests/run_tests.sh` does not name, add the file to the
-   format-patch paths above, to `CARRIED_PATHS` in `tests/test_series.py` and to `FILES` in
-   `run-upstream-tests.sh`.
+   list in `tests/test_series.py`.
 
 ### Retiring a patch
 

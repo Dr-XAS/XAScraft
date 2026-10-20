@@ -1,0 +1,79 @@
+From e8ee7ac8dc24f063bebb29e68a1db54ddff74498 Mon Sep 17 00:00:00 2001
+From: XAScraft refactor <refactor@xascraft.invalid>
+Date: Tue, 20 Oct 2026 12:15:01 -0500
+Subject: [PATCH] Temporary: restore distinct path parameter names, chi from
+ path2chi with lmfit Parameters, and the kmax clamp
+
+Upstream c18a4ed63 ("move hashkey to FeffDatFile, several cleanups") changed three
+FeffPathGroup behaviors that XAScraft relies on or that plain Larch scripts in its
+environment get wrong. This restores the behavior of 8d6cd41c2 for each, and nothing else:
+
+- FeffPathGroup.hashkey comes again from the filename, degeneracy, shell, geometry and
+  reff (__geom2label), not from the Feff.dat content alone. Two paths with identical
+  FEFF content (a split shell, or one file added twice under another name) had the same
+  hashkey, so their path parameters shared names in one Parameters set and the last
+  path's values overwrote the others'. FeffDatFile.hashkey is left as upstream has it.
+  Default labels follow the hashkey, as before.
+- calc_chi_from_params calls _calc_chi for lmfit Parameters too; it was indented into
+  the else branch, so path2chi(path, params=Parameters()) left chi unset.
+- _calc_chi clamps kmax to the Feff.dat k grid whenever k is not given; it was indented
+  under "if kmax is None", so an explicit kmax past the grid extrapolated.
+
+Remove once upstream fixes these (exit condition in larch-patches/README.md).
+---
+ larch/xafs/feffdat.py | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
+index ca4c511f894c0aa4c76c5b8229f1c2e7f8cf4a9d..a5d54cf2e358b29cb8abd2bf3b81e81787f307df 100644
+--- a/larch/xafs/feffdat.py
++++ b/larch/xafs/feffdat.py
+@@ -387,7 +387,7 @@ class FeffPathGroup(Group):
+             self.absorber = self._feffdat.absorber
+             self.__def_degen  = self._feffdat.degen
+ 
+-            self.hashkey = self._feffdat.hashkey
++            self.hashkey = self.__geom2label()
+             if self.label in ('', None):
+                 self.label = self.hashkey
+ 
+@@ -444,11 +444,20 @@ class FeffPathGroup(Group):
+         self.absorber = self._feffdat.absorber
+         def_degen  = self._feffdat.degen
+ 
+-        self.hashkey = self._feffdat.hashkey
++        self.hashkey = self.__geom2label()
+         def_label = "p%s" % (hex(hash(self))[2:])
+         if self.label in ('', None):
+             self.label = self.hashkey
+ 
++    def __geom2label(self):
++        """generate label by hashing full filename and path geometry"""
++        rep = [self._feffdat.degen, self._feffdat.shell, self.filename]
++        for atom in self.geom:
++            rep.extend(atom)
++        rep.append("%7.4f" % self._feffdat.reff)
++        s = "|".join([str(i) for i in rep])
++        return "p%s" % (b32hash(s)[:8].lower())
++
+     def pathpar_name(self, parname):
+         """
+         get internal name of lmfit Parameter for a path paramter,
+@@ -725,7 +734,7 @@ class FeffPathGroup(Group):
+             self.create_path_params(params=params)
+         else:
+             self.create_path_params(params=group2params(params))
+-            self._calc_chi(**kws)
++        self._calc_chi(**kws)
+ 
+     def _calc_chi(self, k=None, kmax=None, kstep=None, degen=None, s02=None,
+                   e0=None, ei=None, deltar=None, sigma2=None,
+@@ -739,7 +748,7 @@ class FeffPathGroup(Group):
+         if k is None:
+             if kmax is None:
+                 kmax = 30.0
+-                kmax = min(max(fdat.k), kmax)
++            kmax = min(max(fdat.k), kmax)
+             if kstep is None: kstep = 0.05
+             k = kstep * np.arange(int(1.01 + kmax/kstep), dtype='float64')
+         if not self.use:

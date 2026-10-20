@@ -29,11 +29,12 @@ TEAM_COMMITS = [
     "aee4bb5e6",
 ]
 
-# The queue's own temporary patches, which no XAScraft commit made (README, "Ledger"),
-# after the team's: number -> subject.  They carry no XAScraft-commit trailer.
-QUEUE_PATCHES = {
-    "0009": "fluo_corr: use the e0 the caller or the group gives (revert d6d27ccca)",
-}
+# Temporary patches written for upstream regressions (decisions record, "Tracking upstream"),
+# after the team patches. They come from no XAScraft commit, so they carry no trailer.
+TEMPORARY_PATCHES = [
+    "0008",  # feffdat: c18a4ed63's path parameter names, path2chi and kmax (ticket 20)
+    "0009",  # fluo_corr: revert d6d27ccca, use the e0 it is given (ticket 21)
+]
 
 COMMITTER = {
     "GIT_COMMITTER_NAME": "XAScraft patch queue",
@@ -94,10 +95,18 @@ def test_pin_names_a_full_upstream_commit():
     assert pin["upstream-url"] == "https://github.com/xraypy/xraylarch.git"
 
 
-def test_series_has_one_patch_per_team_commit_then_the_queues_own():
+def test_series_has_one_patch_per_team_commit_then_the_temporary_ones():
     names = [p.name for p in series()]
-    assert [n[:5] for n in names] == [f"{i:04d}-" for i in range(1, 8)] + [
-        f"{n}-" for n in QUEUE_PATCHES]
+    count = len(TEAM_COMMITS) + len(TEMPORARY_PATCHES)
+    assert [n[:5] for n in names] == [f"{i:04d}-" for i in range(1, count + 1)]
+    assert [n[:4] for n in names[len(TEAM_COMMITS):]] == TEMPORARY_PATCHES
+
+
+def applied_commits(cwd: Path) -> list[str]:
+    upstream = read_pin()["upstream-commit"]
+    applied = git("rev-list", "--reverse", f"{upstream}..HEAD", cwd=cwd).split()
+    assert len(applied) == len(TEAM_COMMITS) + len(TEMPORARY_PATCHES)
+    return applied
 
 
 def test_series_reproduces_the_pinned_larch_tree(patched):
@@ -112,20 +121,20 @@ def test_series_reproduces_the_pinned_pyproject(patched):
 
 
 def test_expected_hashes_in_pin_are_the_reviewed_ones():
-    """PIN's patched hashes, as computed in a scratch clone with 0009 applied (ticket 21).
-    The team's 0001 to 0007 alone, rebased onto 247278cef, gave larch deec1766f137 (ticket
-    18; notes/04 section 2 got the same).  At the previous pin 8d6cd41c2 they were the
-    baseline tag's own (larch 72b7101ea9da, pyproject c6445f212e24)."""
+    """PIN's patched hashes on 247278cef: the seven team patches give larch deec1766f137
+    (ticket 18; notes/04 section 2 got the same), 0008 (ticket 20) then gives 2d4ee8af38a3,
+    and 0009 (ticket 21) the tree below.
+    At the previous pin 8d6cd41c2 they were the baseline tag's own (larch 72b7101ea9da,
+    pyproject c6445f212e24)."""
     pin = read_pin()
-    assert pin["patched-larch-tree"] == "9872cd50079495052d333304b91965189ccdb067"
+    assert pin["patched-larch-tree"] == "50051233d1761bc8ecf24553bd4f50b81663c3b2"
     assert pin["patched-pyproject-blob"] == "14ccc10ed6f759cda9059d331e3c9139cfe7a8d2"
 
 
 # What the series carries (README "Maintaining the queue"), less tests/run_tests.sh, whose
 # context is upstream's list and so moves with the pin (checked on its own below).
 CARRIED_PATHS = ["larch", "pyproject.toml", "tests/test_xafs_defects.py",
-                 "tests/test_xrf_model.py", "tests/test_read_beamlinedata.py",
-                 "tests/test_xafs_fluo.py"]
+                 "tests/test_xrf_model.py", "tests/test_read_beamlinedata.py"]
 
 
 def patch_id(sha: str, cwd: Path) -> str:
@@ -140,11 +149,20 @@ def patch_id(sha: str, cwd: Path) -> str:
 def test_each_applied_commit_makes_the_change_its_xascraft_commit_made(patched):
     """Needs XAScraft's history, which this checkout has.  Whatever the pin, each patch makes
     the same change as the team's commit made to the vendored copy."""
-    upstream = read_pin()["upstream-commit"]
-    applied = git("rev-list", "--reverse", f"{upstream}..HEAD", cwd=patched).split()
-    assert len(applied) == len(TEAM_COMMITS) + len(QUEUE_PATCHES)
+    applied = applied_commits(patched)
     for sha, new in zip(TEAM_COMMITS, applied):
         assert patch_id(new, patched) == patch_id(sha, REPO_ROOT), sha
+
+
+def test_temporary_patches_change_only_larch_and_carry_no_xascraft_commit(patched):
+    """A temporary patch fixes an upstream regression in larch/ only; its regression tests
+    live in larch-patches/tests, not in upstream's tests/."""
+    for sha in applied_commits(patched)[len(TEAM_COMMITS):]:
+        changed = git("show", "--format=", "--name-only", sha, cwd=patched).split()
+        assert changed and all(name.startswith("larch/") for name in changed), changed
+        trailer = git("log", "-1", "--format=%(trailers:key=XAScraft-commit,valueonly)", sha,
+                      cwd=patched)
+        assert trailer.strip() == "", sha
 
 
 def test_run_tests_sh_is_upstreams_plus_the_team_regression_file(patched):
@@ -157,9 +175,10 @@ def test_run_tests_sh_is_upstreams_plus_the_team_regression_file(patched):
 
 def test_applied_commits_carry_their_xascraft_sha_in_order(patched):
     upstream = read_pin()["upstream-commit"]
+    team_tip = applied_commits(patched)[len(TEAM_COMMITS) - 1]
     trailers = git(
         "log", "--reverse", "--format=%(trailers:key=XAScraft-commit,valueonly)",
-        f"{upstream}..HEAD", cwd=patched,
+        f"{upstream}..{team_tip}", cwd=patched,
     ).split()
     assert [t[:9] for t in trailers] == TEAM_COMMITS
     assert all(len(t) == 40 for t in trailers)
@@ -168,11 +187,12 @@ def test_applied_commits_carry_their_xascraft_sha_in_order(patched):
 def test_applied_commits_keep_original_author_date_and_message(patched):
     """Needs XAScraft's history, which this checkout has."""
     upstream = read_pin()["upstream-commit"]
+    team_tip = applied_commits(patched)[len(TEAM_COMMITS) - 1]
     fmt = "%an%x00%ae%x00%at%x00%B"
     applied = git(
-        "log", "--reverse", f"--format={fmt}%x01", f"{upstream}..HEAD", cwd=patched
+        "log", "--reverse", f"--format={fmt}%x01", f"{upstream}..{team_tip}", cwd=patched
     ).split("\x01")[:-1]
-    assert len(applied) == len(TEAM_COMMITS) + len(QUEUE_PATCHES)
+    assert len(applied) == len(TEAM_COMMITS)
     for sha, got in zip(TEAM_COMMITS, applied):
         original = git("log", "-1", f"--format={fmt}", sha, cwd=REPO_ROOT)
         full_sha = git("rev-parse", sha, cwd=REPO_ROOT).strip()
@@ -184,14 +204,3 @@ def test_applied_commits_keep_original_author_date_and_message(patched):
         trailer = f"XAScraft-commit: {full_sha}"
         assert body.rstrip().endswith(trailer), sha
         assert body.rstrip().removesuffix(trailer).rstrip() == obody.rstrip(), sha
-
-
-def test_the_queues_own_patches_follow_the_teams_with_their_subjects_and_no_trailer(patched):
-    upstream = read_pin()["upstream-commit"]
-    applied = git(
-        "log", "--reverse", "--format=%s%x00%(trailers:key=XAScraft-commit,valueonly)%x01",
-        f"{upstream}..HEAD", cwd=patched,
-    ).split("\x01")[:-1]
-    own = [entry.lstrip("\n").split("\x00") for entry in applied[len(TEAM_COMMITS):]]
-    assert [subject for subject, _ in own] == list(QUEUE_PATCHES.values())
-    assert all(not trailer.strip() for _, trailer in own)
