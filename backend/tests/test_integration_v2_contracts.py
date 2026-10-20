@@ -223,6 +223,17 @@ def test_guest_quota_cannot_exceed_account_quota(monkeypatch):
         Settings.from_environment()
 
 
+def test_default_project_caps_leave_room_for_every_caller(monkeypatch):
+    # The project cap counts every caller's projects on the server, not one
+    # account's, so 20 filled up and refused every new Dr.XAS project. Each
+    # caller enforces its own per-account limit.
+    monkeypatch.delenv("XRAYLARCH_INTEGRATION_MAX_PROJECTS", raising=False)
+    monkeypatch.delenv("XRAYLARCH_INTEGRATION_GUEST_MAX_PROJECTS", raising=False)
+    settings = Settings.from_environment()
+    assert settings.integration_max_projects == 1000
+    assert settings.integration_guest_max_projects == 100
+
+
 def test_generated_typescript_matches_json_schema_requiredness():
     root = Path(__file__).resolve().parents[2]
     generated = (root / "frontend/lib/generated/integration-contracts.ts").read_text()
