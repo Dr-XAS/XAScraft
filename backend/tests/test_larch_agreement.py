@@ -339,6 +339,56 @@ def test_private_calc_chi_takes_resolved_path_values(copper_path):
     assert np.isfinite(copper_path.chi).all() and np.ptp(copper_path.chi) > 0
 
 
+def _path_params_before_c18a4ed63(self, **kws):
+    """FeffPathGroup.__path_params as upstream 8d6cd41c2 has it: a keyword value given to
+    _calc_chi overrides the path parameter, which is read only when none is given."""
+    from larch.xafs.feffdat import PATH_PARS
+
+    self.store_feffdat()
+    if self.params is None:
+        self.create_path_params()
+    out = []
+    for pname in PATH_PARS:
+        val = kws.get(pname, None)
+        if val is None:
+            val = self.params[self.pathpar_name(pname)]._getval()
+        out.append(val)
+    return out
+
+
+def test_path_chi_gives_the_same_chi_on_larch_before_and_after_c18a4ed63(monkeypatch):
+    """artemis._path_chi is the adapter for upstream c18a4ed63, which made _calc_chi drop
+    keyword values. It must give, bit for bit, the chi the backend's earlier call
+    path._calc_chi(k=k, **values) gave before that change: on the installed Larch, and on a
+    stand-in of the earlier __path_params."""
+    from larch.xafs import feffpath
+    from larch.xafs.feffdat import FeffPathGroup
+
+    from xraylarch_web import artemis
+
+    k = np.arange(241) * 0.05
+    values = dict(s02=0.9, e0=3.0, deltar=0.01, sigma2=0.008)
+
+    def chi(compute):
+        path = feffpath(str(artemis._EXAMPLE), s02=0.7, e0=-1.0, deltar=-0.02, sigma2=0.003)
+        compute(path)
+        return np.array(path.chi, dtype=float)
+
+    def adapter(path):
+        artemis._path_chi(path, k, values)
+
+    installed = chi(adapter)
+    with monkeypatch.context() as patch:
+        patch.setattr(FeffPathGroup, "_FeffPathGroup__path_params", _path_params_before_c18a4ed63)
+        earlier_call = chi(lambda path: path._calc_chi(k=k, **values))
+        earlier_adapter = chi(adapter)
+        own_values = chi(lambda path: path._calc_chi(k=k))
+
+    assert not np.array_equal(earlier_call, own_values)  # the values given do count
+    np.testing.assert_array_equal(earlier_adapter, earlier_call)
+    np.testing.assert_array_equal(installed, earlier_call)
+
+
 def test_private_xafsft_fills_a_group_with_chi_r(copper_path):
     """Site 4: backend/xraylarch_web/artemis.py preview_paths calls
     transform._xafsft(chi, group=, rmax_out=10), per path and for the sum."""
