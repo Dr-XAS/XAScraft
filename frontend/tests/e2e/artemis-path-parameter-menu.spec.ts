@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -8,7 +9,7 @@ test("copies path expressions by shell or inclusion and saves them across reload
   page.on("request", request => { if (/\/fit(?:-saved)?$/.test(request.url())) fits.push(request.url()) })
   await page.goto("/")
   const initialSave = page.waitForResponse(response => response.url().endsWith("/model"))
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const project = await (await initialSave).json() as AthenaProject
   const group = project.groups.find(item => item.label === "Cu₂O · room temperature")!
   const model = structuredClone(group.artemis!.model)

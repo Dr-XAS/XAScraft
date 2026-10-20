@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 type Point = { x: number; y: number; z: number }
@@ -49,7 +50,7 @@ test("clicks atoms for persistent distances and angle, tolerates jitter, and kee
   await page.setViewportSize({ width: 1440, height: 1100 })
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const loaded = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   expect((await loaded).ok()).toBe(true)
   const panel = page.getByRole("region", { name: "CIF structure viewer", exact: true })
   await expect(panel.getByText("15 atoms shown", { exact: true })).toBeVisible()

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 
@@ -14,7 +15,7 @@ test('Athena rebin previews measured E and k data, inserts current/marked data, 
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message))
   await page.goto('/')
   const loaded = page.waitForResponse(r => r.url().endsWith('/command'))
-  await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
+  await loadCopperExamples(page)
   let original = await (await loaded).json()
   const unmarking = page.waitForResponse(r => r.url().endsWith('/command') && r.request().postDataJSON().action === 'metadata')
   await page.getByLabel(`Mark ${original.groups[3].label}`, { exact: true }).click()
@@ -89,7 +90,7 @@ test('saved rebin grids stay in postprocessing and survive browser sessions and 
   const original = await (await page.request.get(url)).json()
   try {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
+    await loadCopperExamples(page)
     await expect(page.getByRole('heading', { name: /^Data 5\b/ })).toBeVisible()
     await page.getByRole('button', { name: 'Process', exact: true }).click()
     await page.getByRole('button', { name: 'Rebin data', exact: true }).click()
@@ -126,7 +127,7 @@ test('saved rebin grids stay in postprocessing and survive browser sessions and 
     const other = await browser.newContext({ baseURL: info.project.use.baseURL })
     try {
       const tab = await other.newPage(); await tab.goto('/')
-      await tab.getByRole('button', { name: 'Load copper examples', exact: true }).click()
+      await loadCopperExamples(tab)
       await expect(tab.getByRole('heading', { name: /^Data 5\b/ })).toBeVisible()
       await tab.getByRole('button', { name: 'Process', exact: true }).click()
       await tab.getByRole('button', { name: 'Rebin data', exact: true }).click()

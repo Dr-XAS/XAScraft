@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Page } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -43,7 +44,7 @@ test("inserts, saves, reopens and fits fractional expansion using each FEFF path
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   await expectSeparateModelRows(page)
   const pathCard = page.locator("[data-path-id]").filter({ has: page.getByLabel("Path 1 ΔR (Å)", { exact: true }) })

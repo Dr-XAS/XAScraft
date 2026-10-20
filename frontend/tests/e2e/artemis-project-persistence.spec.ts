@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { confirmProjectSave } from "./project-save"
 import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
@@ -18,7 +19,7 @@ test("real Cu2O model and fit survive reload, PRJ exchange and input changes", a
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   const examples = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await examples).json() as AthenaProject
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   await page.getByLabel("Parameter 1 value", { exact: true }).fill("0.85")
@@ -131,7 +132,7 @@ test("unfinished model edits autosave across spectrum and tab switches", async (
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   const examples = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const project = await (await examples).json() as AthenaProject
   await expect(page.getByLabel("Parameter 1 value", { exact: true })).toBeVisible()
   const saving = page.waitForResponse(response => response.url().endsWith("/model") && response.request().postDataJSON().model.parameters[0].value === "-")

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 async function crystalScene(panel: Locator) {
@@ -41,7 +42,7 @@ test("expands complete unit cells along each lattice axis without recalculating 
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const loaded = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
   const transformed = page.waitForResponse(response => response.url().endsWith("/plot-transform"))
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   expect((await loaded).ok()).toBe(true)
   expect((await transformed).ok()).toBe(true)
   const panel = page.getByRole("region", { name: "CIF structure viewer", exact: true })
@@ -120,7 +121,7 @@ test("calculates finite-cluster coordination numbers and invalidates changed inp
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const loaded = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
   const transformed = page.waitForResponse(response => response.url().endsWith("/plot-transform"))
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   expect((await loaded).ok()).toBe(true)
   expect((await transformed).ok()).toBe(true)
   const panel = page.getByRole("region", { name: "CIF structure viewer", exact: true })

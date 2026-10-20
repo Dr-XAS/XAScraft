@@ -82,6 +82,12 @@ const dialogDescriptors = {
   close: Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close"),
 }
 
+function copperExamplesButton() {
+  const fileMenu = screen.getByRole("button", { name: "File" })
+  if (fileMenu.getAttribute("aria-expanded") !== "true") fireEvent.click(fileMenu)
+  return screen.getByRole("button", { name: "Load copper examples" })
+}
+
 async function waitForIntegratedProject() {
   await screen.findByRole("button", { name: "Copper study" })
 }
@@ -911,7 +917,14 @@ describe("AthenaWorkbench branding", () => {
     expect(screen.getByRole("button", { name: "Select E₀…" })).toBeVisible()
     expect(screen.queryByRole("region", { name: "Import edge policy" })).not.toBeInTheDocument()
     expect(screen.queryByText("Foils · 10, 50 & 300 K · Cu₂O at room temperature")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Load copper examples" })).toBeVisible()
+    expect(screen.getByRole("button", { name: "Load demo cases" })).toBeVisible()
+    expect(screen.queryByRole("button", { name: "Load copper examples" })).not.toBeInTheDocument()
+    for (const text of ["Ni · Cu · Fe — three folders, transmission + fluorescence", "NiO transmission: saved EXAFS fit included", "Includes shared foil + Cu₂O EXAFS", "Cu₂O EXAFS example added"]) {
+      expect(screen.queryByText(text)).not.toBeInTheDocument()
+    }
+    fireEvent.click(screen.getByRole("button", { name: "File" }))
+    expect(copperExamplesButton()).toBeEnabled()
+    fireEvent.click(screen.getByRole("button", { name: "File" }))
     expect(screen.queryByRole("combobox", { name: "Viewer k-weight" })).not.toBeInTheDocument()
     fireEvent.click(within(screen.getByRole("region", { name: "Single spectrum viewer" })).getByRole("tab", { name: /EXAFS/ }))
     expect(screen.getByRole("combobox", { name: "Single spectrum k-weight" })).toBeVisible()
@@ -1569,9 +1582,8 @@ describe("AthenaWorkbench data group folders", () => {
     fireEvent.click(multipleViewer().getByRole("tab", { name: /EXAFS/ }))
     fireEvent.change(screen.getByRole("textbox", { name: "Search data" }), { target: { value: "existing search" } })
     const button = screen.getByRole("button", { name: "Load demo cases" })
-    const copperButton = screen.getByRole("button", { name: "Load copper examples" })
-    expect(button.compareDocumentPosition(copperButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
-    expect(button).toHaveAccessibleDescription("Ni · Cu · Fe — three folders, transmission + fluorescence")
+    expect(screen.queryByRole("button", { name: "Load copper examples" })).not.toBeInTheDocument()
+    expect(button).not.toHaveAttribute("aria-describedby")
 
     const loaded = curatedDemoProject(project)
     const response = deferred<AthenaProject>()
@@ -1579,7 +1591,7 @@ describe("AthenaWorkbench data group folders", () => {
     const requestCount = api.mock.calls.length
     fireEvent.click(button)
     await waitFor(() => expect(button).toBeDisabled())
-    expect(copperButton).toBeDisabled()
+    expect(copperExamplesButton()).toBeDisabled()
     await act(async () => response.resolve(loaded))
 
     await waitForCommand(project.id, {
@@ -1589,7 +1601,7 @@ describe("AthenaWorkbench data group folders", () => {
     expect(plotProps()).toMatchObject({ space: "E", energyMode: "norm" })
     expect(screen.getByRole("tab", { name: "Processing" })).toHaveAttribute("aria-selected", "true")
     expect(screen.getByRole("combobox", { name: "Viewed CIF structure" })).toHaveValue("demo-nio-cif")
-    expect(screen.getByText("NiO transmission: saved EXAFS fit included")).toBeVisible()
+    expect(screen.queryByText("NiO transmission: saved EXAFS fit included")).not.toBeInTheDocument()
     expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].group?.artemis?.model.paths[0].metadata.absorber).toBe("Ni")
     expect(screen.getByRole("textbox", { name: "Search data" })).toHaveValue("")
     for (const folder of loaded.group_folders!) {
@@ -1600,7 +1612,7 @@ describe("AthenaWorkbench data group folders", () => {
     expect(listedGroupIds()).toEqual(loaded.groups.map(item => item.id))
     expect(api).toHaveBeenCalledTimes(requestCount + 1)
     expect(button).toBeEnabled()
-    expect(copperButton).toBeEnabled()
+    expect(copperExamplesButton()).toBeEnabled()
   })
 
   it("opens the saved NiO fit, its CIF, and the fit viewer directly without running a fit or changing saved layout preferences", async () => {
@@ -1686,18 +1698,17 @@ describe("AthenaWorkbench data group folders", () => {
     expect(listedGroupIds()).toEqual(project.groups.map(item => item.id))
     expect(screen.queryByRole("group", { name: "Ni · acquisition modes data group" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Load demo cases" })).toBeEnabled()
-    expect(screen.getByRole("button", { name: "Load copper examples" })).toBeEnabled()
+    expect(copperExamplesButton()).toBeEnabled()
   })
 
-  it("keeps the example loader at the top and opens the prepared Cu₂O demo in one step", async () => {
+  it("loads the prepared Cu₂O demo from File without adding sidebar notices", async () => {
     const project = await openSaved()
     fireEvent.click(within(screen.getByRole("group", { name: "Choose viewers" })).getByRole("button", { name: "Wavelet plotter" }))
     fireEvent.change(screen.getByRole("combobox", { name: "Sort viewers" }), { target: { value: "process" } })
-    const button = screen.getByRole("button", { name: "Load copper examples" })
-    const openProject = screen.getByRole("button", { name: "Open project" })
-    expect(button.compareDocumentPosition(openProject) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(screen.queryByRole("button", { name: "Load copper examples" })).not.toBeInTheDocument()
+    const button = copperExamplesButton()
     expect(screen.queryByText("Foils · 10, 50 & 300 K · Cu₂O at room temperature")).not.toBeInTheDocument()
-    expect(screen.getByText("Includes shared foil + Cu₂O EXAFS")).toBeVisible()
+    expect(screen.queryByText("Includes shared foil + Cu₂O EXAFS")).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Open Cu₂O EXAFS" })).not.toBeInTheDocument()
 
     const loaded = copperExampleProject(project)
@@ -1713,7 +1724,8 @@ describe("AthenaWorkbench data group folders", () => {
     expect(within(screen.getByRole("group", { name: "Choose viewers" })).getByRole("button", { name: "Wavelet plotter" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByRole("button", { name: "Collapse Temperature series group" })).toBeVisible()
     expect(screen.getByRole("button", { name: "Collapse reference group" })).toBeVisible()
-    expect(screen.getByText("Cu₂O EXAFS example added")).toBeVisible()
+    expect(screen.queryByText("Cu₂O EXAFS example added")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "File" })).toHaveAttribute("aria-expanded", "false")
     expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0]).toMatchObject({
       group: { id: "example-cu2o" },
       exampleSetup: { projectId: project.id, groupId: "example-cu2o", attachmentId: "example-cuprite-cif", example: loaded.last_operation!.artemis_example!.example },
@@ -1735,7 +1747,7 @@ describe("AthenaWorkbench data group folders", () => {
     ]
     api.mockResolvedValueOnce(loaded)
     const requestCount = api.mock.calls.length
-    fireEvent.click(screen.getByRole("button", { name: "Load copper examples" }))
+    fireEvent.click(copperExamplesButton())
 
     await waitFor(() => expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0]).toMatchObject({
       projectId: project.id, version: loaded.version, group: { id: "example-cu2o" },
@@ -1754,25 +1766,25 @@ describe("AthenaWorkbench data group folders", () => {
     const project = await openSaved()
     const loaded = copperExampleProject(project)
     api.mockResolvedValueOnce(loaded)
-    fireEvent.click(screen.getByRole("button", { name: "Load copper examples" }))
-    await screen.findByText("Cu₂O EXAFS example added")
+    fireEvent.click(copperExamplesButton())
+    await waitFor(() => expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup?.groupId).toBe("example-cu2o"))
 
     api.mockResolvedValueOnce({ ...project, version: loaded.version + 1, redo: ["Copper examples"], last_operation: { action: "undo", skipped_group_ids: [] } })
     fireEvent.click(screen.getByRole("button", { name: "Undo" }))
-    await waitFor(() => expect(screen.queryByText("Cu₂O EXAFS example added")).not.toBeInTheDocument())
+    await waitFor(() => expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup).toBeUndefined())
     expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup).toBeUndefined()
 
     api.mockResolvedValueOnce({ ...loaded, version: loaded.version + 2, last_operation: { action: "redo", skipped_group_ids: [] } })
     fireEvent.click(screen.getByRole("button", { name: "Redo" }))
-    expect(await screen.findByText("Cu₂O EXAFS example added")).toBeVisible()
+    await waitFor(() => expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup?.groupId).toBe("example-cu2o"))
     expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup?.groupId).toBe("example-cu2o")
   })
 
   it("does not offer a prior project's Cu₂O setup after opening another project with the same group ID", async () => {
     const project = await openSaved()
     api.mockResolvedValueOnce(copperExampleProject(project))
-    fireEvent.click(screen.getByRole("button", { name: "Load copper examples" }))
-    await screen.findByText("Cu₂O EXAFS example added")
+    fireEvent.click(copperExamplesButton())
+    await waitFor(() => expect(vi.mocked(ArtemisFittingPanel).mock.calls.at(-1)?.[0].exampleSetup?.groupId).toBe("example-cu2o"))
     const other = projectFixture({ id: "other-project", name: "Other project", groups: [group("example-cu2o", "Unrelated Cu₂O")] })
     api.mockResolvedValueOnce([{ id: other.id, name: other.name, updated: other.updated, count: other.groups.length }]).mockResolvedValueOnce(other)
     fireEvent.click(screen.getByRole("button", { name: "Open project" }))

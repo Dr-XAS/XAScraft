@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 
 test("inserts, saves, reopens and fits Einstein and Debye path models", async ({ page }, info) => {
@@ -6,7 +7,7 @@ test("inserts, saves, reopens and fits Einstein and Debye path models", async ({
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   await expect(page.getByLabel("Path 1 σ² (Å²)", { exact: true })).toBeVisible()
   for (const index of [2, 3, 4]) await page.getByLabel(`Include path ${index}`, { exact: true }).uncheck()

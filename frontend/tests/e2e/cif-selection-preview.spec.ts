@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 import type { ArtemisProjectStructures } from "../../lib/artemis-structures"
@@ -69,7 +70,7 @@ test("database CIF selection renders an interactive preview before attachment", 
   await page.goto("/")
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
   const preparedModel = page.waitForResponse(response => response.url().endsWith("/model") && response.request().method() === "POST")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await exampleResponse).json() as AthenaProject
   expect((await preparedModel).ok()).toBe(true)
   const attachments = async () => {

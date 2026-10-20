@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -8,7 +9,7 @@ test("custom CIF upload renders, survives reload and generates FEFF through the 
   await page.setViewportSize({ width: 1500, height: 1000 })
   await page.goto("/")
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await exampleResponse).json() as AthenaProject
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   const source = await page.request.get("/api/backend/api/artemis/structures/13088")

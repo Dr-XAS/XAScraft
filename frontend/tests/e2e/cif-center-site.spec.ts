@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -57,7 +58,7 @@ test("Covellite keeps the selected Cu center and element colors when highlightin
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const example = await (await exampleResponse).json() as AthenaProject
   await expect(page.locator(".ath-group.selected .ath-group-select")).toContainText("Cu₂O · room temperature")
   await expect(page.locator(".ath-autosaved")).toHaveText("Saved locally")

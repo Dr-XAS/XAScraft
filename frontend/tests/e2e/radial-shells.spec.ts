@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 async function sceneColors(viewer: Locator) {
@@ -18,7 +19,7 @@ test("radial shells share ranges across CIF, FEFF groups and the EXAFS model", a
   page.on("request", request => { if (/\/fit(?:-saved)?$/.test(request.url())) fits.push(request.url()) })
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const viewer = page.getByRole("region", { name: "CIF structure viewer", exact: true })
   await expect(viewer.getByRole("option", { name: "Radial shells", exact: true })).toBeEnabled()
   await viewer.getByRole("combobox", { name: "CIF view mode" }).selectOption("radial")

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 
 test.describe("tool dialogs on a narrow touch screen", () => {
@@ -7,9 +8,7 @@ test.describe("tool dialogs on a narrow touch screen", () => {
     const errors: string[] = []
     page.on("pageerror", error => errors.push(error.message))
     await page.goto("/", { waitUntil: "domcontentloaded" })
-    const loadExamples = page.getByRole("button", { name: "Load copper examples", exact: true })
-    await expect(loadExamples).toBeEnabled()
-    await loadExamples.click()
+    await loadCopperExamples(page)
     // Help icons are hidden unless instructions are shown.
     await page.getByRole("checkbox", { name: "Show instruction", exact: true }).check()
     await expect(page.getByRole("button", { name: "Analysis", exact: true })).toBeEnabled()

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -15,7 +16,7 @@ test("CIF names can be edited without changing their source or saved FEFF model"
   await page.goto("/")
   const examples = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
   const preparedModel = page.waitForResponse(response => response.url().endsWith("/model") && response.request().method() === "POST")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   expect((await examples).ok()).toBe(true)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   const prepared = await preparedModel

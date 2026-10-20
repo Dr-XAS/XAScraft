@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 
 test("shows matching shell labels beside every fitting and generated FEFF filename", async ({ page }, info) => {
@@ -7,7 +8,7 @@ test("shows matching shell labels beside every fitting and generated FEFF filena
   page.on("request", request => { if (/\/fit(?:-saved)?$/.test(request.url())) fits.push(request.url()) })
   await page.setViewportSize({ width: 1500, height: 1000 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const fitting = page.getByRole("region", { name: "Artemis EXAFS fitting setup" })
   const pathCard = (index: number) => fitting.locator("[data-path-id]").filter({ has: page.getByRole("checkbox", { name: `Include path ${index}`, exact: true }) })
   for (const index of [1, 2, 4]) {

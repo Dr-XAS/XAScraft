@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { selectImportSignals } from './import-signals'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -38,7 +39,7 @@ async function download(page: Page, info: TestInfo, button: string, filename: st
 async function example(page: Page) {
   await page.goto('/')
   const waiting=page.waitForResponse(r=>r.url().endsWith('/command') && r.request().postDataJSON().action==='example')
-  await page.getByRole('button',{name:'Load copper examples',exact:true}).click()
+  await loadCopperExamples(page)
   const response=await waiting;expect(response.ok()).toBe(true);return response.json()
 }
 

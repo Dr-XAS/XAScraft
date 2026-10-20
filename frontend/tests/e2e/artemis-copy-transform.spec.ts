@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Page, type Response } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -31,7 +32,7 @@ test("right-click copies live transform settings only to marked data and restore
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   const examples = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await models(await examples)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   await expect(page.locator(".ath-autosaved")).toHaveText("Saved locally")

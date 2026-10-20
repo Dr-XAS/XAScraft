@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 async function expectTooltipInViewport(tooltip: Locator) {
@@ -15,7 +16,7 @@ test("section descriptions stay compact and help works across panels, modal dial
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1600, height: 1050 })
   await page.goto("/")
-  await expect(page.getByRole("button", { name: "Load copper examples", exact: true })).toBeEnabled()
+  await expect(page.getByRole("button", { name: "Load demo cases", exact: true })).toBeEnabled()
   const credits = page.locator(".ath-brand-credits")
   const instructions = page.getByRole("checkbox", { name: "Show instruction" })
   await expect(instructions).not.toBeChecked()
@@ -30,7 +31,7 @@ test("section descriptions stay compact and help works across panels, modal dial
   await expect(page.getByRole("tooltip")).toHaveCount(0)
   await instructions.check()
   await expect(credits).toBeVisible()
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const fitting = page.getByRole("region", { name: "Artemis EXAFS fitting setup" })
   const help = fitting.getByRole("button", { name: "About FEFF paths", exact: true })
   await expect(help).toBeVisible()

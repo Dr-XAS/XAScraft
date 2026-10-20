@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 type Point = { x: number; y: number; z: number }
@@ -95,7 +96,7 @@ test("shows each CIF bond's endpoint distance on hover while preserving atom det
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const loaded = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
   const transformed = page.waitForResponse(response => response.url().endsWith("/plot-transform"))
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   expect((await loaded).ok()).toBe(true)
   expect((await transformed).ok()).toBe(true)
   const panel = page.getByRole("region", { name: "CIF structure viewer", exact: true })

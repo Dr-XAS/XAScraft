@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -21,7 +22,7 @@ test("component checkboxes overlay spectra independently and fit desktop and mob
   await page.setViewportSize({ width: 1500, height: 1100 })
   await page.goto("/")
   const loading = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const response = await loading
   expect(response.ok()).toBe(true)
   const project = await response.json() as AthenaProject

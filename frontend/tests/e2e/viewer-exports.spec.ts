@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 
@@ -18,7 +19,7 @@ test("viewer heading menus download scientific data and current plot/structure i
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1500, height: 1000 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.locator(".ath-autosaved")).toHaveText("Saved locally", { timeout: 60_000 })
 
   const single = page.getByRole("region", { name: "Single spectrum viewer", exact: true })

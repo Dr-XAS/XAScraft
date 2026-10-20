@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
 import { expect, test, type Locator, type Page } from "@playwright/test"
@@ -35,7 +36,7 @@ function expectArrowCorridor(arrows: { start: Point; end: Point }[], a: Point, b
 async function loadPaths(page: Page, withMatchingCif = false) {
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const example = await (await exampleResponse).json()
   if (withMatchingCif) {
     // Import through the real native-project API. This explicit test snapshot
@@ -532,7 +533,7 @@ test("the in-canvas legend combines independently colored paths and allows every
 test("separates another source with the same FEFF filename from the prepared CIF paths", async ({ page }) => {
   test.setTimeout(120000)
   await page.goto("/", { waitUntil: "domcontentloaded" })
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const panel = page.getByRole("region", { name: "FEFF path viewer", exact: true })
   const legend = panel.getByRole("group", { name: "FEFF path legend", exact: true })
   await expect(legend.getByRole("button")).toHaveCount(4)
@@ -573,7 +574,7 @@ test("copper demo opens the prepared Cu2O model and draws one representative fir
     if (request.url().endsWith("/examples/cuprite") || request.method() === "POST" &&
       /\/api\/artemis\/projects\/[^/]+\/(structures|groups\/[^/]+\/fit(?:-saved)?)$/.test(request.url())) exampleRequests.push(request.url())
   })
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.locator(".ath-group.selected .ath-group-select")).toContainText("Cu₂O · room temperature")
   await expect(page.getByRole("region", { name: "Artemis EXAFS fitting setup", exact: true })).toContainText("Cu₂O · room temperature")
   await expect(page.getByRole("tab", { name: "EXAFS fitting", exact: true })).toHaveAttribute("aria-selected", "true")

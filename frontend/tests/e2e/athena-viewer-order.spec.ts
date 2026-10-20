@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
 const defaultOrder = ["single", "multiple", "wavelet", "cif", "feff", "fit"]
@@ -45,8 +46,8 @@ test("dragging viewer handles orders chips and panels and survives loading and r
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto("/", { waitUntil: "domcontentloaded" })
-  const loadExamples = page.getByRole("button", { name: "Load copper examples", exact: true })
-  await expect(loadExamples).toBeEnabled()
+  const loadDemoCases = page.getByRole("button", { name: "Load demo cases", exact: true })
+  await expect(loadDemoCases).toBeEnabled()
   await expectOrder(page, defaultOrder)
   const controls = chooser(page)
   const sort = page.getByRole("combobox", { name: "Sort viewers", exact: true })
@@ -67,7 +68,7 @@ test("dragging viewer handles orders chips and panels and survives loading and r
     response.request().postDataJSON().action === "example")
   const savingExampleModel = page.waitForResponse(response => response.url().includes("/api/artemis/projects/") &&
     response.url().endsWith("/model") && response.request().method() === "POST")
-  await loadExamples.click()
+  await loadCopperExamples(page)
   const loaded = await loading
   expect(loaded.ok()).toBe(true)
   const project = await loaded.json() as { id: string; version: number }
@@ -94,13 +95,13 @@ test("dragging viewer handles orders chips and panels and survives loading and r
   await controls.screenshot({ path: info.outputPath("viewer-custom-order-desktop.png") })
 
   await page.reload({ waitUntil: "domcontentloaded" })
-  await expect(loadExamples).toBeEnabled()
+  await expect(loadDemoCases).toBeEnabled()
   await expectOrder(page, savedOrder)
   await expect(sort).toHaveValue("custom")
   await sort.selectOption("default")
   await expectOrder(page, defaultOrder)
   await page.reload({ waitUntil: "domcontentloaded" })
-  await expect(loadExamples).toBeEnabled()
+  await expect(loadDemoCases).toBeEnabled()
   await expectOrder(page, defaultOrder)
   await expect(sort).toHaveValue("default")
   expect(errors).toEqual([])
@@ -113,7 +114,7 @@ test.describe("viewer order on a narrow touch screen", () => {
     const errors: string[] = []
     page.on("pageerror", error => errors.push(error.message))
     await page.goto("/", { waitUntil: "domcontentloaded" })
-    await expect(page.getByRole("button", { name: "Load copper examples", exact: true })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "Load demo cases", exact: true })).toBeEnabled()
     const controls = chooser(page)
     await controls.getByRole("button", { name: "Wavelet plotter", exact: true }).click()
     const originalShown = await shownState(page)

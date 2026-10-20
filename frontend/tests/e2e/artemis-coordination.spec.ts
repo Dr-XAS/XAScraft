@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -9,7 +10,7 @@ test("discovers, saves, reopens and fits an explicit coordination number", async
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
 
   const amplitude = page.getByLabel("Path 1 S₀²", { exact: true })

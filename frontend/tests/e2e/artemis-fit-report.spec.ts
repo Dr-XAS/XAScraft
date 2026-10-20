@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 import { readFile, writeFile } from "node:fs/promises"
 import type { AthenaProject } from "../../lib/athena"
@@ -15,7 +16,7 @@ test("real EXAFS fit has a readable report and preserves original downloads", as
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   await page.getByRole("radio", { name: "Light theme", exact: true }).click()
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   const fitting = page.waitForResponse(response => response.url().endsWith("/fit-saved"))
   await page.getByRole("button", { name: "Run EXAFS fit", exact: true }).click()

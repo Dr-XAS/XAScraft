@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { expect, test, type Locator, type Page } from "@playwright/test"
@@ -47,7 +48,7 @@ for (const mobile of [false, true]) {
     page.on("pageerror", error => errors.push(error.message))
     await page.goto("/")
     const initial = await command(page, "example", () =>
-      page.getByRole("button", { name: "Load copper examples", exact: true }).click())
+      loadCopperExamples(page))
     await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
     await expect.poll(async () => (await currentProject(page, initial.id)).groups
       .find(group => group.label === "Cu₂O · room temperature")?.artemis?.model.paths.length).toBe(4)

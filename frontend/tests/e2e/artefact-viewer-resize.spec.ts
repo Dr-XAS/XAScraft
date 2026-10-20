@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 import type { ArtemisFeffJob, ArtemisFeffRequest } from "../../lib/artemis-structures"
@@ -78,7 +79,7 @@ function scientificRequests(page: Page) {
 async function loadCopper(page: Page) {
   await page.goto("/")
   const loading = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON()?.action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const response = await loading
   expect(response.ok()).toBe(true)
   const project = await response.json() as AthenaProject

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -96,7 +97,7 @@ test("selects and orders result viewers after loading copper examples", async ({
   await page.getByRole("combobox", { name: "Sort viewers" }).selectOption("process")
   await expect(page.getByText(/Single and multiple spectra stay first; saved CIF attachment/)).toBeVisible()
 
-  await page.getByRole("button", { name: "Load copper examples" }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("combobox", { name: "Sort viewers" })).toHaveValue("default")
   expect(await viewerOrder()).toEqual(defaultOrder)
   await expect(stack.locator('[data-viewer-id="single"]')).toBeVisible()
@@ -119,7 +120,7 @@ test("keeps current and marked spectra in independent viewer panels", async ({ p
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const loading = page.waitForResponse(response => response.url().endsWith("/command") &&
     response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const response = await loading
   expect(response.ok()).toBe(true)
   const project = await response.json() as AthenaProject

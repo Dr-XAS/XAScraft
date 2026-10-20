@@ -153,10 +153,6 @@ html[data-theme="dark"] .ath-measurement-tag[data-tag="theory"] { border-color: 
 .ath-dirty-dot { background: #c6913d; border-radius: 50%; height: 5px; width: 5px; }
 .ath-sidebar-example { padding: 12px 12px 4px; }
 .ath-app .ath-sidebar-example > button { white-space: normal; text-align: left; justify-content: flex-start; width: 100%; color: var(--ath-primary); border: 1px dashed var(--ath-primary-line); background: var(--ath-surface-muted); font-size: var(--text-body); padding: 11px 8px; }
-.ath-example-details { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 4px; }
-.ath-example-details small { color: var(--ath-muted); font-size: var(--text-caption); }
-.ath-example-tutorial { margin-top: 8px; }
-.ath-app .ath-example-tutorial > button { padding: 2px 0; border: 0; background: transparent; color: var(--ath-muted); font-size: var(--text-caption); text-decoration: underline; }
 .ath-sidebar-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 12px 12px; padding-top: 10px; border-top: 1px solid var(--ath-line); }
 .ath-app .ath-sidebar-actions button { font-size: var(--text-body); color: var(--ath-muted); }
 .ath-empty-groups { text-align: center; padding: 40px 21px; color: var(--ath-muted); }

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { confirmProjectSave } from "./project-save"
 import { expect, test, type Page } from '@playwright/test'
 import type { AthenaGroup, AthenaProject } from '../../lib/athena'
@@ -35,7 +36,7 @@ test('real copper processing settings: four combinations, frozen recipes, scopes
   test.setTimeout(90000)
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message))
   await page.goto('/')
-  const initial = await command(page, 'example', () => page.getByRole('button', { name: 'Load copper examples', exact: true }).click())
+  const initial = await command(page, 'example', () => loadCopperExamples(page))
   const [, second, third, reference] = initial.groups
   await page.locator('.ath-group-select').filter({ hasText: 'Cu foil · 10 K' }).click()
   await page.getByRole('tab', { name: 'Processing', exact: true }).click()
@@ -173,7 +174,7 @@ test('real copper processing settings: four combinations, frozen recipes, scopes
 test('normalized input with EXAFS disabled survives downloaded .prj and reopened plots', async ({ page }, info) => {
   test.setTimeout(90000)
   await page.goto('/')
-  await command(page, 'example', () => page.getByRole('button', { name: 'Load copper examples', exact: true }).click())
+  await command(page, 'example', () => loadCopperExamples(page))
   await page.locator('.ath-group-select').filter({ hasText: 'Cu foil · 10 K' }).click()
   await page.getByRole('tab', { name: 'Processing', exact: true }).click()
   const panel = await openSettings(page)

@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 
 async function expectInViewport(tooltip: Locator) {
@@ -14,8 +15,9 @@ test("field instructions stay opt-in and usable at desktop and phone widths", as
   page.on("pageerror", error => errors.push(error.message))
   await page.setViewportSize({ width: 1600, height: 1050 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
-  await expect(page.getByText("Cu₂O EXAFS example added", { exact: true })).toBeVisible({ timeout: 60_000 })
+  await loadCopperExamples(page)
+  await expect(page.getByRole("tab", { name: "EXAFS fitting", exact: true })).toHaveAttribute("aria-selected", "true", { timeout: 60_000 })
+  await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   await page.getByRole("tab", { name: "Processing", exact: true }).click()
   const rbkg = page.getByRole("spinbutton", { name: "Rbkg Å", exact: true })
   await expect(rbkg).toBeEnabled()

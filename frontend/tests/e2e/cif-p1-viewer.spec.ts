@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 import fixture from "../../lib/fixtures/cif-p1-perturbed-cu-cr-p-s.json" with { type: "json" }
@@ -50,7 +51,7 @@ test("renders complete P1 snapshots at their exact saved coordinates after uploa
   await page.setViewportSize({ width: 1500, height: 1100 })
   await page.goto("/")
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await exampleResponse).json() as AthenaProject
   const region = page.getByRole("region", { name: "Project CIF structures", exact: true })
   await expect(region.getByRole("button", { name: "Upload CIF", exact: true })).toBeVisible()

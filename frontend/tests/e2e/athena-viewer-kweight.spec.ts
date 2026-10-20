@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -18,7 +19,7 @@ test("each spectrum and wavelet viewer controls its own k-weight", async ({ page
   await page.setViewportSize({ width: 1500, height: 1100 })
   await page.goto("/")
   const examples = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const loaded = await examples
   expect(loaded.ok()).toBe(true)
   const project = await loaded.json() as AthenaProject
@@ -145,7 +146,7 @@ test("EXAFS fit k-weight retransforms data, model and paths without changing the
   const viewer = page.getByRole("region", { name: "EXAFS fit results", exact: true })
   const weight = viewer.getByRole("combobox", { name: "EXAFS fit k-weight", exact: true })
   await expect(weight).toHaveCount(0)
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   const fittedResponse = page.waitForResponse(response => response.url().endsWith("/fit-saved"))
   await page.getByRole("button", { name: "Run EXAFS fit", exact: true }).click()

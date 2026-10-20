@@ -63,7 +63,7 @@ NiO transmission also includes its Bunsenite CIF, five FEFF paths and an archive
 two-shell EXAFS fit. Loading opens its saved curves, fitted parameters and warnings
 directly, without running the optimizer. The editable model retains the original
 starting values, with the first Ni–O and Ni–Ni shells enabled.
-The smaller **Load copper examples** shortcut retains the earlier fitting tutorial:
+The **File → Load copper examples** command retains the earlier fitting tutorial:
 three temperature-series foils, a room-temperature Cu₂O reference,
 and a shared Cu foil reference. Data groups show each sample’s reference as
 an indented link; **Ref** assigns one foil to several selected spectra.

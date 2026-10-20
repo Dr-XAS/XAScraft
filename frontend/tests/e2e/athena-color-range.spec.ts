@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
 function plottedColors(viewer: Locator) {
@@ -19,7 +20,7 @@ async function dragHandle(page: Page, handle: Locator, distance: number) {
 test("spectrum color range arrows recolor plots and keep viewer preferences separate", async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto("/", { waitUntil: "domcontentloaded" })
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
 
   const multiple = page.getByRole("region", { name: "Multiple spectra viewer", exact: true })
   const single = page.getByRole("region", { name: "Single spectrum viewer", exact: true })

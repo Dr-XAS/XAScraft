@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test, type Page } from "@playwright/test"
 import type { AthenaProject } from "../../lib/athena"
 
@@ -18,7 +19,7 @@ test("visible CIF removal persists without changing FEFF paths and can be undone
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await exampleResponse).json() as AthenaProject
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
 
@@ -116,7 +117,7 @@ test("CIF removal waits for an in-flight model save and uses its committed revis
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
   const exampleResponse = page.waitForResponse(response => response.url().endsWith("/command") && response.request().postDataJSON().action === "example")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const initial = await (await exampleResponse).json() as AthenaProject
   await expect(page.getByRole("checkbox", { name: /^Include path \d+$/ })).toHaveCount(4)
   const savedProject = async () => await (await page.request.get(`/api/backend/api/athena/projects/${initial.id}`)).json() as AthenaProject

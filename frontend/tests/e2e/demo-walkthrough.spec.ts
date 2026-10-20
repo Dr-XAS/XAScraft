@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 /**
  * One walk per moment of the feature demonstration: import from ten facilities,
  * raw XRF and fluorescence XAS, EXAFS fitting with the fast backend, and the
@@ -372,9 +373,8 @@ test.describe('demo walkthrough', () => {
 
     const examples = page.waitForResponse(r =>
       r.url().endsWith('/command') && r.request().postDataJSON()?.action === 'example')
-    await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
+    await loadCopperExamples(page)
     expect((await examples).ok()).toBe(true)
-    await expect(page.getByText('Cu₂O EXAFS example added', { exact: true })).toBeVisible()
 
     // Loading the examples opens the prepared Cu₂O model in the fitting tab.
     await expect(page.getByRole('tab', { name: 'EXAFS fitting', exact: true }))

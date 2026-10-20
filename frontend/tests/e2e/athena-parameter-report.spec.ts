@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +8,7 @@ const python=fileURLToPath(new URL('../../../backend/.venv/bin/python',import.me
 async function example(page:Page){
   await page.goto('/')
   const response=page.waitForResponse(r=>r.url().endsWith('/command') && r.request().postDataJSON().action==='example')
-  await page.getByRole('button',{name:'Load copper examples',exact:true}).click()
+  await loadCopperExamples(page)
   const loaded=await response;expect(loaded.ok()).toBe(true);return loaded.json()
 }
 async function openReport(page:Page,scope='all'){

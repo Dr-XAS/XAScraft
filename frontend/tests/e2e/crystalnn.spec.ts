@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { expect, test } from "@playwright/test"
 
 test("CrystalNN shell, FEFF candidates, and periodic viewer use the selected absorber", async ({ page }, info) => {
@@ -8,7 +9,7 @@ test("CrystalNN shell, FEFF candidates, and periodic viewer use the selected abs
   page.on("request", request => { if (/\/fit(?:-saved)?$/.test(request.url())) fitRequests.push(request.url()) })
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto("/")
-  await page.getByRole("button", { name: "Load copper examples", exact: true }).click()
+  await loadCopperExamples(page)
   const viewer = page.getByRole("region", { name: "CIF structure viewer", exact: true })
   await expect(viewer.getByText("CrystalNN first shell · CN 2", { exact: true })).toBeHidden()
   await viewer.getByRole("combobox", { name: "CIF view mode" }).selectOption("shell")

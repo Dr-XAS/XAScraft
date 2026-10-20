@@ -1,3 +1,4 @@
+import { loadCopperExamples } from "./examples"
 import { selectImportSignals } from './import-signals'
 import { confirmProjectSave } from "./project-save"
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -119,7 +120,7 @@ for (const file of ['xdi-official-cu_metal_rt.xdi', 'demeter-x11a-cu.012']) {
 
 test('ordinary groups expose absorber metadata and missing field status', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Load copper examples', exact: true }).click()
+  await loadCopperExamples(page)
   await page.locator('.ath-group-select').filter({ hasText: 'Cu foil · 10 K' }).click()
   await page.getByRole('tab', { name: 'Processing', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Edit data information', exact: true })).toBeVisible()
