@@ -155,3 +155,80 @@ def test_feffit_independent_points_are_larchs(client, bundled_project, transform
     larch_count = fitted.json()["statistics"]["n_independent"]
     assert 3 < larch_count < 4
     assert app_count == pytest.approx(larch_count, abs=0.005)
+
+
+XRF_MODELS = [
+    pytest.param(dict(symbols=["Mn", "Fe", "Cr"], xray_energy_kev=7.2, energy_window=(3.8, 7.8), material="Ge",
+                      split_kbeta=("Mn",)), id="mn-fe-cr-ge-split-kbeta"),
+    pytest.param(dict(symbols=["Fe"], xray_energy_kev=8.0, energy_window=(1.0, 8.0), material="Si",
+                      escape_amp=1.0), id="fe-si-escape"),
+    pytest.param(dict(symbols=["Zn", "Ba"], xray_energy_kev=12.0, energy_window=(0.9, 12.0), material="Si",
+                      escape_amp=0.5, peak_gamma=0.03), id="zn-ba-k-and-l-lines"),
+]
+
+
+def _xrf_model(symbols, xray_energy_kev, energy_window, material, escape_amp=0.0, peak_gamma=0.0, split_kbeta=()):
+    from xraylarch_web import athena_xrf_xas as engine
+
+    model = engine.build_model(symbols, xray_energy_kev, energy_window, material=material, thickness=1.0,
+                               det_noise=0.065, peak_step=1.5e-3, peak_tail=0.06, escape_amp=escape_amp,
+                               peak_gamma=peak_gamma)
+    energy = np.linspace(*energy_window, 801)
+    return model, energy
+
+
+@pytest.mark.parametrize("case", XRF_MODELS)
+def test_xrf_line_columns_sum_to_larchs_element_components(case):
+    """Copy: backend/xraylarch_web/athena_xrf_xas.py:874-915 (element_columns) and :849-861 (detected).
+
+    Original: larch/xrf/xrf_model.py XRF_Model.calc_spectrum, the per-element
+    loop that fills model.comps. The app splits each element's lines by
+    initial level (and a target's K-beta); the columns of one element at unit
+    amplitude must add up to Larch's component for that element.
+    """
+    from xraylarch_web import athena_xrf_xas as engine
+
+    split_kbeta = case.get("split_kbeta", ())
+    model, energy = _xrf_model(**case)
+    columns = engine.element_columns(model, energy, split_kbeta=split_kbeta)
+
+    for symbol in case["symbols"]:
+        model.params[f"amp_{symbol.lower()}"].value = 1.0
+    model.calc_spectrum(energy)
+    for symbol in case["symbols"]:
+        parts = [key for key in columns if key[0] == symbol]
+        assert parts, symbol
+        summed = np.sum([columns[key] for key in parts], axis=0)
+        native = model.comps[symbol]
+        assert native.max() > 0
+        np.testing.assert_allclose(summed, native, rtol=1e-10, atol=1e-12 * native.max(), err_msg=symbol)
+    if case["symbols"] == ["Zn", "Ba"]:
+        # The point of the split: one element, two excitation levels.
+        assert {key[1] for key in columns if key[0] == "Zn"} >= {"K", "L3"}
+    for symbol in split_kbeta:
+        assert (symbol, "Kbeta") in columns
+
+
+@pytest.mark.parametrize("case", XRF_MODELS)
+def test_xrf_scatter_column_is_larchs_scatter_component(case):
+    """Copy: backend/xraylarch_web/athena_xrf_xas.py:926-934 (scatter_column).
+
+    Original: larch/xrf/xrf_model.py XRF_Model.calc_spectrum, the Rayleigh and
+    Compton loop. A unit-amplitude scatter column must be Larch's own scatter
+    component for the same centre and shape.
+    """
+    from xraylarch_web import athena_xrf_xas as engine
+
+    model, energy = _xrf_model(**case)
+    shapes = dict(elastic=dict(center=case["xray_energy_kev"] - 0.05, step=0.006, tail=0.35, sigmax=1.1, beta=0.5),
+                  compton=dict(center=case["xray_energy_kev"] - 0.4, step=0.006, tail=1.2, sigmax=2.8, beta=0.5))
+    for name, shape in shapes.items():
+        model.add_scatter_peak(name=name, amplitude=1.0, **shape)
+    model.calc_spectrum(energy)
+    det_noise = model.params["det_noise"].value
+    for name, shape in shapes.items():
+        column = engine.scatter_column(model, energy, shape["center"], sigmax=shape["sigmax"], step=shape["step"],
+                                       tail=shape["tail"], beta=shape["beta"], det_noise=det_noise)
+        native = model.comps[name]
+        assert native.max() > 0
+        np.testing.assert_allclose(column, native, rtol=1e-10, atol=1e-12 * native.max(), err_msg=name)
