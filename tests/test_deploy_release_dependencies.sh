@@ -7,7 +7,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 release="$test_root/build"
 mkdir -p "$release/backend/.venv/bin" "$release/deploy"
-printf '%s\n' '-e ..' 'fastapi==0.116.1' 'xlwt==1.3.0' 'xlrd==2.0.2' > "$release/backend/requirements.txt"
+printf '%s\n' 'fastapi==0.116.1' 'xlwt==1.3.0' 'xlrd==2.0.2' > "$release/backend/requirements.txt"
 printf '%s\n' 'fastapi==0.116.1' > "$release/deploy/python-release-constraints.txt"
 run_clean() {
   printf '%s\n' "$PWD" > "$test_root/cwd"
@@ -15,7 +15,7 @@ run_clean() {
   if [[ "$*" == *'pip install'* ]]; then
     local previous='' argument
     for argument in "$@"; do
-      [[ "$previous" != --requirement ]] || cp "$argument" "$test_root/installed-requirements"
+      [[ "$previous" != --requirement ]] || printf '%s\n' "$argument" > "$test_root/installed-requirements"
       previous="$argument"
     done
   fi
@@ -24,7 +24,7 @@ run_clean() {
 declare -F install_backend_requirements >/dev/null || fail_test 'backend requirement install helper is missing'
 install_backend_requirements "$release" || fail_test 'backend dependency installation must succeed'
 [[ "$(cat "$test_root/cwd")" == "$release/backend" ]] || fail_test 'requirements must resolve from backend cwd'
-[[ "$(cat "$test_root/installed-requirements")" == $'fastapi==0.116.1\nxlwt==1.3.0\nxlrd==2.0.2' ]] || fail_test 'install backend dependencies while preserving wheel instead of editable root'
+[[ "$(cat "$test_root/installed-requirements")" == requirements.txt ]] || fail_test 'install the web dependencies declared in backend/requirements.txt'
 grep -Fx -- '--constraint' "$test_root/args" >/dev/null || fail_test 'constraints argument missing'
 grep -Fx -- "$release/deploy/python-release-constraints.txt" "$test_root/args" >/dev/null || fail_test 'wrong constraints file'
 command_status=7
@@ -65,6 +65,66 @@ command_status=0
 # gate must fail before the immutable release or frontend can be published.
 declare -F install_release_backend >/dev/null || fail_test 'shared release installer is missing'
 
+# Larch comes from XAScraft's patched build (larch-patches/build.py), never from
+# the release checkout. Each run records its run_clean calls, one stage per line.
+larch_release="$test_root/larch-release"
+mkdir -p "$larch_release/backend/.venv/bin" "$larch_release/deploy" "$larch_release/larch-patches"
+printf '%s\n' 'fastapi==0.116.1' > "$larch_release/backend/requirements.txt"
+: > "$larch_release/deploy/python-release-constraints.txt"
+run_larch_install() (
+  # $1: stage to fail (or none); the environment selects the Larch source.
+  local failure="$1"
+  calls="$test_root/larch-calls"
+  : > "$calls"
+  run_clean() {
+    local stage=''
+    case "$*" in
+      *'pip install --requirement '*'/deploy/python-release-constraints.txt '*) stage=constraints ;;
+      *'pip install --no-deps --no-build-isolation --upgrade setuptools=='*) stage=build_tools ;;
+      *'pip wheel '*) stage=checkout_wheel ;;
+      *'larch-patches/build.py '*)
+        stage=larch_build
+        local previous='' argument
+        for argument in "$@"; do
+          if [[ "$previous" == --out ]]; then
+            [[ ! -e "$argument" ]] || fail_test 'build.py output directory must be fresh'
+            mkdir -p "$argument/dist"
+            : > "$argument/dist/xraylarch-2026.3.1.post35+g8d6cd41c2.xascraft.test-py3-none-any.whl"
+            printf '%s\n' "$argument" > "$test_root/larch-out"
+          fi
+          previous="$argument"
+        done
+        ;;
+      *'pip install --constraint '*'xraylarch-'*'.whl') stage=larch_install ;;
+      *'pip install --requirement requirements.txt '*) stage=backend ;;
+      *'import larch, xraylarch_web'*) stage=import ;;
+      *'from xraylarch_web.main import app'*) stage=app ;;
+      *'patched-larch-tree'*) stage=larch_check ;;
+      *'pip check'*) stage=check ;;
+      *'pip freeze'*) stage=freeze ;;
+      *) stage="unexpected: $*" ;;
+    esac
+    local call="$*"
+    printf '%s\t%s\n' "$stage" "${call//$'\n'/ }" >> "$calls"
+    [[ "$stage" != "$failure" ]] || return 7
+  }
+  install_release_backend "$larch_release"
+)
+larch_stages() { cut -f1 "$test_root/larch-calls" | paste -sd ' ' -; }
+larch_call() { grep "^$1"$'\t' "$test_root/larch-calls" | cut -f2-; }
+
+unset XASCRAFT_LARCH_UPSTREAM XASCRAFT_LARCH_WHEEL
+run_larch_install none || fail_test 'release backend install with a Larch build must succeed'
+[[ "$(larch_stages)" == 'constraints build_tools larch_build larch_install backend import app larch_check check freeze' ]] \
+  || fail_test "unexpected release install stages: $(larch_stages)"
+larch_out=$(cat "$test_root/larch-out")
+build_call=$(larch_call larch_build)
+[[ "$build_call" == "$larch_release/backend/.venv/bin/python -I $larch_release/larch-patches/build.py --out $larch_out --build-python $larch_release/backend/.venv/bin/python" ]] \
+  || fail_test "build.py must build with the release interpreter and fetch the pin itself: $build_call"
+[[ "$(larch_call larch_install)" == "$larch_release/backend/.venv/bin/python -m pip install --constraint $larch_release/deploy/python-release-constraints.txt $larch_out/dist/xraylarch-2026.3.1.post35+g8d6cd41c2.xascraft.test-py3-none-any.whl" ]] \
+  || fail_test "the built wheel must be installed under the release constraints: $(larch_call larch_install)"
+[[ ! -e "$larch_out" ]] || fail_test 'build.py output must be removed after installation'
+
 # Mounted builds must receive their public path at build time. Health qualification
 # must bind the backend response to the exact immutable release and contract.
 build_source=$(declare -f build_release)
@@ -73,7 +133,7 @@ health_source=$(declare -f backend_health_ok)
 [[ "$health_source" == *'git_revision'* ]] || fail_test 'backend health must verify the exact release revision'
 [[ "$health_source" == *'integration_contract_version'* ]] || fail_test 'backend health must verify integration contract version 2'
 
-for failure in constraints wheel backend app check freeze collection runtime frontend_runtime; do
+for failure in constraints larch_build larch_install backend app larch_check check freeze collection runtime frontend_runtime; do
 (
   XRAYLARCH_WEB_TEST_MODE=1 source "$repo_root/scripts/deploy-xraylarch-web.sh"
   RELEASES_ROOT="$test_root/build-releases-$failure"
@@ -88,19 +148,22 @@ for failure in constraints wheel backend app check freeze collection runtime fro
       'git init --quiet '*)
         local target="${@: -1}"
         mkdir -p "$target/backend/.venv/bin" "$target/frontend" "$target/deploy"
-        printf '%s\n' '-e ..' 'xlwt==1.3.0' > "$target/backend/requirements.txt"
+        printf '%s\n' 'xlwt==1.3.0' > "$target/backend/requirements.txt"
         : > "$target/deploy/python-release-constraints.txt"
         ;;
       *'rev-parse '*) printf '%s\n' "$REQUESTED_SHA" ;;
       *'git '*describe*) printf '1.0.0\n' ;;
       *'pip install --requirement '*'/deploy/python-release-constraints.txt '*) stage=constraints ;;
-      *'pip wheel '*)
-        stage=wheel
-        mkdir -p ../.release-wheel
-        : > ../.release-wheel/xraylarch-test.whl
+      *'pip wheel '*) fail_test 'the release checkout must not be built as Larch' ;;
+      *'larch-patches/build.py '*)
+        stage=larch_build
+        mkdir -p ../.release-larch/dist
+        : > ../.release-larch/dist/xraylarch-test.whl
         ;;
-      *'pip install --requirement '*'.release-requirements.'*) stage=backend ;;
+      *'pip install --constraint '*'xraylarch-test.whl') stage=larch_install ;;
+      *'pip install --requirement requirements.txt '*) stage=backend ;;
       *'from xraylarch_web.main import app'*) stage=app ;;
+      *'patched-larch-tree'*) stage=larch_check ;;
       *'pip check'*) stage=check ;;
       *'pip freeze'*) stage=freeze ;;
       *'pytest '*--collect-only*) stage=collection ;;

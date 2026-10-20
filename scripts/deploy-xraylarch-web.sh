@@ -934,15 +934,40 @@ assert_frontend_runtime_supported() {
 }
 
 install_backend_requirements() (
-  local release="$1" requirements
+  local release="$1"
   cd "${release}/backend" || return 1
-  requirements=$(mktemp "${release}/backend/.release-requirements.XXXXXX") || return 1
-  trap 'rm -f -- "$requirements"' EXIT
-  # The root package is already installed from its versioned wheel. Only omit
-  # the editable root entry; install every dependency declared by the web app.
-  awk '!/^[[:space:]]*-e[[:space:]]+\.\.[[:space:]]*$/' requirements.txt > "$requirements" || return 1
   run_clean "${release}/backend/.venv/bin/python" -m pip install \
-    --requirement "$requirements" --constraint "${release}/deploy/python-release-constraints.txt"
+    --requirement requirements.txt --constraint "${release}/deploy/python-release-constraints.txt"
+)
+
+# The installed Larch must be the patched build of this release's pin and series
+# (the version build.py writes to IDENTITY), imported from site-packages.
+assert_patched_larch() (
+  local release="$1"
+  cd "${release}/backend" || return 1
+  run_clean "${release}/backend/.venv/bin/python" -I -c '
+import sys
+from importlib.metadata import version
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+release = Path(sys.argv[1]).resolve()
+patches = release / "larch-patches"
+spec = spec_from_file_location("larch_patches_build", patches / "build.py")
+build = module_from_spec(spec)
+spec.loader.exec_module(build)
+pin = build.read_pin(patches / "PIN")
+series = sorted((patches / "series").glob("*.patch"))
+expected = build.make_identity(pin, series, series, False, pin["patched-larch-tree"])["version"]
+import larch
+where = Path(larch.__file__).resolve()
+metadata = version("xraylarch")
+if larch.__version__ != expected or metadata != expected:
+    sys.exit(f"installed Larch is {larch.__version__} (metadata {metadata}), "
+             f"the patched build of this release is {expected}")
+if "site-packages" not in where.parts:
+    sys.exit(f"Larch is not imported from site-packages: {where}")
+print(f"patched Larch {expected} at {where.parent}")
+' "$release"
 )
 
 assert_backend_application_import() (
@@ -954,25 +979,33 @@ assert_backend_application_import() (
 # Shared with the fresh-environment CI job: do not duplicate this dependency
 # sequence in workflow YAML or allow build_release to bypass its checks.
 install_release_backend() (
-  local release="$1" wheel
+  local release="$1" python="${1}/backend/.venv/bin/python" larch_out='' wheel
+  local constraints="${1}/deploy/python-release-constraints.txt"
   cd "${release}/backend" || return 1
-  run_clean "${release}/backend/.venv/bin/python" -m pip install \
-    --requirement "${release}/deploy/python-release-constraints.txt" \
-    --constraint "${release}/deploy/python-release-constraints.txt" || return 1
-  run_clean "${release}/backend/.venv/bin/python" -m pip install \
+  run_clean "$python" -m pip install \
+    --requirement "$constraints" --constraint "$constraints" || return 1
+  # build.py uses the release interpreter as its build backend, so it needs these pins.
+  run_clean "$python" -m pip install \
     --no-deps --no-build-isolation --upgrade \
     'setuptools==79.0.1' 'wheel==0.47.0' 'setuptools-scm==9.2.2' || return 1
-  run_clean "${release}/backend/.venv/bin/python" -m pip wheel \
-    --no-deps --no-build-isolation --wheel-dir "${release}/.release-wheel" "$release" || return 1
-  wheel=$(find "${release}/.release-wheel" -maxdepth 1 -type f -name 'xraylarch-*.whl' -print -quit) || return 1
-  [[ -n "$wheel" ]] || { fail "release wheel was not built"; return 1; }
-  run_clean "${release}/backend/.venv/bin/python" -m pip install --no-deps "$wheel" || return 1
+  # Larch is XAScraft's patched build, never the release checkout: build.py
+  # fetches upstream at larch-patches/PIN (from GitHub, or XASCRAFT_LARCH_UPSTREAM)
+  # and applies the series.
+  larch_out="${release}/.release-larch"
+  [[ ! -e "$larch_out" && ! -L "$larch_out" ]] || { fail "stale Larch build output: $larch_out"; return 1; }
+  local build_args=(--out "$larch_out" --build-python "$python")
+  [[ -z "${XASCRAFT_LARCH_UPSTREAM:-}" ]] || build_args+=(--upstream "$XASCRAFT_LARCH_UPSTREAM")
+  run_clean "$python" -I "${release}/larch-patches/build.py" "${build_args[@]}" || return 1
+  wheel=$(find "${larch_out}/dist" -maxdepth 1 -type f -name 'xraylarch-*.whl' -print -quit) || return 1
+  [[ -n "$wheel" ]] || { fail "build.py produced no Larch wheel"; return 1; }
+  run_clean "$python" -m pip install --constraint "$constraints" "$wheel" || return 1
   install_backend_requirements "$release" || return 1
-  run_clean "${release}/backend/.venv/bin/python" -c 'import larch, xraylarch_web' || return 1
+  run_clean "$python" -c 'import larch, xraylarch_web' || return 1
   assert_backend_application_import "$release" || return 1
-  rm -rf -- "${release}/.release-wheel" || return 1
-  run_clean "${release}/backend/.venv/bin/python" -m pip check || return 1
-  run_clean "${release}/backend/.venv/bin/python" -m pip freeze --all > pip-freeze.txt
+  assert_patched_larch "$release" || return 1
+  rm -rf -- "$larch_out" || return 1
+  run_clean "$python" -m pip check || return 1
+  run_clean "$python" -m pip freeze --all > pip-freeze.txt
 )
 
 # Run the same dependency/runtime gate in CI and before publishing a release.
