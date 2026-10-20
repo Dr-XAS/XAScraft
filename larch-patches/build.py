@@ -118,19 +118,41 @@ def patch_set_id(patches: list[Path]) -> str:
     return digest.hexdigest()[:12]
 
 
-def make_identity(pin: dict[str, str], patches: list[Path], larch_tree: str) -> dict:
-    set_id = patch_set_id(patches)
+def select_patches(series: list[Path], exclude: list[str], pure: bool) -> list[Path]:
+    """The patches to apply: all, all but ``exclude``, or none for ``pure``."""
+    if pure and exclude:
+        raise BuildError("--exclude is not allowed with --pure-upstream")
+    numbers = {p.name[:4] for p in series}
+    wanted = [n.zfill(4) for n in exclude]
+    for number in wanted:
+        if number not in numbers:
+            raise BuildError(f"--exclude: there is no patch {number} in series/")
+    if pure:
+        return []
+    return [p for p in series if p.name[:4] not in wanted]
+
+
+def make_identity(pin: dict[str, str], series: list[Path], patches: list[Path],
+                  pure: bool, larch_tree: str) -> dict:
+    """What was built.  A leave-one-out build gets the id of the patches it applied plus a
+    ``.withoutNNNN`` mark per excluded patch; a pure build gets the bare upstream version.
+    (``withoutNNNN`` is one PEP 440 local segment, so setuptools leaves it as written.)"""
+    excluded = [p.name[:4] for p in series if p not in patches]
+    set_id = None if pure else patch_set_id(patches)
+    version = pin["upstream-version"]
+    if not pure:
+        version += f".xascraft.{set_id}" + "".join(f".without{n}" for n in excluded)
     return {
         "pin": pin["upstream-commit"],
         "upstream_version": pin["upstream-version"],
         "patch_set_id": set_id,
-        "version": f"{pin['upstream-version']}.xascraft.{set_id}",
-        "pure_upstream": False,
+        "version": version,
+        "pure_upstream": pure,
         "patches": [
             {"number": p.name[:4], "file": p.name, "xascraft_commit": xascraft_commit(p)}
             for p in patches
         ],
-        "excluded": [],
+        "excluded": excluded,
         "larch_tree": larch_tree,
     }
 
@@ -226,21 +248,25 @@ def build(args: argparse.Namespace) -> Path:
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise BuildError(f"--out {out} exists and is not empty")
     pin = read_pin(HERE / "PIN")
-    patches = sorted((HERE / "series").glob("*.patch"))
+    series = sorted((HERE / "series").glob("*.patch"))
+    patches = select_patches(series, args.exclude, args.pure_upstream)
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="xascraft-larch-") as tmp:
+    # Work happens in the system temp dir (outside any repository); the result is staged
+    # next to --out and renamed into place only when everything has succeeded.
+    with tempfile.TemporaryDirectory(prefix="xascraft-larch-") as tmp, \
+            tempfile.TemporaryDirectory(prefix=f".{out.name}-", dir=out.parent) as staging:
         work = Path(tmp)
         repo = work / "xraylarch"
         checkout_upstream(args.upstream, pin["upstream-commit"], repo)
         apply_series(patches, repo)
         larch_tree = git("rev-parse", "HEAD:larch", cwd=repo).strip()
         expected = pin.get("patched-larch-tree")
-        if expected and larch_tree != expected:
+        if patches == series and expected and larch_tree != expected:
             raise BuildError(f"the series gives larch/ tree {larch_tree}, but PIN records "
                              f"patched-larch-tree = {expected}; update PIN (README.md)")
-        ident = make_identity(pin, patches, larch_tree)
-        stage = work / "out"
+        ident = make_identity(pin, series, patches, args.pure_upstream, larch_tree)
+        stage = Path(staging) / "out"
         stage.mkdir()
         export_tree(repo, stage / "xraylarch-src")
         python = args.build_python or build_environment(work)
@@ -249,7 +275,7 @@ def build(args: argparse.Namespace) -> Path:
         (stage / "IDENTITY").write_text(json.dumps(ident, indent=2) + "\n")
         if out.exists():
             out.rmdir()
-        shutil.move(str(stage), str(out))
+        stage.rename(out)
     return out
 
 
@@ -258,7 +284,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", required=True, help="output directory (absent or empty)")
     parser.add_argument("--upstream", default=None,
                         help="local xraylarch clone or git URL (default: upstream-url in PIN)")
-    parser.add_argument("--build-python", default=None)
+    parser.add_argument("--exclude", action="append", default=[], metavar="NNNN",
+                        help="leave this patch out (repeatable); marks the version")
+    parser.add_argument("--pure-upstream", action="store_true",
+                        help="apply no patches; the version is upstream's own")
+    parser.add_argument("--build-python", default=None, metavar="PYTHON",
+                        help="interpreter that already has the pinned setuptools, wheel and "
+                             "setuptools-scm (default: a fresh venv, installed from PyPI)")
     args = parser.parse_args(argv)
     try:
         if args.upstream is None:

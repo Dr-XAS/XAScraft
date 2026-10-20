@@ -66,16 +66,19 @@ def full(tmp_path_factory) -> Path:
     return build_ok(tmp_path_factory.mktemp("full") / "out")
 
 
-def test_full_build_gives_the_larch_tree_recorded_in_pin(full):
-    """The exported ``larch/`` hashes to the git tree that ``PIN`` records."""
-    scratch = full.parent / "tree-check"
-    env = {**os.environ, "GIT_DIR": str(scratch), "GIT_WORK_TREE": str(full / "xraylarch-src")}
+def larch_tree_of(out: Path, scratch: Path) -> str:
+    """The git tree hash of the exported ``larch/`` folder, computed from the files."""
+    env = {**os.environ, "GIT_DIR": str(scratch), "GIT_WORK_TREE": str(out / "xraylarch-src")}
     subprocess.run(["git", "init", "-q", "--bare", str(scratch)], check=True)
     subprocess.run(["git", "add", "-f", "larch"], env=env, check=True,
-                   cwd=full / "xraylarch-src")
-    tree = subprocess.run(["git", "write-tree", "--prefix=larch/"], env=env, check=True,
+                   cwd=out / "xraylarch-src")
+    return subprocess.run(["git", "write-tree", "--prefix=larch/"], env=env, check=True,
                           capture_output=True, text=True).stdout.strip()
-    assert tree == PIN["patched-larch-tree"]
+
+
+def test_full_build_gives_the_larch_tree_recorded_in_pin(full, tmp_path):
+    """The exported ``larch/`` hashes to the git tree that ``PIN`` records."""
+    assert larch_tree_of(full, tmp_path / "git") == PIN["patched-larch-tree"]
 
 
 def test_full_build_larch_equals_the_baseline_larch_byte_for_byte(full):
@@ -241,3 +244,52 @@ def test_a_corrupted_patch_stops_the_build_and_writes_nothing(tmp_path):
     assert result.returncode != 0
     assert "0003-" in result.stderr and "does not apply" in result.stderr
     assert not out.exists()
+
+
+# git rev-parse 8d6cd41c2b2a19260dbc80519c3c95211331d4fc:larch in the upstream clone.
+UPSTREAM_LARCH_TREE = "244732f073d99905e9414fc12379b58de769c220"
+
+
+@pytest.fixture(scope="module")
+def pure(tmp_path_factory) -> Path:
+    return build_ok(tmp_path_factory.mktemp("pure") / "out", "--pure-upstream")
+
+
+def test_pure_upstream_build_is_upstream_at_the_pin(pure, tmp_path):
+    ident = identity(pure)
+    assert larch_tree_of(pure, tmp_path / "git") == ident["larch_tree"] == UPSTREAM_LARCH_TREE
+    assert ident["pure_upstream"] is True
+    assert ident["patch_set_id"] is None
+    assert ident["patches"] == []
+    assert ident["excluded"] == list(XASCRAFT_COMMITS)
+    assert ident["version"] == "2026.3.1.post35+g8d6cd41c2"
+    assert installed_versions(the_wheel(pure), tmp_path / "site") == [ident["version"]] * 2
+
+
+def test_exclude_leaves_one_patch_out_and_says_so(full, pure, tmp_path):
+    out = build_ok(tmp_path / "out", "--exclude", "0001")
+    ident = identity(out)
+    patch_set = series_id(PATCHES_DIR, skip=("0001",))
+    assert ident["patch_set_id"] == patch_set != identity(full)["patch_set_id"]
+    assert ident["version"] == f"2026.3.1.post35+g8d6cd41c2.xascraft.{patch_set}.without0001"
+    assert ident["excluded"] == ["0001"]
+    assert [p["number"] for p in ident["patches"]] == list(XASCRAFT_COMMITS)[1:]
+    assert the_wheel(out).name == f"xraylarch-{ident['version']}-py3-none-any.whl"
+    # 0001 changes only larch/io/csvfiles.py: that file is upstream's, the rest is patched.
+    larch = files_under(out / "xraylarch-src" / "larch")
+    csv = "io/csvfiles.py"
+    assert larch[csv] == files_under(pure / "xraylarch-src" / "larch")[csv]
+    assert larch[csv] != files_under(full / "xraylarch-src" / "larch")[csv]
+    assert {k: v for k, v in larch.items() if k != csv} == {
+        k: v for k, v in files_under(full / "xraylarch-src" / "larch").items() if k != csv}
+
+
+@pytest.mark.parametrize("args, message", [
+    (["--exclude", "0099"], "no patch 0099"),
+    (["--pure-upstream", "--exclude", "0001"], "not allowed with"),
+])
+def test_bad_selections_are_refused(tmp_path, args, message):
+    result = run_build(tmp_path / "out", *args)
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert not (tmp_path / "out").exists()
