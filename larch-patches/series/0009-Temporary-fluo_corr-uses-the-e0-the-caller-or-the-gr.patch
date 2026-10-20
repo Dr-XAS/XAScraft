@@ -1,8 +1,8 @@
-From dea94051d103a298e91a690ba865e3f1c1ae65cc Mon Sep 17 00:00:00 2001
+From b66f68550031daebc0cb58131b12a64889315913 Mon Sep 17 00:00:00 2001
 From: XAScraft refactor <refactor@xascraft.invalid>
-Date: Tue, 20 Oct 2026 12:00:00 -0500
-Subject: [PATCH] fluo_corr: use the e0 the caller or the group gives (revert
- d6d27ccca)
+Date: Tue, 20 Oct 2026 12:30:00 -0500
+Subject: [PATCH] Temporary: fluo_corr uses the e0 the caller or the group
+ gives (revert d6d27ccca)
 
 Revert upstream d6d27ccca ("fluo: force recalculation of e0"). It sets
 pre_opts['e0'] = None after the caller's keywords and the group's
@@ -17,9 +17,9 @@ found by pre_edge() only when neither gives one. This is fluo.py as
 it was after 11448b7b3; its test_fluo_corr_uses_group_normalization
 still passes.
 
-Temporary XAScraft patch: it keeps the app's self-absorption numbers as
-they were at the previous pin until the project owner decides whether to
-adopt upstream's behavior.
+This keeps XAScraft's self-absorption numbers as they were at upstream
+8d6cd41c2 until the project owner decides whether to adopt upstream's
+behavior (exit condition in larch-patches/README.md).
 ---
  larch/xafs/fluo.py | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
