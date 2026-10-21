@@ -43,3 +43,19 @@ def test_a_path_parameter_given_to_path2chi_replaces_the_paths_own(form):
     np.testing.assert_array_equal(path.k, expected.k)
     np.testing.assert_array_equal(path.chi, expected.chi)
     assert path.chi[100] == pytest.approx(0.03606396143, rel=1e-9)   # k = 5
+
+
+def test_every_path_parameter_can_be_given_to_path2chi_on_a_k_grid():
+    """All seven path parameters as keywords, on an explicit k grid: the chi of a path whose
+    own parameters have these values. With every one given, none reached the values
+    _calc_chi unpacks ('expected 7, got 0')."""
+    values = dict(s02=0.81, e0=2.5, deltar=0.012, sigma2=0.0052, third=1.0e-4, fourth=2.0e-5,
+                  ei=0.3)
+    k = np.arange(241) * 0.05
+    path = a_path(s02=0.9, e0=1.0, sigma2=0.003)
+    path2chi(path, k=k, **values)
+    expected = a_path(**values)
+    path2chi(expected, k=k)
+    np.testing.assert_array_equal(path.k, k)
+    np.testing.assert_array_equal(path.chi, expected.chi)
+    assert path.chi[100] == pytest.approx(0.03443451930, rel=1e-9)   # k = 5
