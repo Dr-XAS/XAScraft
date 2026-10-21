@@ -8,9 +8,9 @@ move a point that sits within ``tiny`` of the last value before a NaN gap.
 
 That case never reaches the app: it refuses NaN energies, with a ScientificError, where it
 processes a spectrum (``athena_science.process_spectrum``) and where it rebins one at import
-(``athena_rebin.prepare_rebin``), the two places that lead to its own remove_dups calls. The
-last two tests check those refusals, and that the same spectra without the NaN still process.
-Inside Larch, the app's calls reach remove_dups with energies that passed those checks.
+(``athena_rebin.prepare_rebin``), the two places that lead to its own remove_dups calls. Two
+tests check those refusals, and that the same spectra without the NaN still process. Inside
+Larch, the app's calls reach remove_dups with energies that passed those checks.
 """
 from types import SimpleNamespace
 
