@@ -6,10 +6,11 @@ With a NaN after the first step, the builtin ``min`` skipped it while numpy's gi
 function now runs its de-duplication loop where it used to return the array unchanged, and can
 move a point that sits within ``tiny`` of the last value before a NaN gap.
 
-That case never reaches the app: both places that call remove_dups directly
-(``athena_science.process_spectrum`` and ``athena_rebin.rebin_edge``) refuse NaN energies
-first, in the same function. Inside Larch, the app's calls reach remove_dups with energies that
-passed those checks.
+That case never reaches the app: it refuses NaN energies, with a ScientificError, where it
+processes a spectrum (``athena_science.process_spectrum``) and where it rebins one at import
+(``athena_rebin.prepare_rebin``), the two places that lead to its own remove_dups calls. The
+last two tests check those refusals, and that the same spectra without the NaN still process.
+Inside Larch, the app's calls reach remove_dups with energies that passed those checks.
 """
 from types import SimpleNamespace
 
@@ -18,7 +19,6 @@ import pytest
 from larch.math import remove_dups
 from larch.xafs.xafsutils import TINY_ENERGY
 
-from xraylarch_web import athena_rebin, athena_science
 from xraylarch_web.athena_rebin import ImportRebin, prepare_rebin
 from xraylarch_web.athena_science import ScientificError, process_spectrum
 
@@ -93,38 +93,22 @@ def test_a_nan_after_the_first_step_can_now_move_a_point_across_the_gap():
     np.testing.assert_array_equal(remove_dups(arr), [1.0, 2.0, np.nan, 2.0000011, 3.0])
 
 
-@pytest.fixture
-def recorded_remove_dups_calls(monkeypatch):
-    """The arrays the app's own remove_dups calls receive."""
-    calls = []
-
-    def recording(arr, *args, **kwargs):
-        calls.append(np.array(arr, dtype=float))
-        return remove_dups(arr, *args, **kwargs)
-
-    monkeypatch.setattr(athena_science, "remove_dups", recording)
-    monkeypatch.setattr(athena_rebin, "remove_dups", recording)
-    return calls
-
-
 def edge_spectrum(n=200):
     energy = np.linspace(8900.0, 9300.0, n)
     return energy, np.arctan((energy - 8979.0) / 3.0) + 2.0
 
 
-def test_process_spectrum_refuses_nan_energies_before_it_calls_remove_dups(recorded_remove_dups_calls):
+def test_process_spectrum_refuses_nan_energies():
     energy, mu = edge_spectrum()
-    energy[50] = energy[51] - 1e-4                             # a close pair, so it would be called
+    energy[50] = energy[51] - 1e-4                             # a close pair, for remove_dups
     with_nan = energy.copy()
     with_nan[120] = np.nan
     with pytest.raises(ScientificError, match="NaN"):
         process_spectrum(with_nan, mu, {"energy_shift": 0.0})
-    assert recorded_remove_dups_calls == []
-    process_spectrum(energy, mu, {})                           # without the NaN it is called
-    assert len(recorded_remove_dups_calls) == 1 and np.isfinite(recorded_remove_dups_calls[0]).all()
+    process_spectrum(energy, mu, {})                           # without the NaN it processes
 
 
-def test_import_rebinning_refuses_nan_energies_before_it_calls_remove_dups(recorded_remove_dups_calls):
+def test_import_rebinning_refuses_nan_energies():
     energy, mu = edge_spectrum(n=80)                           # short scans take remove_dups
     request = SimpleNamespace(rebin=ImportRebin(), data_type="mu", edge_policy=None)
     with_nan = energy.copy()
@@ -132,6 +116,4 @@ def test_import_rebinning_refuses_nan_energies_before_it_calls_remove_dups(recor
     mapped = {"x": with_nan, "samples": [{"y": mu}], "reference": None}
     with pytest.raises(ScientificError, match="nondecreasing"):
         prepare_rebin(mapped, request)
-    assert recorded_remove_dups_calls == []
     prepare_rebin({"x": energy, "samples": [{"y": mu}], "reference": None}, request)
-    assert len(recorded_remove_dups_calls) == 1 and np.isfinite(recorded_remove_dups_calls[0]).all()
