@@ -3,9 +3,9 @@
 The repository used to hold the whole upstream xraylarch tree and installed it in
 editable mode.  That tree, its packaging files and its CI are gone; Larch now comes from
 ``larch-patches/`` (see larch-patches/README.md).  These checks catch docs, comments and
-other text that still send a reader to the deleted paths or to the old install, or that
-place Larch in this checkout.  Links are checked in the Markdown docs; the phrases in
-every tracked text file.
+other text that still send a reader to the deleted paths or to the old install, that
+place Larch in this checkout, or that name a patch by its number outside the queue.
+Links are checked in the Markdown docs; the phrases in every tracked text file.
 
 Dated records (``docs/agent-runs/``, ``docs/superpowers/``, ``docs/qa/``, ``reports/``)
 describe the tree as it was when they were written, so they are not checked.
@@ -147,17 +147,20 @@ def test_no_doc_calls_larch_this_checkouts_or_checked_out(name):
     assert not matches(name, STALE_LARCH)
 
 
-# Outside the queue, a patch is named by its ledger title in larch-patches/README.md, never by
-# its number: retiring a patch renumbers the later ones, so a number would quietly point at
-# another patch.  The per-patch report is keyed by patch number, so it is queue tooling too.
-QUEUE_TOOLING = (PATCH_QUEUE, "scripts/refactor-checks/")
-PATCH = re.compile(r"\bpatch", re.IGNORECASE)
-PATCH_NUMBER = re.compile(r"(?<![\w.])0\d{3}(?!\w)")
+# Outside the queue and its tooling, a patch is named by its ledger title in
+# larch-patches/README.md, in quotes, never by its number: retiring a patch renumbers the
+# later ones, so a number would quietly point at another patch.  The tooling is
+# scripts/refactor-checks/: check 1, and the per-patch report, which is keyed by patch number.
+QUEUE_AND_TOOLING = (PATCH_QUEUE, "scripts/refactor-checks/")
+PATCH = re.compile(r"\bpatch(?:es)?\b", re.IGNORECASE)
+# Four digits, zero-padded (0010), and not part of a word or a dotted number (1.0001).
+NUMBER = r"0\d{3}"
+PATCH_NUMBER = re.compile(rf"(?<![\w.]){NUMBER}(?!\w)")
 # A patch file name may stand, such as the made-up one in a build error ("0003-x.patch").
-PATCH_FILE = re.compile(r"\b\d{4}-[\w.-]+\.patch\b")
+PATCH_FILE = re.compile(rf"\b{NUMBER}-[\w.-]+\.patch\b")
 
 
-@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(QUEUE_TOOLING)])
+@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(QUEUE_AND_TOOLING)])
 def test_no_doc_names_a_patch_by_number(name):
     found = [f"{name}:{number}: {line.strip()}" for number, line in lines(name)
              if PATCH.search(line) and PATCH_NUMBER.search(PATCH_FILE.sub("", line))]
