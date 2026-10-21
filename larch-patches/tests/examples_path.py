@@ -14,3 +14,7 @@ def examples_dir() -> Path:
     if configured:
         return Path(configured).resolve()
     return Path(__file__).resolve().parents[2] / "examples"
+
+
+# The copper FEFF paths (feff0001.dat, ...) that the FEFF path tests read.
+FEFF_CU = examples_dir() / "feffit" / "Feff_Cu"

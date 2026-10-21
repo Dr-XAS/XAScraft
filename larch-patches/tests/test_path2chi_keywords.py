@@ -23,9 +23,7 @@ from lmfit import Parameters
 from larch.fitting import param, param_group
 from larch.xafs import feffpath, path2chi
 
-from examples_path import examples_dir
-
-FEFF0001 = examples_dir() / 'feffit' / 'Feff_Cu' / 'feff0001.dat'
+from examples_path import FEFF_CU
 
 # The forms in which path2chi takes the parameters that path parameters may refer to.
 PARAMETER_FORMS = {
@@ -36,7 +34,7 @@ PARAMETER_FORMS = {
 
 
 def a_path(**values):
-    return feffpath(str(FEFF0001), **values)
+    return feffpath(str(FEFF_CU / 'feff0001.dat'), **values)
 
 
 @pytest.mark.parametrize('form', PARAMETER_FORMS)

@@ -10,9 +10,7 @@ from lmfit import Parameters
 
 from larch.xafs import feffpath, path2chi
 
-from examples_path import examples_dir
-
-FEFF_CU = examples_dir() / 'feffit' / 'Feff_Cu'
+from examples_path import FEFF_CU
 
 
 def test_paths_with_identical_feff_content_keep_their_own_parameters(tmp_path):
