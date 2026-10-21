@@ -163,7 +163,8 @@ def installed_versions(wheel: Path, target: Path) -> list[str]:
         "assert larch.__file__.startswith(sys.argv[1]), larch.__file__;"
         "print(md.version('xraylarch')); print(larch.__version__)"
     )
-    # Run isolated (-I), so the new install is the one imported.
+    # Isolated (-I): no PYTHONPATH, user site or working directory on sys.path, so with the
+    # target put first, the new install is the one imported.
     result = subprocess.run([sys.executable, "-I", "-c", probe, str(target)], cwd=target,
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
