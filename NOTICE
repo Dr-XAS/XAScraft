@@ -20,7 +20,7 @@ its MIT license (see LICENSE):
   top of the pinned upstream commit. Each patch modifies files that come from xraylarch.
 
 - backend/tests/test_larch_remove_dups.py and backend/tests/test_larch_agreement.py:
-  copies of three xraylarch functions, which those tests compare against: remove_dups
+  three copies of xraylarch functions, which those tests compare against: remove_dups
   (larch.math.utils) and FeffPathGroup.__path_params (larch.xafs.feffdat) as at commit
   8d6cd41c2b2a19260dbc80519c3c95211331d4fc, and FeffPathGroup.__path_params as at
   commit c18a4ed63f7945ba52dbe6dd93e28e8f4b075b93.
