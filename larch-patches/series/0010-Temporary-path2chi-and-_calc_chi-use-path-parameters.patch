@@ -1,6 +1,6 @@
-From c661c2843362b441973b411af3f6cd8b765ada30 Mon Sep 17 00:00:00 2001
+From fafe5bd2996ff7ea8cd44f859cda0dd51ebabd3e Mon Sep 17 00:00:00 2001
 From: XAScraft refactor <refactor@xascraft.invalid>
-Date: Tue, 20 Oct 2026 19:15:00 -0500
+Date: Tue, 20 Oct 2026 20:05:00 -0500
 Subject: [PATCH] Temporary: path2chi and _calc_chi use path parameters given
  as keywords
 
@@ -13,25 +13,28 @@ _calc_chi(k=k, sigma2=0.005) raise "not enough values to unpack
 (expected 7, got 6)". At 8d6cd41c2 the keyword's value was used in place
 of the path's own.
 
-This moves out.append(val) back to the loop, as at 8d6cd41c2, and
-nothing else. Upstream's check stays: a path parameter that is neither
-given nor in the path's Parameters now gives None instead of being left
-out (at 8d6cd41c2 it raised KeyError).
+This restores the loop of 8d6cd41c2 exactly, and nothing else: a value
+given as a keyword is used again, and a path parameter that is neither
+given nor in the path's lmfit Parameters raises KeyError again, as at
+8d6cd41c2 (upstream leaves it out, and the unpacking fails).
 
 Remove once upstream fixes this (exit condition in larch-patches/README.md).
 ---
- larch/xafs/feffdat.py | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ larch/xafs/feffdat.py | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/larch/xafs/feffdat.py b/larch/xafs/feffdat.py
-index a5d54cf2e358b29cb8abd2bf3b81e81787f307df..4c2ff6bd513ce3104137b0c6060918f4b9de188b 100644
+index a5d54cf2e358b29cb8abd2bf3b81e81787f307df..fd93ac20f2f55fda8402a4544ad8dceef39cdf87 100644
 --- a/larch/xafs/feffdat.py
 +++ b/larch/xafs/feffdat.py
-@@ -580,7 +580,7 @@ class FeffPathGroup(Group):
+@@ -578,9 +578,8 @@ class FeffPathGroup(Group):
+             val = kws.get(pname, None)
+             if val is None:
                  parname = self.pathpar_name(pname)
-                 if parname in self.params:
-                     val = self.params[parname]._getval()
+-                if parname in self.params:
+-                    val = self.params[parname]._getval()
 -                    out.append(val)
++                val = self.params[parname]._getval()
 +            out.append(val)
          return out
  

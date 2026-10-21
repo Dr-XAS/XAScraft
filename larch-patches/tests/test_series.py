@@ -138,7 +138,7 @@ def test_pin_is_the_reviewed_one():
     given as keywords), the tree below."""
     pin = read_pin()
     assert pin["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
-    assert pin["patched-larch-tree"] == "47f35aea67b9f6d5982bb344f18cda4de991a497"
+    assert pin["patched-larch-tree"] == "937f65c6f8677223a5d5f7d562e34f072be3e28d"
     assert pin["patched-pyproject-blob"] == "14ccc10ed6f759cda9059d331e3c9139cfe7a8d2"
 
 
