@@ -1,9 +1,11 @@
-"""The current docs name only paths that exist and describe the patched-Larch setup.
+"""Docs and comments name only paths that exist and describe the patched-Larch setup.
 
 The repository used to hold the whole upstream xraylarch tree and installed it in
 editable mode.  That tree, its packaging files and its CI are gone; Larch now comes from
-``larch-patches/`` (see larch-patches/README.md).  These checks catch docs that still send
-a reader to the deleted paths or to the old install.
+``larch-patches/`` (see larch-patches/README.md).  These checks catch docs, comments and
+other text that still send a reader to the deleted paths or to the old install, or that
+place Larch in this checkout.  Links are checked in the Markdown docs; the phrases in
+every tracked text file.
 
 Dated records (``docs/agent-runs/``, ``docs/superpowers/``, ``docs/qa/``, ``reports/``)
 describe the tree as it was when they were written, so they are not checked.
@@ -20,18 +22,26 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 RECORDS = ("docs/agent-runs/", "docs/superpowers/", "docs/qa/", "reports/", "examples/",
            "larch-patches/series/")
-# This file is about upstream's tree, so it names upstream's files (tests/run_tests.sh,
-# pyproject.toml) on purpose.
-UPSTREAM_TREE_DOCS = {"larch-patches/README.md"}
+# The patch queue is about upstream's tree, so it names upstream's files (tests/run_tests.sh,
+# pyproject.toml, MANIFEST.in) on purpose.
+UPSTREAM_TREE = "larch-patches/"
+# The guards spell out the phrases they forbid.
+GUARDS = {"tests/ci/test_docs.py", "tests/ci/test_workflows.py"}
 
 
-def current_docs() -> list[str]:
-    tracked = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=REPO, check=True,
+def tracked_text_files() -> list[str]:
+    """Every tracked text file, less the dated records, examples/ and the patch series.
+    A file with a NUL byte counts as binary."""
+    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, check=True,
                              capture_output=True, text=True).stdout.split("\0")
-    return sorted(name for name in tracked if name and not name.startswith(RECORDS))
+    return sorted(name for name in tracked
+                  if name and not name.startswith(RECORDS) and (REPO / name).is_file()
+                  and b"\0" not in (REPO / name).read_bytes())
 
 
-DOCS = current_docs()
+TEXT = tracked_text_files()
+DOCS = [name for name in TEXT if name.endswith(".md")]
+CHECKED = [name for name in TEXT if name not in GUARDS]
 
 
 def lines(name: str):
@@ -42,6 +52,11 @@ def lines(name: str):
 def test_there_are_docs():
     assert {"README.md", "AGENTS.md", "docs/local-installation.md",
             "larch-patches/README.md"} <= set(DOCS)
+
+
+def test_the_phrase_checks_read_code_and_scripts_too():
+    assert {"backend/xraylarch_web/athena_science.py", "larch-patches/install-dev.sh",
+            "frontend/tests/e2e/screens/workbench.screens.ts", "NOTICE"} <= set(CHECKED)
 
 
 LINK = re.compile(r"\]\(([^)\s]+)\)")
@@ -78,24 +93,21 @@ TEST_FILE = re.compile(r"(?<![\w./-])tests/(test_\w+\.py|run_tests\w*\.sh)")
 UPSTREAM_AT_COMMIT = re.compile(r"\[[^\]]*\]\(https://github\.com/xraypy/xraylarch/blob/[0-9a-f]{40}/[^)]*\)")
 
 
-@pytest.mark.parametrize("name", DOCS)
+@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(UPSTREAM_TREE)])
 def test_no_doc_names_the_deleted_upstream_tree(name):
     found = []
     for number, line in lines(name):
         line = UPSTREAM_AT_COMMIT.sub("", line)
-        for match in DELETED.finditer(line):
-            if not (name in UPSTREAM_TREE_DOCS and match.group() == "`pyproject.toml`"):
+        found += [f"{name}:{number}: {match.group()}" for match in DELETED.finditer(line)]
+        # Upstream's root tests/ files are gone; the app's tests live elsewhere.
+        for match in TEST_FILE.finditer(line):
+            homes = ("tests", "backend/tests", "frontend/tests", "larch-patches/tests")
+            if not any((REPO / home / match.group(1)).exists() for home in homes):
                 found.append(f"{name}:{number}: {match.group()}")
-        if name not in UPSTREAM_TREE_DOCS:
-            # Upstream's root tests/ files are gone; the app's tests live elsewhere.
-            for match in TEST_FILE.finditer(line):
-                homes = ("tests", "backend/tests", "frontend/tests", "larch-patches/tests")
-                if not any((REPO / home / match.group(1)).exists() for home in homes):
-                    found.append(f"{name}:{number}: {match.group()}")
     assert not found
 
 
-@pytest.mark.parametrize("name", DOCS)
+@pytest.mark.parametrize("name", CHECKED)
 def test_no_doc_describes_the_old_editable_install(name):
     found = [f"{name}:{number}: {line.strip()}" for number, line in lines(name)
              if OLD_INSTALL.search(line)]
@@ -103,13 +115,18 @@ def test_no_doc_describes_the_old_editable_install(name):
 
 
 # "This checkout" was the repository with Larch inside it ("built on this checkout of
-# the `xraylarch` library", "this checkout's `larch/xafs/autobk.py`").  Larch is now an
-# installed build; the phrase may still name the repository itself.  The words may wrap.
+# the `xraylarch` library", "this checkout's `larch/xafs/autobk.py`", "the checked-out
+# `feffit.py`").  Larch is now an installed build, so nothing here is "this checkout's"
+# and no Larch file is "checked-out".  The words may wrap.
 THIS_CHECKOUTS_LARCH = re.compile(
-    r"this\s+checkout(?:'s)?\s+(?:of\s+(?:the\s+)?)?`?(?:xraylarch|larch)\b", re.IGNORECASE)
+    r"this\s+checkout['’]s"
+    r"|this\s+checkout\s+(?:of\s+(?:the\s+)?)?`?(?:xraylarch|larch)\b"
+    r"|checked-out\s+\[?`?[\w./-]+\.py\b", re.IGNORECASE)
+# In these, "this checkout" is the repository itself.
+THE_REPOSITORY = {"CLAUDE.md", "docs/athena-verification.md", "larch-patches/tests/test_series.py"}
 
 
-@pytest.mark.parametrize("name", DOCS)
+@pytest.mark.parametrize("name", [name for name in CHECKED if name not in THE_REPOSITORY])
 def test_no_doc_places_larch_in_this_checkout(name):
     text = (REPO / name).read_text(encoding="utf-8")
     found = [f"{name}:{text.count(chr(10), 0, match.start()) + 1}: {' '.join(match.group().split())}"
