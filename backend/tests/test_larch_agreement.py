@@ -331,8 +331,9 @@ def test_private_calc_chi_takes_resolved_path_values(copper_path):
     """Site 3: backend/xraylarch_web/artemis.py preview_paths sets s02, e0, deltar, sigma2 on
     the path, calls path.create_path_params(params=Parameters()) and path._calc_chi(k=k).
     Upstream drops keyword values to _calc_chi since c18a4ed63 ('expected 7, got 3'), and
-    XAScraft's build restores them with temporary patch 0010; this call passes none, so it
-    works on both."""
+    XAScraft's build restores them with the temporary patch
+    "Path parameters given as keywords" (larch-patches/README.md); this call passes none,
+    so it works on both."""
     from xraylarch_web.artemis import _path_chi
 
     k = np.arange(241) * 0.05
@@ -343,8 +344,9 @@ def test_private_calc_chi_takes_resolved_path_values(copper_path):
 
 def _path_params_before_c18a4ed63(self, **kws):
     """FeffPathGroup.__path_params as upstream 8d6cd41c2 has it (and XAScraft's build, with
-    temporary patch 0010): a keyword value given to _calc_chi overrides the path parameter,
-    which is read only when none is given."""
+    the temporary patch "Path parameters given as keywords" in larch-patches/README.md): a
+    keyword value given to _calc_chi overrides the path parameter, which is read only when
+    none is given."""
     from larch.xafs.feffdat import PATH_PARS
 
     self.store_feffdat()
@@ -382,10 +384,11 @@ def _path_params_since_c18a4ed63(self, **kws):
 def test_path_chi_gives_the_keyword_calls_chi_with_path_params_before_and_after_c18a4ed63(
         monkeypatch):
     """artemis._path_chi replaced the backend's call path._calc_chi(k=k, **values), whose
-    keyword values upstream c18a4ed63 drops (XAScraft's build restores them with temporary
-    patch 0010). With stand-ins of FeffPathGroup.__path_params as before and after c18a4ed63,
-    whatever Larch is installed, and on the installed Larch: _path_chi gives, bit for bit, the
-    chi the keyword call gives before c18a4ed63. After it, the keyword call fails."""
+    keyword values upstream c18a4ed63 drops (XAScraft's build restores them with the temporary
+    patch "Path parameters given as keywords" in larch-patches/README.md). With stand-ins of
+    FeffPathGroup.__path_params as before and after c18a4ed63, whatever Larch is installed,
+    and on the installed Larch: _path_chi gives, bit for bit, the chi the keyword call gives
+    before c18a4ed63. After it, the keyword call fails."""
     from larch.xafs import feffpath
     from larch.xafs.feffdat import FeffPathGroup
 

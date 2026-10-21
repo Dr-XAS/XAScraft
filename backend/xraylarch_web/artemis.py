@@ -789,8 +789,9 @@ def _path_chi(path, k, values: dict) -> None:
     The values become the path's own, its path parameters are rebuilt in fresh
     lmfit Parameters, and _calc_chi reads them from there. Upstream Larch drops
     keyword values to _calc_chi since c18a4ed63; XAScraft's build restores them
-    with temporary patch 0010. This form passes no keywords, so it works on both
-    and gives the same chi bit for bit.
+    with the temporary patch "Path parameters given as keywords"
+    (larch-patches/README.md). This form passes no keywords, so it works on
+    both and gives the same chi bit for bit.
     """
     for name, value in values.items():
         setattr(path, name, value)

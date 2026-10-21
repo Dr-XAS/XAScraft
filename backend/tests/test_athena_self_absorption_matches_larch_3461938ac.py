@@ -9,8 +9,8 @@ E0 the import found, and with E0 set to the tabulated edge energy.
 
 Upstream Larch `d6d27ccca` ("fluo: force recalculation of e0") made `fluo_corr` ignore the E0
 it is given and normalize around its own, which moves the normalized corrected curve by up to
-3.7% of the edge step on these spectra. Temporary patch 0009 keeps the E0 the app passes until
-the owner decides (larch-patches/README.md, ledger "Self-absorption E0").
+3.7% of the edge step on these spectra. The temporary patch "Self-absorption E0"
+(larch-patches/README.md) keeps the E0 the app passes until the owner decides.
 
 The comparison is exact, so BLAS runs single-threaded here and in the reference script
 (`single_threaded_blas`): a multi-threaded BLAS may sum in another order from run to run.
