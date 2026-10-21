@@ -1,6 +1,6 @@
 # Reduced chi-square in feffit depends on how the noise level is set (factor 2), and on the k window
 
-Applies to the Larch copy in this repository (`larch/xafs/feffit.py`), the same code as upstream Larch 2026.3.1. This issue is a write-up with a reproducer. No code changes with it, because the fix involves a convention choice for the team.
+Applies to upstream Larch's `larch/xafs/feffit.py`. It was measured at upstream `8d6cd41c2` (Larch 2026.3.1), and `set_epsilon_k`, `estimate_noise` and `_residual` are unchanged at the commit in [`larch-patches/PIN`](../larch-patches/PIN); no patch in [`larch-patches/series/`](../larch-patches/series/) changes the file. This issue is a write-up with a reproducer. No code changes with it, because the fix involves a convention choice for the team.
 
 ## What happens
 
@@ -36,7 +36,7 @@ With both changes a perfect model should give about 1 for every window and both 
 
 ## Reproducer
 
-`noise_scale_demo.py` (below) prints the table above from Larch's own `prepare_fit` and residual. Run it with this repository's `larch` on the path.
+`noise_scale_demo.py` (below) prints the table above from Larch's own `prepare_fit` and residual. Run it with the patched Larch installed (`larch-patches/install-dev.sh`).
 
 ## Related, already fixed
 
