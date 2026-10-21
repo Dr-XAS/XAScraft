@@ -24,7 +24,7 @@ RECORDS = ("docs/agent-runs/", "docs/superpowers/", "docs/qa/", "reports/", "exa
            "larch-patches/series/")
 # The patch queue is about upstream's tree, so it names upstream's files (tests/run_tests.sh,
 # pyproject.toml, MANIFEST.in) on purpose.
-UPSTREAM_TREE = "larch-patches/"
+PATCH_QUEUE = "larch-patches/"
 # The guards spell out the phrases they forbid.
 GUARDS = {"tests/ci/test_docs.py", "tests/ci/test_workflows.py"}
 
@@ -39,9 +39,9 @@ def tracked_text_files() -> list[str]:
                   and b"\0" not in (REPO / name).read_bytes())
 
 
-TEXT = tracked_text_files()
-DOCS = [name for name in TEXT if name.endswith(".md")]
-CHECKED = [name for name in TEXT if name not in GUARDS]
+TEXT_FILES = tracked_text_files()
+DOCS = [name for name in TEXT_FILES if name.endswith(".md")]
+CHECKED = [name for name in TEXT_FILES if name not in GUARDS]
 
 
 def lines(name: str):
@@ -55,7 +55,7 @@ def test_there_are_docs():
 
 
 def test_the_phrase_checks_read_code_and_scripts_too():
-    assert {"backend/xraylarch_web/athena_science.py", "larch-patches/install-dev.sh",
+    assert {"backend/xraylarch_web/athena_science.py", "scripts/deploy-xraylarch-web.sh",
             "frontend/tests/e2e/screens/workbench.screens.ts", "NOTICE"} <= set(CHECKED)
 
 
@@ -93,7 +93,7 @@ TEST_FILE = re.compile(r"(?<![\w./-])tests/(test_\w+\.py|run_tests\w*\.sh)")
 UPSTREAM_AT_COMMIT = re.compile(r"\[[^\]]*\]\(https://github\.com/xraypy/xraylarch/blob/[0-9a-f]{40}/[^)]*\)")
 
 
-@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(UPSTREAM_TREE)])
+@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(PATCH_QUEUE)])
 def test_no_doc_names_the_deleted_upstream_tree(name):
     found = []
     for number, line in lines(name):
@@ -114,21 +114,34 @@ def test_no_doc_describes_the_old_editable_install(name):
     assert not found
 
 
+# Between two words of a phrase: spaces or a line break, also one inside a #, // or * comment.
+GAP = r"[\s#/*]+"
 # "This checkout" was the repository with Larch inside it ("built on this checkout of
-# the `xraylarch` library", "this checkout's `larch/xafs/autobk.py`", "the checked-out
-# `feffit.py`").  Larch is now an installed build, so nothing here is "this checkout's"
-# and no Larch file is "checked-out".  The words may wrap.
+# the `xraylarch` library", "this checkout's `larch/xafs/autobk.py`").  Larch is now an
+# installed build; the phrase may still name the repository itself.  The words may wrap.
 THIS_CHECKOUTS_LARCH = re.compile(
-    r"this\s+checkout['’]s"
-    r"|this\s+checkout\s+(?:of\s+(?:the\s+)?)?`?(?:xraylarch|larch)\b"
-    r"|checked-out\s+\[?`?[\w./-]+\.py\b", re.IGNORECASE)
+    rf"this{GAP}checkout(?:'s)?{GAP}(?:of{GAP}(?:the{GAP})?)?`?(?:xraylarch|larch)\b", re.IGNORECASE)
+# Nothing here is "this checkout's" ("this checkout's ETOK" was Larch's), and no Python file
+# is "checked-out" ("the checked-out `feffit.py`" was Larch's).  The words may wrap.
+STALE_LARCH = re.compile(
+    rf"this{GAP}checkout['’]s|checked-out{GAP}\[?`?[\w./-]+\.py\b", re.IGNORECASE)
 # In these, "this checkout" is the repository itself.
-THE_REPOSITORY = {"CLAUDE.md", "docs/athena-verification.md", "larch-patches/tests/test_series.py"}
+CHECKOUT_MEANS_THE_REPOSITORY = {"CLAUDE.md", "docs/athena-verification.md",
+                                 "larch-patches/tests/test_series.py"}
 
 
-@pytest.mark.parametrize("name", [name for name in CHECKED if name not in THE_REPOSITORY])
-def test_no_doc_places_larch_in_this_checkout(name):
+def matches(name: str, pattern: re.Pattern) -> list[str]:
+    """Each match in the whole text, as ``name:line: words``, so a match may wrap."""
     text = (REPO / name).read_text(encoding="utf-8")
-    found = [f"{name}:{text.count(chr(10), 0, match.start()) + 1}: {' '.join(match.group().split())}"
-             for match in THIS_CHECKOUTS_LARCH.finditer(text)]
-    assert not found
+    return [f"{name}:{text.count(chr(10), 0, match.start()) + 1}: {' '.join(match.group().split())}"
+            for match in pattern.finditer(text)]
+
+
+@pytest.mark.parametrize("name", CHECKED)
+def test_no_doc_places_larch_in_this_checkout(name):
+    assert not matches(name, THIS_CHECKOUTS_LARCH)
+
+
+@pytest.mark.parametrize("name", [name for name in CHECKED if name not in CHECKOUT_MEANS_THE_REPOSITORY])
+def test_no_doc_calls_larch_this_checkouts_or_checked_out(name):
+    assert not matches(name, STALE_LARCH)
