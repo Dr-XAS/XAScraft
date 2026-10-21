@@ -163,7 +163,7 @@ def installed_versions(wheel: Path, target: Path) -> list[str]:
         "assert larch.__file__.startswith(sys.argv[1]), larch.__file__;"
         "print(md.version('xraylarch')); print(larch.__version__)"
     )
-    # Run outside the repository, so its root larch/ folder cannot shadow the install.
+    # Run isolated (-I), so the new install is the one imported.
     result = subprocess.run([sys.executable, "-I", "-c", probe, str(target)], cwd=target,
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
