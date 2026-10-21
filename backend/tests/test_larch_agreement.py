@@ -342,8 +342,9 @@ def test_private_calc_chi_takes_resolved_path_values(copper_path):
 
 
 def _path_params_before_c18a4ed63(self, **kws):
-    """FeffPathGroup.__path_params as upstream 8d6cd41c2 has it: a keyword value given to
-    _calc_chi overrides the path parameter, which is read only when none is given."""
+    """FeffPathGroup.__path_params as upstream 8d6cd41c2 has it (and XAScraft's build, with
+    temporary patch 0010): a keyword value given to _calc_chi overrides the path parameter,
+    which is read only when none is given."""
     from larch.xafs.feffdat import PATH_PARS
 
     self.store_feffdat()
@@ -358,11 +359,33 @@ def _path_params_before_c18a4ed63(self, **kws):
     return out
 
 
-def test_path_chi_gives_the_same_chi_on_larch_before_and_after_c18a4ed63(monkeypatch):
-    """artemis._path_chi is the adapter for upstream c18a4ed63, which made _calc_chi drop
-    keyword values. It must give, bit for bit, the chi the backend's earlier call
-    path._calc_chi(k=k, **values) gave before that change: on the installed Larch, and on a
-    stand-in of the earlier __path_params."""
+def _path_params_since_c18a4ed63(self, **kws):
+    """FeffPathGroup.__path_params as upstream c18a4ed63 has it (and upstream's main since): a
+    value goes in only when no keyword gives it and the path parameter is in the path's lmfit
+    Parameters, so a keyword value is dropped."""
+    from larch.xafs.feffdat import PATH_PARS
+
+    self.store_feffdat()
+    if self.params is None:
+        self.create_path_params()
+    out = []
+    for pname in PATH_PARS:
+        val = kws.get(pname, None)
+        if val is None:
+            parname = self.pathpar_name(pname)
+            if parname in self.params:
+                val = self.params[parname]._getval()
+                out.append(val)
+    return out
+
+
+def test_path_chi_gives_the_keyword_calls_chi_with_path_params_before_and_after_c18a4ed63(
+        monkeypatch):
+    """artemis._path_chi replaced the backend's call path._calc_chi(k=k, **values), whose
+    keyword values upstream c18a4ed63 drops (XAScraft's build restores them with temporary
+    patch 0010). With stand-ins of FeffPathGroup.__path_params as before and after c18a4ed63,
+    whatever Larch is installed, and on the installed Larch: _path_chi gives, bit for bit, the
+    chi the keyword call gives before c18a4ed63. After it, the keyword call fails."""
     from larch.xafs import feffpath
     from larch.xafs.feffdat import FeffPathGroup
 
@@ -379,15 +402,23 @@ def test_path_chi_gives_the_same_chi_on_larch_before_and_after_c18a4ed63(monkeyp
     def adapter(path):
         artemis._path_chi(path, k, values)
 
+    def keyword_call(path):
+        path._calc_chi(k=k, **values)
+
     installed = chi(adapter)
     with monkeypatch.context() as patch:
         patch.setattr(FeffPathGroup, "_FeffPathGroup__path_params", _path_params_before_c18a4ed63)
-        earlier_call = chi(lambda path: path._calc_chi(k=k, **values))
+        earlier_call = chi(keyword_call)
         earlier_adapter = chi(adapter)
         own_values = chi(lambda path: path._calc_chi(k=k))
+        patch.setattr(FeffPathGroup, "_FeffPathGroup__path_params", _path_params_since_c18a4ed63)
+        later_adapter = chi(adapter)
+        with pytest.raises(ValueError, match=r"expected 7, got 3"):
+            chi(keyword_call)
 
     assert not np.array_equal(earlier_call, own_values)  # the values given do count
     np.testing.assert_array_equal(earlier_adapter, earlier_call)
+    np.testing.assert_array_equal(later_adapter, earlier_call)
     np.testing.assert_array_equal(installed, earlier_call)
 
 
