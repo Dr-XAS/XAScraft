@@ -6,7 +6,7 @@ import {
 } from "./screens"
 
 /**
- * Every page, menu, viewer and main dialog of the workbench. The coverage list
+ * Every page, menu, viewer and main dialog of XAScraft. The coverage list
  * is in README.md; keep the two in step.
  */
 
@@ -41,7 +41,7 @@ async function openSpectrum(page: Page, spectrum: Spectrum) {
 }
 
 test.describe("pages", () => {
-  test("empty workbench", async ({ page }) => {
+  test("empty Athena workbench", async ({ page }) => {
     await openWorkbench(page)
     await shoot(page, "page-empty-workbench")
   })
@@ -104,7 +104,7 @@ test.describe("menus", () => {
 
 for (const spectrum of Object.keys(spectra) as Spectrum[]) {
   test.describe(`${spectrum} · ${spectra[spectrum]}`, () => {
-    test("workbench and parameter panels", async ({ page }) => {
+    test("Athena workbench and parameter panels", async ({ page }) => {
       await openSpectrum(page, spectrum)
       await shoot(page, `${spectrum}-workbench`)
       await shoot(page.locator("#athena-data-groups"), `${spectrum}-data-list`)
