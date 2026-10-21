@@ -23,8 +23,10 @@ REPO = Path(__file__).resolve().parents[2]
 RECORDS = ("docs/agent-runs/", "docs/superpowers/", "docs/qa/", "reports/", "examples/",
            "larch-patches/series/")
 # The patch queue is about upstream's tree, so it names upstream's files (tests/run_tests.sh,
-# pyproject.toml, MANIFEST.in) on purpose.
+# pyproject.toml, MANIFEST.in) on purpose, and so does the NOTICE, to say which files here
+# match xraylarch's (dylibs/XDI/).
 PATCH_QUEUE = "larch-patches/"
+NAMES_UPSTREAMS_TREE = (PATCH_QUEUE, "NOTICE")
 # The guards spell out the phrases they forbid.
 GUARDS = {"tests/ci/test_docs.py", "tests/ci/test_workflows.py"}
 
@@ -93,10 +95,7 @@ TEST_FILE = re.compile(r"(?<![\w./-])tests/(test_\w+\.py|run_tests\w*\.sh)")
 UPSTREAM_AT_COMMIT = re.compile(r"\[[^\]]*\]\(https://github\.com/xraypy/xraylarch/blob/[0-9a-f]{40}/[^)]*\)")
 
 
-# The NOTICE says which files here come from xraylarch, so like the patch queue it names
-# upstream's paths (dylibs/XDI/) on purpose.
-@pytest.mark.parametrize("name", [name for name in CHECKED
-                                  if not name.startswith(PATCH_QUEUE) and name != "NOTICE"])
+@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(NAMES_UPSTREAMS_TREE)])
 def test_no_doc_names_the_deleted_upstream_tree(name):
     found = []
     for number, line in lines(name):
