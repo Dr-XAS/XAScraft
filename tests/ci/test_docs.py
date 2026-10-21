@@ -4,8 +4,8 @@ The repository used to hold the whole upstream xraylarch tree and installed it i
 editable mode.  That tree, its packaging files and its CI are gone; Larch now comes from
 ``larch-patches/`` (see larch-patches/README.md).  These checks catch docs, comments and
 other text that still send a reader to the deleted paths or to the old install, that
-place Larch in this checkout, or that name a patch by its number outside the queue.
-Links are checked in the Markdown docs; the phrases in every tracked text file.
+place Larch in this checkout, or that name a patch by number outside the queue and its
+tooling.  Links are checked in the Markdown docs; the phrases in every tracked text file.
 
 Dated records (``docs/agent-runs/``, ``docs/superpowers/``, ``docs/qa/``, ``reports/``)
 describe the tree as it was when they were written, so they are not checked.
