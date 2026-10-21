@@ -20,7 +20,8 @@ from xraylarch.
 | `larch-patches/` | Where Larch comes from: `PIN` (the upstream commit), `series/` (the patches), `build.py` (builds the patched Larch wheel) and `install-dev.sh` (installs it into a development venv). See [larch-patches/README.md](larch-patches/README.md) |
 | `examples/` | Example spectra and projects from xraylarch, plus the team's curated demo cases; the app, the installer and the tests read them |
 | `installers/local/`, `Install.command`, `Install Windows.cmd` | The per-user installer; see [docs/local-installation.md](docs/local-installation.md) |
-| `scripts/`, `deploy/` | The hosted deploy scripts, the release constraints (`deploy/python-release-constraints.txt`) and the deployment manifest |
+| `scripts/`, `deploy/` | The hosted deploy and watcher scripts, the release constraints (`deploy/python-release-constraints.txt`) and the deployment manifest |
+| `scripts/refactor-checks/` | Check 1 ([baseline match](scripts/refactor-checks/baseline_match/README.md)) and check 3 ([per-patch report](scripts/refactor-checks/per_patch/README.md)), rerun whenever the pin or a patch changes |
 | `tests/` | Installer, CI and deploy/watcher tests (the app's own tests are in `backend/` and `frontend/`) |
 | `docs/` | Feature references, verification records and guides |
 
