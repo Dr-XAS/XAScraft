@@ -3,8 +3,8 @@ XAScraft
 
 XAScraft is a web application built on xraylarch (Larch), the X-ray absorption and
 fluorescence analysis library by Matthew Newville and the xraylarch contributors:
-https://github.com/xraypy/xraylarch. Larch is not included in this repository; it is
-installed from the upstream commit pinned in larch-patches/PIN.
+https://github.com/xraypy/xraylarch. The Larch library itself is not included in this
+repository; it is installed from the upstream commit pinned in larch-patches/PIN.
 
 The following parts of this repository come from xraylarch and are distributed under
 its MIT license (see LICENSE):
@@ -18,3 +18,18 @@ its MIT license (see LICENSE):
 
 - larch-patches/series/: changes to xraylarch source files, made by the XAScraft team on
   top of the pinned upstream commit. Each patch modifies files that come from xraylarch.
+
+- backend/tests/: test fixtures and two reference functions from xraylarch at commit
+  8d6cd41c2b2a19260dbc80519c3c95211331d4fc. Each fixture is a byte-identical, renamed
+  copy of the xraylarch file next to it:
+    fixtures/demeter-cmc.dat               examples/xafsdata/beamlines/APS9BM_2006.dat
+    fixtures/demeter-diff.prj              examples/xafsdata/AthenaProjectFiles/diff_ex.prj
+    fixtures/demeter-hxma.dat              examples/xafsdata/beamlines/CLSHXMA.dat
+    fixtures/demeter-mee-LaCoO3.prj        examples/xafsdata/AthenaProjectFiles/LaCoO3.prj
+    fixtures/demeter-merge-fe.060          examples/xafsdata/fe.060
+    fixtures/demeter-pfbl12c.dat           examples/xafsdata/beamlines/PFBL12C_2005.dat
+    fixtures/demeter-snbl.dat              examples/xafsdata/beamlines/ESRF_SNBL_2013.dat
+    fixtures/xdi-official-cu_metal_rt.xdi  dylibs/XDI/cu_metal_rt.xdi
+  The two functions are copied, as at that commit, into the tests that compare against
+  them: remove_dups (larch.math.utils) in test_larch_remove_dups.py, and
+  FeffPathGroup.__path_params (larch.xafs.feffdat) in test_larch_agreement.py.
