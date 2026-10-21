@@ -27,9 +27,9 @@ from xraylarch.
 
 **Larch version.** The patched build is versioned
 `<upstream version at the pin>.xascraft.<patch-set id>`. The upstream version is the one
-setuptools-scm gives the pinned commit, so it ends in `+g<short upstream sha>`, as in
-`2026.3.1.post78+g247278cef`. The patch-set id is a hash of the patch files (12 hex digits),
-so the version changes only when the pin or a patch changes; see
+setuptools-scm gives the pinned commit, so it ends in `+g<short upstream sha>`. The patch-set
+id is a hash of the patch files (12 hex digits), so the version changes only when the pin or
+a patch changes; see
 [larch-patches/README.md](larch-patches/README.md#building) to print it. Processed groups report
 it as `larch_version`; `backend/.venv/bin/python -c "import larch; print(larch.__version__)"`
 prints the installed one.
