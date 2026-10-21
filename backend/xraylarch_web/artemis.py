@@ -787,9 +787,10 @@ def _path_chi(path, k, values: dict) -> None:
     """Fill path.chi on grid k at the given path parameter values.
 
     The values become the path's own, its path parameters are rebuilt in fresh
-    Parameters, and _calc_chi reads them from there. Keyword values to _calc_chi
-    are dropped by Larch since upstream c18a4ed63; this form gives the same chi
-    bit for bit on both sides of that change.
+    lmfit Parameters, and _calc_chi reads them from there. Upstream Larch drops
+    keyword values to _calc_chi since c18a4ed63; XAScraft's build restores them
+    with temporary patch 0010. This form passes no keywords, so it works on both
+    and gives the same chi bit for bit.
     """
     for name, value in values.items():
         setattr(path, name, value)

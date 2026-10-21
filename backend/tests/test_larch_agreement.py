@@ -330,7 +330,9 @@ def test_private_feffdat_carries_the_arrays_and_geometry_read_from_it(copper_pat
 def test_private_calc_chi_takes_resolved_path_values(copper_path):
     """Site 3: backend/xraylarch_web/artemis.py preview_paths sets s02, e0, deltar, sigma2 on
     the path, calls path.create_path_params(params=Parameters()) and path._calc_chi(k=k).
-    Keyword values to _calc_chi are dropped since upstream c18a4ed63 ('expected 7, got 3')."""
+    Upstream drops keyword values to _calc_chi since c18a4ed63 ('expected 7, got 3'), and
+    XAScraft's build restores them with temporary patch 0010; this call passes none, so it
+    works on both."""
     from xraylarch_web.artemis import _path_chi
 
     k = np.arange(241) * 0.05
