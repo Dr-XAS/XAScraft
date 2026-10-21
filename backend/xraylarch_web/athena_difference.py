@@ -7,7 +7,7 @@ documentation/Athena/analysis/diff.rst.
 https://github.com/bruceravel/demeter/blob/06afc8da08a5a7d5a26ee14992170fcf5dc67406/lib/Demeter/Diff.pm
 
 DATA is interpolated onto STANDARD, then the expression is
-(-1 if invert else 1) * (data - multiplier * standard). This checkout's
+(-1 if invert else 1) * (data - multiplier * standard). Larch's
 larch.math.interp defaults to linear; that Larch template is followed within
 the full STANDARD grid, including Larch's linear endpoint extrapolation.
 Extrapolated values are counted and warned about, never called measured data.

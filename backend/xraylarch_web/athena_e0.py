@@ -16,7 +16,7 @@ That source algorithm is used here, with process.demeter_conf's six-sample
 margin and 0.02 eV grid. SciPy's natural CubicSpline has the same boundary
 conditions as Ifeffit 1.2.11d misc_num.f splcoefs/splint; the alternative
 Demeter Larch template uses linear interpolation and a different linspace.
-Initial edge finding and normalization use this checkout's Larch, not an
+Initial edge finding and normalization use the installed Larch, not an
 Ifeffit executable. No normalization-polynomial equivalence is asserted.
 Atomic energies use XrayDB's Elam table; Demeter's configurable absorption
 resource and chemical interpretation are not reproduced by a table lookup.

@@ -4,7 +4,7 @@ Energy and energy widths are in eV, except ``dispersive`` takes pixel numbers.
 Signals retain their input units unless documented otherwise. Unknown options
 and operations raise ValueError. No user expressions are evaluated.
 
-Scientific references: local larch/xafs/{rebin_xafs,deconvolve,fluo}.py;
+Scientific references: the Larch modules larch.xafs.{rebin_xafs,deconvolve,fluo};
 https://xraypy.github.io/xraylarch/xafs_preedge.html and
 https://bruceravel.github.io/demeter/documents/Athena/process/mee.html and
 https://bruceravel.github.io/demeter/documents/Athena/analysis/lr.html.
@@ -507,7 +507,7 @@ def _multi_electron(x, y, options):
 
     Athena manual 9.11 offers this phenomenological arctangent alternative.
     Larch exposes its line shape via lmfit; there is no dedicated MEE-removal
-    routine in this checkout. This is NOT an ab initio shake-off calculation
+    routine in Larch. This is NOT an ab initio shake-off calculation
     and does not implement Athena's translated/reflected XANES alternative.
 
     All physical parameters must be supplied: e0 (primary edge, absolute eV),

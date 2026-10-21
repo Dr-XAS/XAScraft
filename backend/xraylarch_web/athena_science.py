@@ -1,4 +1,4 @@
-"""Core Athena-style calculations using this checkout's Larch implementation.
+"""Core Athena-style calculations using the installed, patched Larch.
 
 Energies (including explicit e0 and utility fit limits) are in eV; k and R
 are in inverse angstroms and angstroms. Shifts are ADDED to the energy axis.
@@ -56,8 +56,8 @@ class AthenaParameters(BaseModel):
     finite real exponents from 0 through 3. nclamp (0..100) counts samples at
     each end of AUTOBK's uniform k grid; zero disables its endpoint clamps.
     New recipes use Athena defaults bkg_dk=1, bkg_window=hanning,
-    nclamp=5 and None/Strong clamps (0/24), overriding this checkout's
-    lower-level Larch defaults. Saved web projects retain their old clamps.
+    nclamp=5 and None/Strong clamps (0/24), overriding Larch's
+    lower-level defaults. Saved web projects retain their old clamps.
     FFTs are limited to powers of two from 128 through 65536.
     fnorm=False preserves scalar edge-step normalization. With fnorm=True,
     raw mu(E) is corrected before a separate normalization/AUTOBK calculation;
@@ -208,7 +208,7 @@ def _edge(x, y, e0=None):
         raise ScientificError("The signal is constant; select an absorption spectrum containing an edge.")
     if e0 is None:
         try:
-            # This checkout's find_energy_step slices [0:-0] below 100
+            # Larch's find_energy_step slices [0:-0] below 100
             # points, producing NaN. Scans of 50-99 points skip it by giving
             # Larch's own _finde0 an explicit step, the way find_e0 chooses one;
             # a bare derivative maximum would make a one-point glitch the edge.
@@ -361,7 +361,7 @@ def _transforms(group, p, effective, warnings):
     rmax_out = p.rmax_out
     if rmax_out is None:
         rmax_out = min(rlast, max(10.0, p.rmax + p.dr / 2 + rstep))
-    # This checkout's xftf_prep casts kweight to int. On our already uniform,
+    # Larch's xftf_prep casts kweight to int. On our already uniform,
     # zero-origin k grid, explicit weighting before its identity interpolation
     # implements real exponents without modifying Larch or truncating them.
     group.weighted_chi = group.chi * group.k ** p.kweight

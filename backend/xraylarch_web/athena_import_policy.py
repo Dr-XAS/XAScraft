@@ -22,7 +22,7 @@ web numeric defaults with every Perl preference (e.g. bkg.dk=0).
 Main-resource nnorm=3 maps to Larch degree 2. The source resolve_defaults does
 not invoke the separate to_default(nnorm) XANES-order reset. Native three-
 decimal range rounding is retained except where it would exceed support;
-native E/k conversion uses this checkout's ETOK. The source's raw/shifted
+native E/k conversion uses Larch's ETOK. The source's raw/shifted
 coordinate inconsistencies and normalized-input recursion are not reproduced.
 """
 

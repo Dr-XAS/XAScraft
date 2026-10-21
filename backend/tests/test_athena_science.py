@@ -27,7 +27,7 @@ from xraylarch_web.athena_science import (
 
 
 def direct_pipeline(energy, mu, effective, flatten=True):
-    """Independent calls to the actual checkout's Larch routines."""
+    """Independent calls to the installed Larch's routines."""
     e = effective
     group = Group()
     pre_edge(energy, mu, group=group, make_flat=flatten,
@@ -37,7 +37,7 @@ def direct_pipeline(energy, mu, effective, flatten=True):
            kweight=e["bkg_kweight"], clamp_lo=e["clamp_lo"], clamp_hi=e["clamp_hi"],
            dk=e["bkg_dk"], win=e["bkg_window"], nclamp=e["nclamp"],
            nfft=e["nfft"], kstep=e["kstep"])
-    # Compensate for this checkout's integer cast; integer cases still call
+    # Compensate for Larch's integer cast; integer cases still call
     # the original high-level weighted transform on unchanged chi.
     integer_weight = int(e["kweight"])
     chi_for_ft = group.chi * group.k ** (e["kweight"] - integer_weight)
