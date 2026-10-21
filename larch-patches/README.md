@@ -356,7 +356,7 @@ retired when **the owner adopts upstream's behavior**.
   passes only `k`, `kmax` and `kstep` on). The app is not reached: its FEFF path preview and theory simulation set the values on
   the path, put every path parameter in fresh lmfit Parameters, and call `_calc_chi(k=k)`
   without keywords (`_path_chi` in `backend/xraylarch_web/artemis.py`).
-- **Covering test:** `test_path2chi_keywords.py` (6 items).
+- **Covering test:** `test_path2chi_keywords.py` (10 items).
 - **Exit condition:** upstream fixes the regression. A patch for upstream is ready (upstream
   offer 13, outside this repository), to be submitted by a person. It keeps upstream's
   membership check, so retiring 0010 on that fix would change a missing path parameter's error
