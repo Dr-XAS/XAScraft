@@ -1,12 +1,12 @@
 """Agreement tests: the backend's copies of Larch logic against Larch itself.
 
 The backend repeats a few of Larch's own computations, to check a request
-before handing it to Larch or to split a result Larch only gives whole. Each
-test here runs bundled data through the copy and through Larch, and fails if
-they part. A copy that disagrees today is marked xfail(strict=True) with the
-reason, so a change in either side is noticed.
+before handing it to Larch or to split a result Larch only gives whole. A test
+of such a copy runs bundled data through the copy and through Larch, and fails
+if they part. A copy that disagrees today is marked xfail(strict=True) with
+the reason, so a change in either side is noticed.
 
-The later tests check the private or undocumented Larch API the backend relies
+The other tests check the private or undocumented Larch API the backend relies
 on. Each names the sites it covers ("Site N") by their numbers in this
 inventory. The files are in backend/xraylarch_web/.
 
@@ -20,9 +20,10 @@ inventory. The files are in backend/xraylarch_web/.
    with the temporary patch "Path parameters given as keywords"
    (larch-patches/README.md).
 4. artemis.py, preview_paths: transform._xafsft, per path and for the sum.
-5. artemis_disorder.py, evaluate_disorder: reads path._feffdat (geom and
-   rnorman); _einstein and _debye_cached use EINS_FACTOR and
-   sigma2_correldebye_py, public names in larch.xafs.sigma2_models but internal.
+5. artemis_disorder.py, evaluate_disorder: hands path._feffdat to _einstein
+   and _debye, which read its geom (and _debye its rnorman); _einstein uses
+   EINS_FACTOR, and _debye_cached sigma2_correldebye_py: public names in
+   larch.xafs.sigma2_models, but internal.
 6. artemis_export.py, export_larix: sets path._feffdat.filename, and calls
    save_session with the private session symbols _feffcache and _feffpaths.
 7. artemis_fast.py, build_residual_spec: reads dataset._chi; and _path_arrays:
