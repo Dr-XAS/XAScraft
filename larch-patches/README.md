@@ -298,7 +298,10 @@ retired when **the owner adopts upstream's behavior**.
   plain Larch scripts in the same environment get chi = None and a k grid up to the given
   `kmax`. Default path labels follow the hashkey, so they also return to the `8d6cd41c2` values;
   the app sets its own labels, so none of its outputs carry them.
-- **Covering test:** `test_feffdat_regressions.py` (3 items).
+- **Covering test:** `test_feffdat_regressions.py` (3 items). The lmfit Parameters and
+  parameter group items of `test_path2chi_keywords.py` (`path2chi` with lmfit Parameters or a
+  parameter group, `calc_chi_from_params` with lmfit Parameters; 3 items) also need it, for the
+  `calc_chi_from_params` hunk, as well as 0010.
 - **Exit condition:** upstream fixes the three regressions (offer each upstream as an issue,
   submitted by a person).
 - **App needs it:** yes, for fits whose paths share FEFF content.
@@ -337,13 +340,13 @@ retired when **the owner adopts upstream's behavior**.
 
 - **Patch:** 0010 (`larch/xafs/feffdat.py`), temporary.
 - **Why:** upstream `c18a4ed63` (2026-10-11, also behind entry 9) added a check to
-  `FeffPathGroup.__path_params` that a path parameter is in the path's Parameters, and indented
-  `out.append(val)` under it. A path parameter given as a keyword then never reaches the seven
-  values `_calc_chi` unpacks: `path2chi(path, sigma2=0.005)` (also with lmfit Parameters or a
-  parameter group, which calculate chi again with 0008) and `_calc_chi(k=k, sigma2=0.005)`
-  raise `ValueError: not enough values to unpack (expected 7, got 6)`. The patch restores
-  `__path_params` as it is at `8d6cd41c2`: it drops the check and moves `out.append(val)` back
-  to the loop.
+  `FeffPathGroup.__path_params` that a path parameter is in the path's lmfit Parameters, and
+  indented `out.append(val)` under it. A path parameter given as a keyword then never reaches
+  the seven values `_calc_chi` unpacks: `path2chi(path, sigma2=0.005)` (also with lmfit
+  Parameters or a parameter group, which calculate chi again with 0008) and
+  `_calc_chi(k=k, sigma2=0.005)` raise `ValueError: not enough values to unpack (expected 7,
+  got 6)`. The patch restores `__path_params` as it is at `8d6cd41c2`: it drops the check and
+  moves `out.append(val)` back to the loop.
 - **Numeric effect:** with the patch, `__path_params` behaves as at step 1 (`8d6cd41c2` with
   the team patches). Every keyword route gives step 1's chi, bit for bit (measured:
   `path2chi` in its three forms, `calc_chi_from_params` and `_calc_chi`; one keyword or all
@@ -353,9 +356,10 @@ retired when **the owner adopts upstream's behavior**.
   that `ValueError`, and so do `path_paramvals()` and `_calc_chi` for a missing path
   parameter. Calls without keywords, on a path with all its path parameters, give the same chi
   with and without the patch; `ff2chi` and `feffit` are among them (`ff2chi` takes `**kws` but
-  passes only `k`, `kmax` and `kstep` on). The app is not reached: its FEFF path preview and theory simulation set the values on
-  the path, put every path parameter in fresh lmfit Parameters, and call `_calc_chi(k=k)`
-  without keywords (`_path_chi` in `backend/xraylarch_web/artemis.py`).
+  passes only `k`, `kmax` and `kstep` on). The app is not reached: its FEFF path preview and
+  theory simulation set the values on the path, put every path parameter in fresh lmfit
+  Parameters, and call `_calc_chi(k=k)` without keywords (`_path_chi` in
+  `backend/xraylarch_web/artemis.py`).
 - **Covering test:** `test_path2chi_keywords.py` (10 items).
 - **Exit condition:** upstream fixes the regression. A patch for upstream is ready (upstream
   offer 13, outside this repository), to be submitted by a person. It keeps upstream's
