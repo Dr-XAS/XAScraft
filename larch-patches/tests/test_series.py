@@ -134,10 +134,11 @@ def test_pin_is_the_reviewed_one():
     larch/ updates PIN and these values together (README.md, "Maintaining the queue").
 
     Upstream 247278cef. The seven team patches give larch/ deec1766f137; with the temporary
-    patches 0008 (FEFF path parameters) and 0009 (self-absorption E0), the tree below."""
+    patches 0008 (FEFF path parameters), 0009 (self-absorption E0) and 0010 (path parameters
+    given as keywords), the tree below."""
     pin = read_pin()
     assert pin["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
-    assert pin["patched-larch-tree"] == "50051233d1761bc8ecf24553bd4f50b81663c3b2"
+    assert pin["patched-larch-tree"] == "47f35aea67b9f6d5982bb344f18cda4de991a497"
     assert pin["patched-pyproject-blob"] == "14ccc10ed6f759cda9059d331e3c9139cfe7a8d2"
 
 

@@ -142,6 +142,7 @@ larch-patches/run-upstream-tests.sh build/larch/xraylarch-src --python PYTHON --
 | 0007 | `aee4bb5e6` | Xiangyu Yin, 2026-10-12 | `xafs/feffdat.py` | [FEFF path data](#7-feff-path-data) |
 | 0008 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/feffdat.py` | [FEFF path parameters (temporary)](#9-feff-path-parameters-temporary) |
 | 0009 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/fluo.py` | [Self-absorption E0 (temporary)](#10-self-absorption-e0-temporary) |
+| 0010 | none (temporary) | XAScraft refactor, 2026-10-20 | `xafs/feffdat.py` | [Path parameters given as keywords (temporary)](#11-path-parameters-given-as-keywords-temporary) |
 
 The patches also carry the team's changes to upstream test files: `tests/test_xafs_defects.py`
 (0005 to 0007), `tests/test_xrf_model.py` and the APS 12-BM test in `tests/test_read_beamlinedata.py`
@@ -155,7 +156,7 @@ trailer. It is one of two kinds:
 
 - A **team patch**: a fix the team wants in Larch for good, to be offered upstream. Like 0005 to
   0007, it may carry its regression test into upstream's `tests/`.
-- A **temporary** patch (all of them so far: 0008 and 0009). It is written while tracking
+- A **temporary** patch (all of them so far: 0008 to 0010). It is written while tracking
   upstream, and either undoes an upstream bug or regression, or keeps an app result that upstream
   changed on purpose until the owner decides whether to adopt the change. Its subject starts
   with `Temporary:`; it changes only `larch/`; and its regression tests are in
