@@ -831,10 +831,9 @@ for the report. It does not implement a second EXAFS equation or optimizer.
 The fit operates on a snapshot and does not modify the saved Athena processing
 parameters or spectrum. The snapshot is resampled onto Larch's 0.05 Å⁻¹ k grid,
 with `nfft = 2048`. Output R arrays extend to 10 Å.
-The numerical references are the checked-out
-[`feffit.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffit.py),
-[`feffdat.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/larch/xafs/feffdat.py), and
-[`xafs_feffit.rst`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/doc/xafs_feffit.rst), alongside the published
+The numerical references are upstream Larch's `feffit.py`, `feffdat.py` and
+`xafs_feffit.rst`, at the commit in [`larch-patches/PIN`](../larch-patches/PIN) with the
+patches in [`larch-patches/series/`](../larch-patches/series/), alongside the published
 [Larch fitting](https://xraypy.github.io/xraylarch/xafs_feffit.html) and
 [FEFF-path documentation](https://xraypy.github.io/xraylarch/xafs_feffpaths.html).
 

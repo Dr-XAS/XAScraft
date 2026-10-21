@@ -226,8 +226,8 @@ Likely starting points found by file inventory, **not implementation evidence**:
 | --- | --- |
 | Web import and processing | `backend/xraylarch_web/parsing.py`, `backend/xraylarch_web/processing.py`, `backend/xraylarch_web/contracts.py` |
 | Browser workflow | `frontend/components/workbench-shell.tsx`, `frontend/components/processing-inspector.tsx`, `frontend/components/upload-inspector.tsx`, `frontend/lib/workbench-state.ts` |
-| Scientific routines | `larch/xafs/pre_edge.py`, `larch/xafs/autobk.py`, `larch/xafs/xafsft.py`, `larch/xafs/rebin_xafs.py`, `larch/xafs/fluo.py`, `larch/xafs/deconvolve.py` |
-| Project exchange | `larch/io/athena_project.py`, upstream's [`tests/test_athena_addgroup.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/tests/test_athena_addgroup.py), `examples/xafsdata/AthenaProjectFiles/` |
+| Scientific routines | In upstream Larch at the commit in [`larch-patches/PIN`](../larch-patches/PIN), with the patches in [`larch-patches/series/`](../larch-patches/series/): `larch/xafs/pre_edge.py`, `larch/xafs/autobk.py`, `larch/xafs/xafsft.py`, `larch/xafs/rebin_xafs.py`, `larch/xafs/fluo.py`, `larch/xafs/deconvolve.py` |
+| Project exchange | `larch/io/athena_project.py` in upstream Larch (the same commit and patches), upstream's [`tests/test_athena_addgroup.py`](https://github.com/xraypy/xraylarch/blob/8d6cd41c2b2a19260dbc80519c3c95211331d4fc/tests/test_athena_addgroup.py), `examples/xafsdata/AthenaProjectFiles/` |
 | Existing checks | `backend/tests/test_processing.py`, `backend/tests/test_parsing.py`, `backend/tests/test_api.py`, `frontend/components/workbench-shell.test.tsx`, `frontend/tests/e2e/workbench.spec.ts` |
 
 No test results are asserted from those filenames. This documentation change does not close the webapp duplication objective.
