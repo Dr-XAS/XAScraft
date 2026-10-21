@@ -145,3 +145,20 @@ def test_no_doc_places_larch_in_this_checkout(name):
 @pytest.mark.parametrize("name", [name for name in CHECKED if name not in CHECKOUT_MEANS_THE_REPOSITORY])
 def test_no_doc_calls_larch_this_checkouts_or_checked_out(name):
     assert not matches(name, STALE_LARCH)
+
+
+# Outside the queue, a patch is named by its ledger title in larch-patches/README.md, never by
+# its number: retiring a patch renumbers the later ones, so a number would quietly point at
+# another patch.  The per-patch report is keyed by patch number, so it is queue tooling too.
+QUEUE_TOOLING = (PATCH_QUEUE, "scripts/refactor-checks/")
+PATCH = re.compile(r"\bpatch", re.IGNORECASE)
+PATCH_NUMBER = re.compile(r"(?<![\w.])0\d{3}(?!\w)")
+# A patch file name may stand, such as the made-up one in a build error ("0003-x.patch").
+PATCH_FILE = re.compile(r"\b\d{4}-[\w.-]+\.patch\b")
+
+
+@pytest.mark.parametrize("name", [name for name in CHECKED if not name.startswith(QUEUE_TOOLING)])
+def test_no_doc_names_a_patch_by_number(name):
+    found = [f"{name}:{number}: {line.strip()}" for number, line in lines(name)
+             if PATCH.search(line) and PATCH_NUMBER.search(PATCH_FILE.sub("", line))]
+    assert not found
