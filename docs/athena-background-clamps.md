@@ -106,9 +106,9 @@ describes values around 1 as ordinary and 10–20 as very strong, but its exampl
 also use 50 and 200. Current native Larix offers values including 0, 1, 2, 5,
 10, 20, 50, 100, 200, 500, and 1000 (`larch/wxxas/exafs_panel.py`). These are tuning choices,
 not calibrated physical categories. Because `d(k)` is in edge-step units, a
-clamp value has the same effect whatever the units of μ; before the Larch patch "AUTOBK"
-(`larch-patches/README.md`) divided by the edge step, `scale` made it depend on the absolute scale of μ
-(χ(k) changed by 15% when μ was multiplied by 100).
+clamp value has the same effect whatever the units of μ; before the clamp fix listed under
+"AUTOBK" in the patch ledger (`larch-patches/README.md`) divided by the edge step, `scale`
+made it depend on the absolute scale of μ (χ(k) changed by 15% when μ was multiplied by 100).
 
 The web defaults above come from `AthenaParameters`; the lower-level `autobk()`
 function retains its own defaults (high weight 1 and 3 clamp points).
