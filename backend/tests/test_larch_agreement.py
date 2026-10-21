@@ -416,7 +416,7 @@ def _path_params_since_c18a4ed63(self, **kws):
 
 def test_path_chi_gives_the_keyword_calls_chi_with_path_params_before_and_after_c18a4ed63(
         monkeypatch):
-    """artemis._path_chi replaced the backend's call path._calc_chi(k=k, **values), whose
+    """Site 3: artemis._path_chi replaced the backend's call path._calc_chi(k=k, **values), whose
     keyword values upstream c18a4ed63 drops (XAScraft's build restores them with the temporary
     patch "Path parameters given as keywords" in larch-patches/README.md). With stand-ins of
     FeffPathGroup.__path_params as before and after c18a4ed63, whatever Larch is installed,
