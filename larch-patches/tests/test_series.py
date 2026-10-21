@@ -133,9 +133,8 @@ def test_pin_is_the_reviewed_one():
     changed pin or patch needs a reviewed edit here too. A re-pin or a patch that changes
     larch/ updates PIN and these values together (README.md, "Maintaining the queue").
 
-    Upstream 247278cef. The seven team patches give larch/ deec1766f137; with the temporary
-    patches 0008 (FEFF path parameters), 0009 (self-absorption E0) and 0010 (path parameters
-    given as keywords), the tree below."""
+    Upstream 247278cef. The seven team patches give larch/ deec1766f137; the whole series gives
+    the tree below. README.md's Patches table and ledger say what each patch does."""
     pin = read_pin()
     assert pin["upstream-commit"] == "247278cefbb16eda04c91f79fc1b43df000fa498"
     assert pin["patched-larch-tree"] == "937f65c6f8677223a5d5f7d562e34f072be3e28d"

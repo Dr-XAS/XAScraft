@@ -156,10 +156,10 @@ trailer. It is one of two kinds:
 
 - A **team patch**: a fix the team wants in Larch for good, to be offered upstream. Like 0005 to
   0007, it may carry its regression test into upstream's `tests/`.
-- A **temporary** patch (all of them so far: 0008 to 0010). It is written while tracking
-  upstream, and either undoes an upstream bug or regression, or keeps an app result that upstream
-  changed on purpose until the owner decides whether to adopt the change. Its subject starts
-  with `Temporary:`; it changes only `larch/`; and its regression tests are in
+- A **temporary** patch, marked "none (temporary)" in the Patches table. It is written while
+  tracking upstream, and either undoes an upstream bug or regression, or keeps an app result
+  that upstream changed on purpose until the owner decides whether to adopt the change. Its
+  subject starts with `Temporary:`; it changes only `larch/`; and its regression tests are in
   `larch-patches/tests/` only.
 
 `tests/test_series.py` checks all of this, and that the table above matches the series.
@@ -427,8 +427,8 @@ GIT_COMMITTER_NAME="XAScraft patch queue" GIT_COMMITTER_EMAIL="patches@xascraft.
    `backend/tests/larch_source.py`, or record a new oracle. A patch that moves an app result
    also changes the backend tests that pin it, and its ledger entry says by how much.
 
-Nothing else names the patch count or the version: the tests read them from `series/` and
-`PIN`.
+Nothing else lists the patches, or names their count or the version: the tests read them from
+`series/` and `PIN`.
 
 ### Retiring a patch
 
