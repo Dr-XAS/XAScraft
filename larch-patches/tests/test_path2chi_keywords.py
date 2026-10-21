@@ -6,8 +6,9 @@ enough values to unpack (expected 7, got 6)``. Larch at 8d6cd41c2 used the keywo
 place of the path's own.
 
 The expected chi is that of a path whose own parameter has the keyword's value, through the
-same Larch: at 8d6cd41c2 the two are equal bit for bit, on any platform. The value at k = 5 is
-Larch's at 8d6cd41c2 (with the team patches), to 9 digits.
+same Larch: the two do the same arithmetic on the same numbers, so they agree bit for bit on
+any platform, as they do at 8d6cd41c2. The value at k = 5 is Larch's at 8d6cd41c2 (with the
+team patches), to 9 digits.
 """
 import numpy as np
 import pytest

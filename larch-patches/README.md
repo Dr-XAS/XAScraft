@@ -339,11 +339,12 @@ retired when **the owner adopts upstream's behavior**.
 - **Why:** upstream `c18a4ed63` (2026-10-11, also behind entry 9) added a check to
   `FeffPathGroup.__path_params` that a path parameter is in the path's Parameters, and indented
   `out.append(val)` under it. A path parameter given as a keyword then never reaches the seven
-  values `_calc_chi` unpacks: `path2chi(path, sigma2=0.005)` (with no parameters, lmfit
-  Parameters or a parameter group) and `_calc_chi(k=k, sigma2=0.005)` raise `ValueError: not
-  enough values to unpack (expected 7, got 6)`. The patch moves `out.append(val)` back to the
-  loop, as at `8d6cd41c2`, and keeps upstream's check: a path parameter that is neither given
-  nor in the Parameters gives None (a `KeyError` at `8d6cd41c2`).
+  values `_calc_chi` unpacks: `path2chi(path, sigma2=0.005)` (also with lmfit Parameters or a
+  parameter group, which calculate chi again with 0008) and `_calc_chi(k=k, sigma2=0.005)`
+  raise `ValueError: not enough values to unpack (expected 7, got 6)`. The patch moves
+  `out.append(val)` back to the loop, as at `8d6cd41c2`, and keeps upstream's check: a path
+  parameter that is neither given nor in the Parameters gives None (a `KeyError` at
+  `8d6cd41c2`).
 - **Numeric effect:** with the patch, every keyword route gives the chi of `8d6cd41c2` with the
   team patches, bit for bit (measured: `path2chi` in its three forms, `calc_chi_from_params`
   and `_calc_chi`; one keyword or all seven; default or explicit k grid). Without it they
