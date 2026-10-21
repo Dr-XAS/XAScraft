@@ -5,6 +5,39 @@ before handing it to Larch or to split a result Larch only gives whole. Each
 test here runs bundled data through the copy and through Larch, and fails if
 they part. A copy that disagrees today is marked xfail(strict=True) with the
 reason, so a change in either side is noticed.
+
+The later tests check the private or undocumented Larch API the backend relies
+on. Each names the sites it covers ("Site N") by their numbers in this
+inventory. The files are in backend/xraylarch_web/.
+
+1. athena_science.py, _edge: larch.xafs.pre_edge._finde0, called with an
+   explicit estep for 50-99 point scans.
+2. artemis.py, _read_path: reads path._feffdat (k, real_phc, mag_feff,
+   pha_feff, red_fact, lam, rep, reff, degen, nleg, geom).
+3. artemis.py, _path_chi, for preview_paths: path._calc_chi(k=k), after
+   path.create_path_params(params=Parameters()). It passes no keyword values:
+   upstream drops them since c18a4ed63, and XAScraft's build restores them
+   with the temporary patch "Path parameters given as keywords"
+   (larch-patches/README.md).
+4. artemis.py, preview_paths: transform._xafsft, per path and for the sum.
+5. artemis_disorder.py, evaluate_disorder: reads path._feffdat (geom and
+   rnorman); _einstein and _debye_cached use EINS_FACTOR and
+   sigma2_correldebye_py, public names in larch.xafs.sigma2_models but internal.
+6. artemis_export.py, export_larix: sets path._feffdat.filename, and calls
+   save_session with the private session symbols _feffcache and _feffpaths.
+7. artemis_fast.py, build_residual_spec: reads dataset._chi; and _path_arrays:
+   reads path._feffdat (k, amp, pha, rep, lam, reff).
+8. artemis_fast.py, fast_fit_group: dataset._residual(params), for the engine
+   parity check.
+9. athena_xrf_xas.py, Fitter._build, build_model, detected, element_columns and
+   scatter_column: read and write XRF_Model internals, and call calc_spectrum
+   with a valuesdict-only params object (_Values).
+10. athena_science.py, _standard_arguments: scales chi_std by edge_step,
+    because larch.xafs.autobk._resid subtracts chi_std before dividing by
+    edge_step.
+11. artemis.py, fit_inputs, and artemis_export.py, export_larix: pass a
+    one-element kweight list as a scalar, because Larch collapses its noise
+    estimate to a scalar. A coupling to Larch's behavior, not a call.
 """
 import re
 
