@@ -12,11 +12,18 @@ it is given and normalize around its own, which moves the normalized corrected c
 3.7% of the edge step on these spectra. The temporary patch "Self-absorption E0"
 (larch-patches/README.md) keeps the E0 the app passes until the owner decides.
 
-The comparison is exact, so BLAS runs single-threaded here and in the reference script
-(`single_threaded_blas`): a multi-threaded BLAS may sum in another order from run to run.
-The reference was recorded on macOS arm64, where numpy and scipy use Accelerate, which
-threadpoolctl cannot limit; there the numbers are the same with VECLIB_MAXIMUM_THREADS=1 and
-unset. On Linux, numpy and scipy use OpenBLAS, which it does limit.
+E0 and the energy grid are compared exactly. The measured, corrected and saved curves are
+compared within rtol = atol = 1e-11, as `test_athena_science.py` compares the pipeline's arrays
+with Larch's. The reference was recorded on macOS arm64, where numpy and scipy use Accelerate,
+and another BLAS rounds differently in the last digits. On x86_64 with OpenBLAS, as on Linux
+CI, the reference tree's Larch and this tree's give the same numbers bit for bit, and both
+differ from the recording by at most 1.5e-14. Without the temporary patch, the corrected
+curves move by up to 3.7% of the edge step.
+
+BLAS runs single-threaded here and in the reference script (`single_threaded_blas`): a
+multi-threaded BLAS may sum in another order from run to run. threadpoolctl cannot limit
+Accelerate; on macOS arm64 the numbers are the same with VECLIB_MAXIMUM_THREADS=1 and unset.
+On Linux, numpy and scipy use OpenBLAS, which it does limit.
 """
 import gzip
 import json
@@ -116,5 +123,7 @@ def test_fluo_correction_gives_the_numbers_of_larch_3461938ac(client, recorded, 
     got = fluo_outputs(client, case)
     assert got["method"] == expected["method"] == "larch.fluo_corr"
     assert got["e0"] == expected["e0"]
-    for key in ("energy", "measured", "corrected", "saved_norm"):
-        np.testing.assert_array_equal(np.array(got[key]), np.array(expected[key]), err_msg=f"{case} {key}")
+    np.testing.assert_array_equal(np.array(got["energy"]), np.array(expected["energy"]), err_msg=f"{case} energy")
+    for key in ("measured", "corrected", "saved_norm"):
+        np.testing.assert_allclose(np.array(got[key]), np.array(expected[key]), rtol=1e-11, atol=1e-11,
+                                   err_msg=f"{case} {key}")
