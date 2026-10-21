@@ -1,7 +1,7 @@
 import type { Parameters } from "./athena"
 
-// Definitions follow larch/xafs/{pre_edge,autobk,xafsft}.py and the Athena
-// processing path in backend/xraylarch_web/athena_science.py.
+// Definitions follow the Larch modules larch.xafs.{pre_edge,autobk,xafsft} and the
+// Athena processing path in backend/xraylarch_web/athena_science.py.
 export const parameterHelp = {
   e0: "Absorption-edge reference energy, in eV. It sets k = 0 when energy is converted to photoelectron wavenumber. When left blank, it is estimated from the spectrum.",
   step: "Absorption jump at E₀ used to scale μ(E) and χ(k). When left blank, it is estimated from the fitted pre-edge and post-edge curves.",
