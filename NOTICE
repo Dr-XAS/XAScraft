@@ -19,17 +19,26 @@ its MIT license (see LICENSE):
 - larch-patches/series/: changes to xraylarch source files, made by the XAScraft team on
   top of the pinned upstream commit. Each patch modifies files that come from xraylarch.
 
-- backend/tests/: test fixtures and two reference functions from xraylarch at commit
-  8d6cd41c2b2a19260dbc80519c3c95211331d4fc. Each fixture is a byte-identical, renamed
-  copy of the xraylarch file next to it:
-    fixtures/demeter-cmc.dat               examples/xafsdata/beamlines/APS9BM_2006.dat
-    fixtures/demeter-diff.prj              examples/xafsdata/AthenaProjectFiles/diff_ex.prj
-    fixtures/demeter-hxma.dat              examples/xafsdata/beamlines/CLSHXMA.dat
-    fixtures/demeter-mee-LaCoO3.prj        examples/xafsdata/AthenaProjectFiles/LaCoO3.prj
-    fixtures/demeter-merge-fe.060          examples/xafsdata/fe.060
-    fixtures/demeter-pfbl12c.dat           examples/xafsdata/beamlines/PFBL12C_2005.dat
-    fixtures/demeter-snbl.dat              examples/xafsdata/beamlines/ESRF_SNBL_2013.dat
-    fixtures/xdi-official-cu_metal_rt.xdi  dylibs/XDI/cu_metal_rt.xdi
-  The two functions are copied, as at that commit, into the tests that compare against
-  them: remove_dups (larch.math.utils) in test_larch_remove_dups.py, and
-  FeffPathGroup.__path_params (larch.xafs.feffdat) in test_larch_agreement.py.
+- backend/tests/test_larch_remove_dups.py and backend/tests/test_larch_agreement.py:
+  copies of three xraylarch functions, which those tests compare against: remove_dups
+  (larch.math.utils) and FeffPathGroup.__path_params (larch.xafs.feffdat) as at commit
+  8d6cd41c2b2a19260dbc80519c3c95211331d4fc, and FeffPathGroup.__path_params as at
+  commit c18a4ed63f7945ba52dbe6dd93e28e8f4b075b93.
+
+Eight test fixtures in backend/tests/fixtures/ are byte-identical to files that
+xraylarch also distributes at commit 8d6cd41c2b2a19260dbc80519c3c95211331d4fc
+(fixture <- xraylarch file):
+    demeter-cmc.dat               <- examples/xafsdata/beamlines/APS9BM_2006.dat
+    demeter-diff.prj              <- examples/xafsdata/AthenaProjectFiles/diff_ex.prj
+    demeter-hxma.dat              <- examples/xafsdata/beamlines/CLSHXMA.dat
+    demeter-mee-LaCoO3.prj        <- examples/xafsdata/AthenaProjectFiles/LaCoO3.prj
+    demeter-merge-fe.060          <- examples/xafsdata/fe.060
+    demeter-pfbl12c.dat           <- examples/xafsdata/beamlines/PFBL12C_2005.dat
+    demeter-snbl.dat              <- examples/xafsdata/beamlines/ESRF_SNBL_2013.dat
+    xdi-official-cu_metal_rt.xdi  <- dylibs/XDI/cu_metal_rt.xdi
+Their recorded origin (in the fixture manifests, backend/tests/fixtures/athena-*.json,
+and for demeter-diff.prj in docs/athena-difference-reference.md) is Demeter
+(https://github.com/bruceravel/demeter) at commit
+06afc8da08a5a7d5a26ee14992170fcf5dc67406, except xdi-official-cu_metal_rt.xdi, from the
+XAS Data Interchange project (https://github.com/XraySpectroscopy/XAS-Data-Interchange)
+at commit ed21ad5aa3a066f569e13e607679b2542fc93fa7.
