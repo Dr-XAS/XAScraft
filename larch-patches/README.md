@@ -432,10 +432,11 @@ GIT_COMMITTER_NAME="XAScraft patch queue" GIT_COMMITTER_EMAIL="patches@xascraft.
    also changes the backend tests that pin it, and its ledger entry says by how much.
 
 Nothing else lists the patches, or names their count or the version: the tests read them from
-`series/` and `PIN`. Outside the queue and the per-patch report, a patch is named by its ledger
-title, as in the temporary patch "Path parameters given as keywords", never by its number:
-retiring a patch renumbers the later ones, so a number would quietly point at another patch.
-`tests/ci/test_docs.py` checks that no line outside them names a patch by number.
+`series/` and `PIN`. Outside the queue and its tooling (`scripts/refactor-checks/`), a patch is
+named by its ledger title in quotes, as in the temporary patch
+"Path parameters given as keywords", never by its number: retiring a patch renumbers the later
+ones, so a number would quietly point at another patch. `tests/ci/test_docs.py` checks that no
+line outside them names a patch by number.
 
 ### Retiring a patch
 
@@ -448,7 +449,8 @@ equivalent fix (the entry's exit condition).
    upstream carries an equivalent one.
 4. Update `PIN`, `test_pin_is_the_reviewed_one` and the Patches table as for adding a patch,
    and run the same tests.
-5. Search the repository for the patch's ledger title, and update or remove each mention.
+5. Search the repository for each of the patch's ledger titles, in quotes as the mentions write
+   them (`git grep -n '"AUTOBK"'`), and update or remove each mention.
 
 ### Re-pinning
 
