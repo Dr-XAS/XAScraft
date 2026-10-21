@@ -333,6 +333,31 @@ retired when **the owner adopts upstream's behavior**.
   backend test's numbers to upstream's.
 - **App needs it:** yes, until the owner decides.
 
+### 11. Path parameters given as keywords (temporary)
+
+- **Patch:** 0010 (`larch/xafs/feffdat.py`), temporary.
+- **Why:** upstream `c18a4ed63` (2026-10-11, also behind entry 9) added a check to
+  `FeffPathGroup.__path_params` that a path parameter is in the path's Parameters, and indented
+  `out.append(val)` under it. A path parameter given as a keyword then never reaches the seven
+  values `_calc_chi` unpacks: `path2chi(path, sigma2=0.005)` (with no parameters, lmfit
+  Parameters or a parameter group) and `_calc_chi(k=k, sigma2=0.005)` raise `ValueError: not
+  enough values to unpack (expected 7, got 6)`. The patch moves `out.append(val)` back to the
+  loop, as at `8d6cd41c2`, and keeps upstream's check: a path parameter that is neither given
+  nor in the Parameters gives None (a `KeyError` at `8d6cd41c2`).
+- **Numeric effect:** with the patch, every keyword route gives the chi of `8d6cd41c2` with the
+  team patches, bit for bit (measured: `path2chi` in its three forms, `calc_chi_from_params`
+  and `_calc_chi`; one keyword or all seven; default or explicit k grid). Without it they
+  raise. Calls without keywords give the same chi with and without the patch; `ff2chi` and
+  `feffit` are among them (`ff2chi` takes `**kws` but passes only `k`, `kmax` and `kstep` on).
+  The app is not reached: its FEFF path preview and theory simulation set the values on the
+  path and call `_calc_chi(k=k)` without keywords (`_path_chi` in
+  `backend/xraylarch_web/artemis.py`).
+- **Covering test:** `test_path2chi_keywords.py` (4 items).
+- **Exit condition:** upstream fixes the regression (offer it upstream as an issue, submitted by
+  a person).
+- **App needs it:** no; the app works around it. Plain Larch scripts in the same environment can
+  give path parameters as keywords again.
+
 ### Packaging: no `mkl_fft`
 
 - **Patch:** 0002 (`pyproject.toml`).
