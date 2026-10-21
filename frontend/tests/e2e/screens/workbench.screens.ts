@@ -46,7 +46,7 @@ test.describe("pages", () => {
     await shoot(page, "page-empty-workbench")
   })
 
-  test("classic workbench", async ({ page }) => {
+  test("Classic workspace", async ({ page }) => {
     await openPage(page, "/classic")
     await shoot(page, "page-classic")
   })

@@ -89,8 +89,8 @@ Each line is one snapshot per project (five projects; the mounted project runs
 - `page-empty-workbench`: `/` on a new, empty project
 - `page-classic`: `/classic`
 - `page-element-picker`, `page-element-picker-open`: `/artefacts/element-picker`, closed and open
-- `page-copper-examples-loaded`: the workbench right after File › Load copper examples
-- `page-demo-cases-loaded`: the workbench right after Load demo cases
+- `page-copper-examples-loaded`: the Athena workbench right after File › Load copper examples
+- `page-demo-cases-loaded`: the Athena workbench right after Load demo cases
 
 ### Menus (`› menus`)
 
@@ -99,7 +99,7 @@ Each line is one snapshot per project (five projects; the mounted project runs
 - `menu-copper-data-actions`: the ⋯ actions menu of the data list
 - `menu-copper-viewer-export`: a viewer's export menu
 
-### Workbench, panels and viewers, for copper, cu2o and demo
+### Athena workbench, panels and viewers, for copper, cu2o and demo
 
 - `<spectrum>-workbench`: the viewport
 - `<spectrum>-data-list`: the data list
