@@ -23,7 +23,8 @@ import pytest
 
 from test_build import build_ok
 
-RUNNER = Path(__file__).resolve().parents[1] / "run-upstream-tests.sh"
+PATCHES_DIR = Path(__file__).resolve().parents[1]
+RUNNER = PATCHES_DIR / "run-upstream-tests.sh"
 
 
 def runner_list(name: str) -> list[str]:
@@ -90,7 +91,7 @@ def test_a_known_failure_that_starts_passing_fails_the_step(tree, tmp_path):
 
 def readme_known_failures() -> list[str]:
     """The tests README.md names in its "Known pre-existing failures" bullet."""
-    readme = (RUNNER.parent / "README.md").read_text()
+    readme = (PATCHES_DIR / "README.md").read_text()
     bullet = readme[readme.index("- **Known pre-existing failures.**"):].split("\n- ", 1)[0]
     return re.findall(r"`(test\d+_\w+)`", bullet)
 
