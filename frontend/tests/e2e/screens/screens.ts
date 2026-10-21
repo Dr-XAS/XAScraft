@@ -56,7 +56,7 @@ export async function openPage(page: Page, path: string) {
   await settle(page)
 }
 
-/** Open the workbench on a project, or on a new one. */
+/** Open the Athena workbench on a project, or on a new one. */
 export async function openWorkbench(page: Page, projectId?: string) {
   await preparePage(page)
   if (projectId) await page.addInitScript(id => localStorage.setItem("athena.project", id), projectId)
