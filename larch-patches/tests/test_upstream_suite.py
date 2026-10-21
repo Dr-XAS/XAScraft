@@ -4,7 +4,8 @@ The upstream example-script tests in the runner's ``KNOWN_FAILURES`` call wx plo
 commands and fail wherever wxPython is missing, on plain upstream too.  The main run leaves
 them out; this mode runs just them, names them as known pre-existing failures, and exits
 non-zero as soon as the set changes (one of them passes, or fails differently), so the list
-never goes stale.  The tests here read that list from the runner.
+never goes stale.  The tests here read that list from the runner, and check that README.md
+names the same tests.
 
 Builds the patched tree like ``test_build.py`` (same upstream and build environment) and
 runs the suite against the Larch installed in the interpreter running these tests.
@@ -12,6 +13,7 @@ runs the suite against the Larch installed in the interpreter running these test
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -84,3 +86,15 @@ def test_a_known_failure_that_starts_passing_fails_the_step(tree, tmp_path):
 
     assert result.returncode != 0
     assert "test02_autobk" in result.stderr and "now passes" in result.stderr
+
+
+def readme_known_failures() -> list[str]:
+    """The tests README.md names in its "Known pre-existing failures" bullet."""
+    readme = (RUNNER.parent / "README.md").read_text()
+    bullet = readme[readme.index("- **Known pre-existing failures.**"):].split("\n- ", 1)[0]
+    return re.findall(r"`(test\d+_\w+)`", bullet)
+
+
+def test_the_readme_names_the_known_failures_the_runner_names():
+    """The runner's error message says to update both lists when the known failures change."""
+    assert sorted(readme_known_failures()) == sorted(KNOWN)
