@@ -9,6 +9,9 @@ The expected chi is that of a path whose own parameter has the keyword's value, 
 same Larch: the two do the same arithmetic on the same numbers, so they agree bit for bit on
 any platform, as they do at 8d6cd41c2. The value at k = 5 is Larch's at 8d6cd41c2 (with the
 team patches), to 9 digits.
+
+A path parameter that is neither given as a keyword nor in the path's lmfit Parameters raises
+``KeyError`` naming it, as at 8d6cd41c2.
 """
 import numpy as np
 import pytest
@@ -60,3 +63,24 @@ def test_every_path_parameter_can_be_given_to_path2chi_on_a_k_grid():
     np.testing.assert_array_equal(path.k, k)
     np.testing.assert_array_equal(path.chi, expected.chi)
     assert path.chi[100] == pytest.approx(0.03443451930, rel=1e-9)   # k = 5
+
+
+# The calls that read a path's parameter values from its lmfit Parameters as they are.
+READ_PATH_PARAMETERS = {
+    'path_paramvals()': lambda path: path.path_paramvals(),
+    '_calc_chi(k=k)': lambda path: path._calc_chi(k=np.arange(241) * 0.05),
+}
+
+
+@pytest.mark.parametrize('call', READ_PATH_PARAMETERS)
+def test_a_path_parameter_neither_given_nor_in_the_lmfit_parameters_raises_key_error(call):
+    """A path parameter missing from the path's lmfit Parameters, and not given as a keyword,
+    raises KeyError naming it. At the pin, upstream's check that it is there leaves it out
+    ('expected 7, got 6'); that check kept with keywords used again would give None."""
+    path = a_path(s02=0.9, e0=1.0, sigma2=0.003)
+    path2chi(path)
+    missing = path.pathpar_name('ei')
+    del path.params[missing]
+    with pytest.raises(KeyError) as raised:
+        READ_PATH_PARAMETERS[call](path)
+    assert raised.value.args == (missing,)
