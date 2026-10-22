@@ -161,7 +161,31 @@ it('uses revisioned undo and redo without closing the panel',async()=>{
   api.mockResolvedValueOnce(undone);fireEvent.click(screen.getByRole('button',{name:'Undo last edit'}))
   await waitFor(()=>expect(p.saved).toHaveBeenCalledWith(undone));expect(api.mock.calls.at(-1)?.[1]).toEqual({version:4,action:'undo'})
   rendered.rerender(<AthenaPointEdit {...p} project={undone}/>);
+  expect(screen.getByRole('status')).toHaveTextContent('Last edit undone at project revision 5.')
   const redone={...project,version:6};api.mockResolvedValueOnce(redone);fireEvent.click(screen.getByRole('button',{name:'Redo last edit'}))
   await waitFor(()=>expect(p.saved).toHaveBeenLastCalledWith(redone));expect(api.mock.calls.at(-1)?.[1]).toEqual({version:5,action:'redo'})
   expect(p.close).not.toHaveBeenCalled()
+})
+
+it('confirms a saved truncation in the dialog instead of re-previewing the spent cutoff as an error',async()=>{
+  const p=props(),reviewed=preview({mode:'truncate',side:'after',value:7033.6,scope:'current'}).results[0]
+  const next={...project,version:5,groups:[{...project.groups[0],energy:reviewed.energy,mu:reviewed.mu}]} as unknown as AthenaProject
+  api.mockImplementation(async(path,body)=>{
+    if(path.endsWith('/command'))return next
+    const {version,options}=body as {version:number;options:Options}
+    // Mirrors the backend: a cutoff outside the current measured range is rejected.
+    if(version===5&&options.value!>next.groups[0].energy.at(-1)!+2)throw new Error('Select a value inside the measured range.')
+    return preview(options)
+  })
+  const rendered=render(<AthenaPointEdit {...p} initialMode="truncate"/>);change('Cutoff energy · eV','7033.6')
+  const save=screen.getByRole('button',{name:'Truncate data'});await waitFor(()=>expect(save).toBeEnabled())
+  fireEvent.click(save);await waitFor(()=>expect(p.saved).toHaveBeenCalledWith(next))
+  rendered.rerender(<AthenaPointEdit {...p} project={next} initialMode="truncate"/>)
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,400))})
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(screen.getByText(/Truncation saved at project revision 5\. Measured Zn: 31 of 41 measurements remain\./)).toBeVisible()
+  expect(api.mock.calls.some(([path,body])=>path.endsWith('/preview')&&(body as {version:number}).version===5)).toBe(false)
+  change('Cutoff energy · eV','7040')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Select a value inside the measured range.')
+  expect(screen.queryByText(/Truncation saved/)).toBeNull()
 })

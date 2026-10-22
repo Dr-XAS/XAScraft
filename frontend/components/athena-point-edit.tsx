@@ -70,6 +70,10 @@ export function AthenaPointEdit({project,activeId,selectGroup,initialMode,initia
   useEffect(()=>{rememberDraft(draft)},[draft,rememberDraft])
   const [view,setView]=useState<View>('mu'),[picking,setPicking]=useState<null|'point'|'emin'|'emax'|'value'>(null)
   const [preview,setPreview]=useState<{key:string;value:PointEditPreview}|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[retry,setRetry]=useState(0)
+  // A saved edit spends its settings: re-previewing them against the edited data (a truncation cutoff now outside
+  // the range) would report an error right after a success. Hold the preview until a setting changes or Refresh.
+  const [done,setDone]=useState<{version:number;activeId:string;draft:PointEditDraft;text:string}|null>(null)
+  const held=!!done&&done.version===project.version&&done.activeId===activeId&&JSON.stringify(done.draft)===JSON.stringify(draft)
   const generation=useRef(0),saving=useRef(false),alive=useRef(true)
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;generation.current++}},[])
   const mutation=draft.mode==='truncate'?'truncate':'deglitch'
@@ -87,7 +91,7 @@ export function AthenaPointEdit({project,activeId,selectGroup,initialMode,initia
   useLayoutEffect(()=>{pickContext.current={key,picking}},[key,picking])
   useEffect(()=>{setDraft(d=>({...d,point:''}));setView('mu')},[activeId])
   useEffect(()=>{
-    if(!eligible||!valid||disabled||!allowedActions.preview||!modeAuthorized)return
+    if(!eligible||!valid||disabled||!allowedActions.preview||!modeAuthorized||held)return
     const abort=new AbortController(),token=++generation.current
     const timer=setTimeout(async()=>{
       setLoading(true);setError('')
@@ -101,7 +105,7 @@ export function AthenaPointEdit({project,activeId,selectGroup,initialMode,initia
     return()=>{clearTimeout(timer);abort.abort();generation.current++}
   // The complete request is captured in key.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[key,retry,eligible,valid,disabled,allowedActions.preview,modeAuthorized])
+  },[key,retry,eligible,valid,disabled,allowedActions.preview,modeAuthorized,held])
   const row=current?.results.find(r=>r.group_id===activeId)??current?.results[0]
   const total=current?.results.reduce((n,r)=>n+r.removed_indices.length,0)??0
   const base=group&&group.data_type!=='chi'?{x:group.energy.map(x=>x+(group.data_type==='chi'?0:group.parameters.energy_shift)),y:group.mu}:null
@@ -128,7 +132,10 @@ export function AthenaPointEdit({project,activeId,selectGroup,initialMode,initia
       if(!alive.current)return
       if(committed.current!==key||next.id!==project.id||next.version!==project.version+1)throw new Error('The workspace changed while applying this edit. Reload the project.')
       if(action==='remove'&&(next.groups.length!==project.groups.length||current!.results.some(r=>{const g=next.groups.find(g=>g.id===r.group_id);return !g||g.energy.length!==r.energy.length||g.energy.some((x,i)=>x!==r.energy[i])||g.mu.length!==r.mu.length||g.mu.some((y,i)=>y!==r.mu[i])})))throw new Error('The saved point removal does not match the preview. Reload the project.')
-      setPreview(null);setDraft(d=>({...d,point:''}));saved(next)
+      const spent={...draft,point:''}
+      const text=action==='undo'?`Last edit undone at project revision ${next.version}.`:action==='redo'?`Last edit redone at project revision ${next.version}.`
+        :`${mutation==='truncate'?'Truncation':'Point removal'} saved at project revision ${next.version}. ${current!.results.map(r=>`${r.label}: ${r.output_points} of ${r.input_points} measurements remain.`).join(' ')}`
+      setPreview(null);setDraft(spent);setDone({version:next.version,activeId,draft:spent,text});saved(next)
     }catch(e){if(alive.current){setPreview(null);setError(e instanceof Error?e.message:'Could not apply this edit.')}}
     finally{saving.current=false;setBusy('')}
   }
@@ -146,13 +153,13 @@ export function AthenaPointEdit({project,activeId,selectGroup,initialMode,initia
       <div className={styles.views}><button disabled={disabled} aria-pressed={view==='mu'} onClick={()=>setView('mu')}>Plot μ(E)</button><button disabled={disabled||draft.mode!=='point'} aria-pressed={view==='chie'} onClick={()=>setView('chie')}>Plot χ(E)</button></div>
       <div className={styles.plot} aria-label="Point removal plot">{original?<Plot data={traces} onClick={pick} layout={{autosize:true,margin:{l:62,r:18,t:55,b:55},hovermode:'closest',legend:{orientation:'h',x:0,y:1.04,yanchor:'bottom'},xaxis:{title:{text:'Energy (eV)'}},yaxis:{title:{text:view==='mu'?'μ(E)':`k^${group?.parameters.kweight} χ(E)`}},uirevision:`${project.id}:${activeId}:${view}`,shapes:draft.mode==='truncate'&&numeric?[{type:'line',x0:Number(draft.value),x1:Number(draft.value),y0:0,y1:1,yref:'paper',line:{color:'#bb6542',dash:'dashdot'}}]:[]}} config={{responsive:true,displaylogo:false}} style={{width:'100%',height:'100%'}} useResizeHandler/>:<p>χ(E) requires a successfully processed EXAFS spectrum. Use μ(E) or repair the processing settings.</p>}</div>
       {picking&&<p role="status">Click a point in the plot to fill the selected field. Escape cancels picking.</p>}
-      <p role="status">{!eligible?'Choose an editable data item or mark data to truncate.':!valid?'Enter finite values; margin limits must increase on the same side of E0.':loading?'Calculating point-removal preview…':current?`${total} points selected at project revision ${current.version}.`:'Select a point or review the removal limits.'}</p>
+      <p role="status">{held?`${done.text} Change a setting or refresh the preview to continue.`:!eligible?'Choose an editable data item or mark data to truncate.':!valid?'Enter finite values; margin limits must increase on the same side of E0.':loading?'Calculating point-removal preview…':current?`${total} points selected at project revision ${current.version}.`:'Select a point or review the removal limits.'}</p>
       {row&&<p>Preview: {row.label} · {row.output_points} of {row.input_points} measurements remain.{row.snapped!==null&&` Cutoff anchor: ${row.snapped} eV.`}</p>}
       {current?.results.map(r=><p key={r.group_id}>{r.label}: remove {r.removed_indices.length} points.{r.processing_error&&` Processing needs attention after this edit: ${r.processing_error}`}</p>)}
       {current&&Object.entries(current.skipped_reasons).map(([id,reason])=><p key={id} className="ath-warning">{project.groups.find(g=>g.id===id)?.label}: {reason}</p>)}
       {error&&<div className="ath-error" role="alert">{error}</div>}
     </section></div>
     </div>
-    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Close point editing</button><button disabled={disabled||!allowedActions.undo||!project.undo?.length} onClick={()=>void apply('undo')}>Undo last edit</button><button disabled={disabled||!allowedActions.redo||!project.redo?.length} onClick={()=>void apply('redo')}>Redo last edit</button><button disabled={disabled||!allowedActions.preview||!modeAuthorized||!eligible||!valid||loading} onClick={()=>{setPreview(null);setRetry(n=>n+1)}}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled||!modeAuthorized||!current||!total||loading} onClick={()=>void apply('remove')}>{draft.mode==='truncate'?'Truncate data':draft.mode==='margins'?'Remove selected glitches':'Remove point'}</button></div>
+    <div className={`ath-modal-actions ${controls.actions}`}><button disabled={disabled} onClick={close}>Close point editing</button><button disabled={disabled||!allowedActions.undo||!project.undo?.length} onClick={()=>void apply('undo')}>Undo last edit</button><button disabled={disabled||!allowedActions.redo||!project.redo?.length} onClick={()=>void apply('redo')}>Redo last edit</button><button disabled={disabled||!allowedActions.preview||!modeAuthorized||!eligible||!valid||loading} onClick={()=>{setPreview(null);setDone(null);setRetry(n=>n+1)}}>{error ? 'Retry preview' : 'Refresh preview'}</button><button className="ath-primary" disabled={disabled||!modeAuthorized||!current||!total||loading} onClick={()=>void apply('remove')}>{draft.mode==='truncate'?'Truncate data':draft.mode==='margins'?'Remove selected glitches':'Remove point'}</button></div>
   </div>
 }
