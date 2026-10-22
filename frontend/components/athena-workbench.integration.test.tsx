@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest"
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest"
 import type { AthenaProject, Parameters } from "@/lib/athena"
 import { AthenaProvider } from "@/lib/athena-context"
 import { AthenaPointEdit } from "./athena-point-edit"
@@ -129,6 +129,40 @@ describe("AthenaWorkbench integrated request gating", () => {
     }} />)
     await screen.findAllByRole("button", { name: /EXAFS sample/ })
     expect(screen.getByRole("button", { name: "Import spectra" })).toBeEnabled()
+  })
+
+  it("opens a project file into the bound project, never offering a new or recent one", async () => {
+    const preview: ProjectPreview = {
+      upload_id: "upload-project", filename: "export.json", name: "Exported project", journal: "",
+      warnings: [], groups: [{ id: "source", label: "Source", data_type: "mu", points: 3,
+        x: [1, 2, 3], y: [1, 2, 3], notes: "", reference_id: null }],
+    }
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith("/api/athena/projects/integrated-project")) return new Response(JSON.stringify(eligibleProject()))
+      if (url.endsWith("/api/athena/projects/integrated-project/preview-project")) return new Response(JSON.stringify(preview))
+      return new Response(JSON.stringify({ detail: "unexpected" }), { status: 404 })
+    })
+    vi.stubGlobal("fetch", fetcher)
+    // jsdom has no <dialog> modal API.
+    const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal")
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, writable: true, value(this: HTMLDialogElement) { this.setAttribute("open", "") } })
+    onTestFinished(() => {
+      if (showModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", showModal)
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
+    })
+    render(<AthenaWorkbench session={{
+      mode: "integration", projectId: "integrated-project", capability: "restore",
+      allowedOperations: ["read_project", "upload", "preview", "read_upload", "import", "restore"], expiresAt: "2099-01-01T00:00:00Z",
+    }} />)
+    await screen.findAllByRole("button", { name: /EXAFS sample/ })
+    fireEvent.click(screen.getByRole("button", { name: "Import spectra" }))
+    fireEvent.change(screen.getByLabelText("Choose data files"), { target: { files: [new File(["{}"], "export.json")] } })
+
+    expect(await screen.findByRole("button", { name: "Import all data" })).toBeEnabled()
+    expect(screen.getByLabelText("Destination project")).toHaveTextContent("added to the open project")
+    expect(screen.queryByLabelText("Open in a new project instead")).not.toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Recent local projects" })).not.toBeInTheDocument()
   })
 
   it("keeps reviewed project restoration inert without restore", async () => {
