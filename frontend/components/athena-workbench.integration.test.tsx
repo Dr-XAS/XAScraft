@@ -75,6 +75,16 @@ function attemptDisabledAction(name: string) {
   fireEvent.click(button)
 }
 
+// jsdom has no <dialog> modal API.
+function stubShowModal() {
+  const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal")
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, writable: true, value(this: HTMLDialogElement) { this.setAttribute("open", "") } })
+  onTestFinished(() => {
+    if (showModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", showModal)
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
+  })
+}
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -144,13 +154,7 @@ describe("AthenaWorkbench integrated request gating", () => {
       return new Response(JSON.stringify({ detail: "unexpected" }), { status: 404 })
     })
     vi.stubGlobal("fetch", fetcher)
-    // jsdom has no <dialog> modal API.
-    const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal")
-    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, writable: true, value(this: HTMLDialogElement) { this.setAttribute("open", "") } })
-    onTestFinished(() => {
-      if (showModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", showModal)
-      else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
-    })
+    stubShowModal()
     render(<AthenaWorkbench session={{
       mode: "integration", projectId: "integrated-project", capability: "restore",
       allowedOperations: ["read_project", "upload", "preview", "read_upload", "import", "restore"], expiresAt: "2099-01-01T00:00:00Z",
@@ -163,6 +167,34 @@ describe("AthenaWorkbench integrated request gating", () => {
     expect(screen.getByLabelText("Destination project")).toHaveTextContent("added to the open project")
     expect(screen.queryByLabelText("Open in a new project instead")).not.toBeInTheDocument()
     expect(screen.queryByRole("heading", { name: "Recent local projects" })).not.toBeInTheDocument()
+  })
+
+  it("merges marked repeat scans and leaves out the tools a linked project cannot run", async () => {
+    const project = eligibleProject()
+    project.groups.push({ ...project.groups[0], id: "second-sample", label: "Second EXAFS sample" })
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/api/athena/projects/integrated-project")) return new Response(JSON.stringify(project))
+      return new Response(JSON.stringify({ detail: "unexpected" }), { status: 404 })
+    })
+    vi.stubGlobal("fetch", fetcher)
+    stubShowModal()
+    render(<AthenaWorkbench session={{
+      mode: "integration", projectId: "integrated-project", capability: "merge",
+      allowedOperations: ["read_project", "preview", "merge"], expiresAt: "2099-01-01T00:00:00Z",
+    }} />)
+    await screen.findAllByRole("button", { name: /EXAFS sample/ })
+    fireEvent.click(screen.getByRole("button", { name: "Process" }))
+    for (const name of ["Dispersive energy calibration", "Fluorescence XAS from XRF fit", "Raw XRF spectra and maps"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument()
+    }
+    const merge = screen.getByRole("button", { name: "Merge marked data" })
+    expect(merge).toBeEnabled()
+    fireEvent.click(merge)
+
+    await screen.findByRole("dialog", { name: "Merge marked data" })
+    await waitFor(() => expect(fetcher.mock.calls.some(([url]) => String(url).endsWith("/api/athena/projects/integrated-project/merge/preview"))).toBe(true), { timeout: 2500 })
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("/api/athena/preferences/"))).toBe(false)
+    expect(screen.queryByRole("button", { name: "Save merge defaults" })).not.toBeInTheDocument()
   })
 
   it("keeps reviewed project restoration inert without restore", async () => {

@@ -79,3 +79,14 @@ it('allows preference failure recovery and explicitly reloads saved settings ove
   change('Short-scan margin · points','20');await ready()
   fireEvent.click(screen.getByRole('button',{name:'Reload saved defaults'}));await waitFor(()=>expect(screen.getByLabelText('Short-scan margin · points')).toHaveValue(10));await ready()
 })
+
+it('merges with built-in defaults and no account preferences when they are unavailable',async()=>{
+  serve();const impl=api.getMockImplementation()!
+  api.mockImplementation(async(path,...rest)=>{if(path.startsWith('/preferences/'))throw new Error('Craft project does not match this integration session');return impl(path,...rest)})
+  render(<AthenaMerge {...props()} accountDefaults={false}/>);await ready()
+  expect(api.mock.calls.some(([path])=>path.startsWith('/preferences/'))).toBe(false)
+  expect(screen.queryByRole('button',{name:'Save merge defaults'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Reload saved defaults'})).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Short-scan margin · points')).toHaveValue(10)
+  fireEvent.click(save());await waitFor(()=>expect(api.mock.calls.at(-1)![0]).toContain('/command'))
+})

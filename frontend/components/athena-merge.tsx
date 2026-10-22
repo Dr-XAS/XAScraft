@@ -45,12 +45,13 @@ function validate(v:MergePreview,p:AthenaProject,ids:string[],options:Options){
   }
 }
 
-export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,disabled=false,setBusy,saved,close}:{project:AthenaProject;initialDraft?:MergeDraft;rememberDraft:(d:MergeDraft)=>void;initialArray?:Options['array'];disabled?:boolean;setBusy:(s:string)=>void;saved:(p:AthenaProject,id:string)=>void;close:()=>void}){
+// accountDefaults=false: the session cannot reach account preferences (a Dr.XAS-linked project), so merge from the built-in defaults.
+export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,disabled=false,accountDefaults=true,setBusy,saved,close}:{project:AthenaProject;initialDraft?:MergeDraft;rememberDraft:(d:MergeDraft)=>void;initialArray?:Options['array'];disabled?:boolean;accountDefaults?:boolean;setBusy:(s:string)=>void;saved:(p:AthenaProject,id:string)=>void;close:()=>void}){
   const athenaApi=useAthenaApi()
   const marked=project.groups.filter(g=>g.marked),ids=marked.map(g=>g.id)
   const refs=project.groups.filter(g=>marked.some(m=>m.reference_id===g.id))
   const [draft,setDraft]=useState<MergeDraft>(()=>({...factory,array:'mu',short_data_margin:'10',weights:{},reference_weights:{},label:'',...initialDraft,...(initialArray?{array:initialArray}:{})}))
-  const [prefs,setPrefs]=useState<{version:number;values:Settings}|null>(null),[ready,setReady]=useState(false),[prefNotice,setPrefNotice]=useState('')
+  const [prefs,setPrefs]=useState<{version:number;values:Settings}|null>(null),[ready,setReady]=useState(!accountDefaults),[prefNotice,setPrefNotice]=useState('')
   const [preview,setPreview]=useState<{key:string;value:MergePreview}|null>(null),[completed,setCompleted]=useState<MergePreview|null>(null),[role,setRole]=useState('sample')
   const [error,setError]=useState(''),[loading,setLoading]=useState(false),[retry,setRetry]=useState(0)
   const alive=useRef(true),generation=useRef(0),saving=useRef(false),manual=useRef(false)
@@ -67,7 +68,7 @@ export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,dis
       setReady(true)
     }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not load merge preferences.')}
   }
-  useEffect(()=>{void loadDefaults()},[]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(accountDefaults)void loadDefaults()},[]) // eslint-disable-line react-hooks/exhaustive-deps
   const value=(id:string,isRef=false)=>{const g=project.groups.find(g=>g.id===id),native=g?.source.native as {args?:{importance?:unknown}}|undefined;return (isRef?draft.reference_weights:draft.weights)[id]??String(g?.source.importance??native?.args?.importance??1)}
   const weights=Object.fromEntries(ids.map(id=>[id,Number(value(id))])),referenceWeights=Object.fromEntries(refs.map(g=>[g.id,Number(value(g.id,true))]))
   const valid=ids.length>=2&&draft.short_data_margin.trim()!==''&&Number.isInteger(Number(draft.short_data_margin))&&Number(draft.short_data_margin)>=0&&Number(draft.short_data_margin)<=250000
@@ -140,7 +141,7 @@ export function AthenaMerge({project,initialDraft,rememberDraft,initialArray,dis
         <label className="ath-field"><span>Merged data label <SectionHelp label="Merged data label">Name the new derived data. Leave blank for Craft’s automatic merge label; source labels are unchanged.</SectionHelp></span><input aria-label="Merged data label" placeholder="Automatic: merge, merge 2…" value={draft.label} onChange={e=>edit({label:e.target.value})}/></label>
       </fieldset>
       <label className="ath-field"><span>Merge plot <SectionHelp label="Merge plot">The standard deviation describes differences between scans; it is not a propagated measurement error.</SectionHelp></span><select aria-label="Merge plot" value={draft.plot} onChange={e=>edit({plot:e.target.value as Settings['plot']})}><option value="stddev">Merge ± standard deviation</option><option value="variance">Variance · scaled standard deviation</option><option value="marked">Merge and contributing scans</option></select></label>
-      <div className={styles.views}><button disabled={disabled||!prefs||!valid} onClick={()=>void saveDefaults()}>Save merge defaults</button><button disabled={disabled} onClick={()=>void loadDefaults(true)}>Reload saved defaults</button></div>
+      {accountDefaults&&<div className={styles.views}><button disabled={disabled||!prefs||!valid} onClick={()=>void saveDefaults()}>Save merge defaults</button><button disabled={disabled} onClick={()=>void loadDefaults(true)}>Reload saved defaults</button></div>}
       {prefNotice&&<p role="status">{prefNotice}</p>}
       <a href="https://bruceravel.github.io/demeter/documents/Athena/process/merge.html" target="_blank" rel="noreferrer">Document section: merging</a>
     </fieldset><section className={styles.results} aria-label="Merge preview">
