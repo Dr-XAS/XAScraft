@@ -197,6 +197,44 @@ describe("AthenaWorkbench integrated request gating", () => {
     expect(screen.queryByRole("button", { name: "Save merge defaults" })).not.toBeInTheDocument()
   })
 
+  // Catches a dropped detector file opening an XRF panel the linked project cannot run.
+  it("says why a detector file's spectra stay out of a linked project instead of opening an XRF panel", async () => {
+    const columns = ["Energy", "I0", "It"].map((name, index) => ({ column_id: `col_${index}`, name, index, numeric: true, unit: null,
+      role_hint: name === "Energy" ? "energy" : name === "I0" ? "i0" : null, preview: [1, 2, 3] }))
+    const both = { upload_id: "upload-both", display_name: "both.0007.hdf5", row_count: 3, warnings: [], issues: [], columns,
+      athena_suggestion: { energy_column: "col_0", numerator: ["col_1"], denominator: "col_2", mode: "transmission", units: "eV", data_type: "mu" },
+      detector_file: { opens: "xrf_xas" } }
+    const inspections = [{ kind: "xrf_detector_file", opens: "xrf_xas", display_name: "scan.0029.hdf5" }, both]
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith("/api/athena/projects/integrated-project")) return new Response(JSON.stringify(eligibleProject()))
+      if (url.endsWith("/api/athena/projects/integrated-project/inspect")) return new Response(JSON.stringify(inspections.shift()))
+      return new Response(JSON.stringify({ detail: "unexpected" }), { status: 404 })
+    })
+    vi.stubGlobal("fetch", fetcher)
+    stubShowModal()
+    render(<AthenaWorkbench session={{
+      mode: "integration", projectId: "integrated-project", capability: "raw-import",
+      allowedOperations: ["read_project", "upload", "preview", "read_upload", "import"], expiresAt: "2099-01-01T00:00:00Z",
+    }} />)
+    await screen.findAllByRole("button", { name: /EXAFS sample/ })
+    fireEvent.click(screen.getByRole("button", { name: "Import spectra" }))
+    fireEvent.change(screen.getByLabelText("Choose data files"), { target: { files: [new File(["hdf"], "scan.0029.hdf5")] } })
+
+    const dialog = await screen.findByRole("dialog", { name: "Import spectra" })
+    const listed = await within(dialog).findByLabelText("Detector spectrum files in this batch")
+    expect(listed).toHaveTextContent("scan.0029.hdf5 holds detector spectra rather than a table of columns. A project opened from Dr.XAS cannot fit detector spectra.")
+    expect(within(listed).queryByRole("button")).not.toBeInTheDocument()
+    expect(screen.queryByRole("dialog", { name: "Fluorescence XAS from XRF fit" })).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText("Choose data files"), { target: { files: [new File(["hdf"], "both.0007.hdf5")] } })
+    await within(dialog).findByRole("combobox", { name: "Energy column" })
+    const offer = within(dialog).getByLabelText("Detector spectra in this file")
+    expect(offer).toHaveTextContent("both.0007.hdf5 also holds detector spectra. Its columns import here; a project opened from Dr.XAS cannot fit its spectra.")
+    expect(within(offer).queryByRole("button")).not.toBeInTheDocument()
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("/xrf-"))).toBe(false)
+  })
+
   it("keeps reviewed project restoration inert without restore", async () => {
     const project = eligibleProject()
     const preview: ProjectPreview = {

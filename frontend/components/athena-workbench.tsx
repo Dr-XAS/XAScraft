@@ -1697,7 +1697,7 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
       const { setAside } = await inspectQueue(incoming)
       // A detector file chosen on its own opens where it is read, already loaded.
       // The rest of a batch keeps the files it set aside listed together.
-      if (!continuing && incoming.length === 1 && setAside.length === 1) { setDetectorFiles([]); openDetectorFile(setAside[0].file, setAside[0].opens) }
+      if (!continuing && incoming.length === 1 && setAside.length === 1 && canOpenTool(setAside[0].opens)) { setDetectorFiles([]); openDetectorFile(setAside[0].file, setAside[0].opens) }
     })
   }
   async function importUpload(projectId: string, body: { upload_id: string } & Record<string, unknown>) {
@@ -1811,8 +1811,8 @@ function AthenaWorkbenchContent({ session }: { session: AthenaSession }) {
   }
   function importFileNotices() {
     return <>
-      {detectorFiles.length > 0 && <div className="ath-hint" role="status" aria-label="Detector spectrum files in this batch">{detectorFiles.map(({ file, opens }) => <p key={file.name}>{file.name} holds detector spectra rather than a table of columns. <button type="button" disabled={!!busy} onClick={() => openDetectorFile(file, opens)}>{opens === "xrf_xas" ? "Open in Fluorescence XAS from XRF fit" : "Open in Raw XRF spectra and maps"}</button></p>)}</div>}
-      {inspection?.detector_file && files[0] instanceof File && <div className="ath-hint" role="status" aria-label="Detector spectra in this file"><p>{inspection.display_name} also holds detector spectra. Its columns import here; its spectra are fitted in the XRF panel. <button type="button" disabled={!!busy} onClick={() => openDetectorFile(files[0] as File, inspection.detector_file!.opens)}>{inspection.detector_file.opens === "xrf_xas" ? "Open in Fluorescence XAS from XRF fit" : "Open in Raw XRF spectra and maps"}</button></p></div>}
+      {detectorFiles.length > 0 && <div className="ath-hint" role="status" aria-label="Detector spectrum files in this batch">{detectorFiles.map(({ file, opens }) => <p key={file.name}>{file.name} holds detector spectra rather than a table of columns. {canOpenTool(opens) ? <button type="button" disabled={!!busy} onClick={() => openDetectorFile(file, opens)}>{opens === "xrf_xas" ? "Open in Fluorescence XAS from XRF fit" : "Open in Raw XRF spectra and maps"}</button> : "A project opened from Dr.XAS cannot fit detector spectra."}</p>)}</div>}
+      {inspection?.detector_file && files[0] instanceof File && <div className="ath-hint" role="status" aria-label="Detector spectra in this file"><p>{inspection.display_name} also holds detector spectra. {canOpenTool(inspection.detector_file.opens) ? <>Its columns import here; its spectra are fitted in the XRF panel. <button type="button" disabled={!!busy} onClick={() => openDetectorFile(files[0] as File, inspection.detector_file!.opens)}>{inspection.detector_file.opens === "xrf_xas" ? "Open in Fluorescence XAS from XRF fit" : "Open in Raw XRF spectra and maps"}</button></> : "Its columns import here; a project opened from Dr.XAS cannot fit its spectra."}</p></div>}
       {batchLeftOut && <div className="ath-warning" role="status" aria-label="Files left out of this batch"><p>Left out of this batch: {batchLeftOut.left.map(item => `${item.name} (${item.reason})`).join('; ')}.</p><button disabled={!!busy} onClick={() => { void queueFiles(batchLeftOut.files, true) }}>Include them</button></div>}
       {!inspection && !scanSelection && !archiveSelection && !!files.length && <div className="ath-modal-actions"><button disabled={!!busy} onClick={() => { void task("Inspecting " + files[0].name, async () => { await inspectQueue(files, inspectionReuseRef.current, inspectionResetReferenceRef.current) }) }}>Retry file inspection</button><button disabled={!!busy} onClick={() => { void skipImportFile() }}>Skip this file</button></div>}
     </>
