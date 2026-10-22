@@ -94,6 +94,9 @@ describe("IntegrationLaunch", () => {
     render(<IntegrationLaunch />)
     await screen.findByText(/spectrum/i)
     expect(fetcher).not.toHaveBeenCalledWith(expect.stringContaining("/browser/consume"), expect.anything())
+    // A deadline beyond setTimeout's range must not overflow into an immediate renewal.
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)) })
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it("rejects unrelated query parameters before consuming", async () => {

@@ -160,8 +160,13 @@ export function IntegrationLaunch() {
         setSession(next)
       }).catch(() => { if (current) retry() })
     }
+    // setTimeout fires at once past 2^31 - 1 ms, so a far deadline waits in steps like the expiry timer.
+    const scheduleRenewal = () => {
+      const wait = deadline - renewalLead - Date.now()
+      renewalTimer = window.setTimeout(wait > 2_147_483_647 ? scheduleRenewal : renew, Math.min(Math.max(0, wait), 2_147_483_647))
+    }
     expireOrReschedule()
-    renewalTimer = window.setTimeout(renew, Math.max(0, deadline - renewalLead - Date.now()))
+    scheduleRenewal()
     return () => { current = false; window.clearTimeout(timer); window.clearTimeout(renewalTimer) }
   }, [session])
 
