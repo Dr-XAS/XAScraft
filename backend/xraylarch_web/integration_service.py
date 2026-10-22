@@ -67,6 +67,11 @@ _REQUIRED_HEADERS = (
     "x-drxas-body-sha256",
     "x-drxas-signature",
 )
+# A browser session capability lives five minutes, so a leaked one is dead five
+# minutes after its tab stops renewing it. An open tab renews it, up to a working
+# day from launch; after that the scientist launches again from Dr.XAS.
+BROWSER_SESSION_LIFETIME = timedelta(seconds=300)
+BROWSER_SESSION_RENEWABLE_LIFETIME = timedelta(hours=12)
 _CORE_READ_ACTIONS = {"read_project", "export"}
 _CORE_MUTATION_ACTIONS = {"metadata", "parameters", "set_e0", "undo", "redo"}
 _NATIVE_ATHENA_OPERATIONS = (
@@ -504,7 +509,8 @@ class IntegrationService:
             project_id=project_id,
             owner_capability=capability,
             allowed_operations=tuple(value["allowed_operations"]),
-            expires_at=now + timedelta(seconds=300),
+            expires_at=now + BROWSER_SESSION_LIFETIME,
+            renewable_until=now + BROWSER_SESSION_RENEWABLE_LIFETIME,
             now=now,
         )
         return {
@@ -514,6 +520,12 @@ class IntegrationService:
             "allowed_operations": value["allowed_operations"],
             "return_reference": value["return_reference"],
         }
+
+    def renew_v2_session(self, project_id: str, session_capability: str, *, now: datetime) -> dict:
+        expires_at = self.storage.renew_project_session(
+            project_id, session_capability, lifetime=BROWSER_SESSION_LIFETIME, now=now,
+        )
+        return {"expires_at": expires_at.isoformat()}
 
     @staticmethod
     def _workspace_bytes(workspace: Path) -> int:

@@ -25,6 +25,11 @@ class ConsumeRequest(BaseModel):
     handle: str = Field(min_length=22, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 
+class RenewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(min_length=1, max_length=200)
+
+
 class RenameProjectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=120)
@@ -285,6 +290,18 @@ def build_integration_router(
             response.headers["Cache-Control"] = "no-store"
             return session
 
+        @v2.post("/browser/renew")
+        def renew_v2(payload: RenewRequest, request: Request, response: Response):
+            capability = request.headers.get("X-XrayLarch-Project-Capability")
+            try:
+                if not capability:
+                    raise IntegrationNotFoundError()
+                renewed = service.renew_v2_session(payload.project_id, capability, now=_now())
+            except (IntegrationNotFoundError, IntegrationAuthorizationError):
+                raise HTTPException(status_code=404, detail="Integration project was not found.")
+            response.headers["Cache-Control"] = "no-store"
+            return renewed
+
     @v2.patch("/projects/{project_id}")
     def rename_project(project_id: str, request: Request, raw_body: bytes = Depends(_raw_body)):
         raw, nonce, timestamp = signed(request, raw_body)
@@ -397,7 +414,7 @@ def build_integration_router(
 
     @v2.api_route("/{unmatched:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
     def v2_fallback(unmatched: str, request: Request, raw_body: bytes = Depends(_raw_body)):
-        if unmatched == "browser/consume" and not settings.browser_consume_enabled:
+        if unmatched in {"browser/consume", "browser/renew"} and not settings.browser_consume_enabled:
             raise HTTPException(status_code=404, detail="Integration project was not found.")
         # Authenticate any other v2-shaped request before reporting that its
         # route is absent, so a method/path substitution never becomes an oracle.

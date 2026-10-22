@@ -692,22 +692,51 @@ class IntegrationStorage:
         allowed_operations: tuple[str, ...],
         expires_at: datetime,
         now: datetime,
+        renewable_until: datetime | None = None,
     ) -> str:
         with self.project_lock(project_id):
             record = self._load_active_project(project_id, owner_capability, now)
             capability = secrets.token_urlsafe(32)
             session_expires_at = _dt(expires_at)
+            session_renewable_until = _dt(renewable_until or expires_at)
             if record.expires_at is not None:
                 session_expires_at = min(session_expires_at, record.expires_at)
+                session_renewable_until = min(session_renewable_until, record.expires_at)
             value = {
                 "project_id": project_id,
                 "capability_hash": _hash(capability),
                 "owner_capability_hash": record.capability_hash,
                 "allowed_operations": list(allowed_operations),
                 "expires_at": session_expires_at.isoformat(),
+                "renewable_until": max(session_expires_at, session_renewable_until).isoformat(),
             }
             self._atomic_json(self.sessions_dir / f"{_hash(capability)}.json", value)
             return capability
+
+    def renew_project_session(
+        self, project_id: str, capability: str, *, lifetime: timedelta, now: datetime,
+    ) -> datetime:
+        """Slide a live browser session's expiry forward by ``lifetime``.
+
+        Never past the ``renewable_until`` fixed when the session was created,
+        and never past a guest project's own expiry. A session from before
+        renewal existed has no ``renewable_until`` and keeps its expiry.
+        """
+        with self.project_lock(project_id):
+            self._load_project_session_locked(project_id, capability, now=now)
+            path = self.sessions_dir / f"{_hash(capability)}.json"
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                expires_at = _dt(value["expires_at"])
+                renewable_until = _dt(value.get("renewable_until", value["expires_at"]))
+            except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise IntegrationNotFoundError("Integration project was not found.") from exc
+            renewed = min(_dt(now) + lifetime, renewable_until)
+            if renewed > expires_at:
+                value["expires_at"] = renewed.isoformat()
+                self._atomic_json(path, value)
+                return renewed
+            return expires_at
 
     def _load_project_session_locked(
         self, project_id: str, capability: str, *, now: datetime,

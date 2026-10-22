@@ -10,6 +10,20 @@ afterEach(() => {
 })
 
 describe("backend proxy", () => {
+  it("forwards a browser session renewal with its capability and refuses other methods", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response('{"expires_at":"2026-10-22T20:05:00+00:00"}', { headers: { "content-type": "application/json" } }))
+    vi.stubGlobal("fetch", fetcher)
+    const path = ["api", "integration", "v2", "browser", "renew"]
+    const url = `http://localhost/api/backend/${path.join("/")}`
+    const request = new Request(url, { method: "POST", headers: { "x-xraylarch-project-capability": "session-token" }, body: '{"project_id":"p1"}' })
+    const response = await POST(request, { params: Promise.resolve({ path }) })
+    expect(fetcher.mock.calls[0][0].pathname).toBe("/api/integration/v2/browser/renew")
+    expect(fetcher.mock.calls[0][1].headers.get("x-xraylarch-project-capability")).toBe("session-token")
+    expect(await response.json()).toEqual({ expires_at: "2026-10-22T20:05:00+00:00" })
+    fetcher.mockClear()
+    expect((await GET(new Request(url), { params: Promise.resolve({ path }) })).status).toBe(404)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
   it.each(["quality-report", "comparison-report"])("forwards a %s snapshot and rejects unsupported methods", async (report) => {
     const path = ["api", "athena", "projects", "cu", report]
     const url = `http://localhost/api/backend/${path.join("/")}`

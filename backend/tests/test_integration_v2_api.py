@@ -1471,3 +1471,126 @@ def test_selected_group_export_puts_a_difference_spectrum_under_xraylarch_web_au
     assert group.science.kind == "exported" and group.science.reason == "difference"
     assert group.source.kind == "athena_internal"
     assert set(group.source.parent_group_ids) == {seed_id, copy_id}
+
+
+def _clocked(monkeypatch, start):
+    import xraylarch_web.athena as athena_module
+    import xraylarch_web.integration_routes as integration_routes
+
+    clock = [start]
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock[0] if tz is None else clock[0].astimezone(tz)
+
+    monkeypatch.setattr(integration_routes, "_now", lambda: clock[0])
+    monkeypatch.setattr(athena_module, "datetime", Clock)
+    return clock
+
+
+def _renew(client, project_id, capability):
+    return client.post(
+        "/api/integration/v2/browser/renew",
+        json={"project_id": project_id},
+        headers=project_headers(capability),
+    )
+
+
+def test_open_browser_session_renews_past_its_five_minute_lifetime(tmp_path, monkeypatch, now):
+    clock = _clocked(monkeypatch, now)
+    with TestClient(create_app(settings(tmp_path))) as client:
+        integrated = create(client)
+        project_id = integrated["project_id"]
+        session = _browser_session(client, integrated)
+
+        clock[0] = now + timedelta(seconds=240)
+        renewed = _renew(client, project_id, session["capability"])
+        assert renewed.status_code == 200, renewed.text
+        assert renewed.headers["cache-control"] == "no-store"
+        assert renewed.json() == {"expires_at": (now + timedelta(seconds=540)).isoformat()}
+
+        clock[0] = now + timedelta(seconds=400)
+        still_open = client.get(
+            f"/api/athena/projects/{project_id}?view=summary",
+            headers=project_headers(session["capability"]),
+        )
+        assert still_open.status_code == 200, still_open.text
+
+        clock[0] = now + timedelta(seconds=541)
+        lapsed = _renew(client, project_id, session["capability"])
+        denied = client.get(
+            f"/api/athena/projects/{project_id}?view=summary",
+            headers=project_headers(session["capability"]),
+        )
+
+    assert lapsed.status_code == 404
+    assert denied.status_code == 404
+
+
+def test_browser_session_renewal_stops_at_its_absolute_lifetime(tmp_path, monkeypatch, now):
+    clock = _clocked(monkeypatch, now)
+    with TestClient(create_app(settings(tmp_path))) as client:
+        integrated = create(client)
+        project_id = integrated["project_id"]
+        session = _browser_session(client, integrated)
+        for minutes in range(4, 12 * 60, 4):
+            clock[0] = now + timedelta(minutes=minutes)
+            assert _renew(client, project_id, session["capability"]).status_code == 200
+
+        clock[0] = now + timedelta(hours=12, seconds=-60)
+        capped = _renew(client, project_id, session["capability"])
+        assert capped.json() == {"expires_at": (now + timedelta(hours=12)).isoformat()}
+
+        clock[0] = now + timedelta(hours=12)
+        assert _renew(client, project_id, session["capability"]).status_code == 404
+
+
+def test_guest_browser_session_renewal_never_outlives_the_project(tmp_path, monkeypatch, now):
+    clock = _clocked(monkeypatch, now)
+    with TestClient(create_app(settings(tmp_path, integration_guest_ttl_seconds=120))) as client:
+        guest = create(client, persistent=False)
+        session = _browser_session(client, guest)
+        clock[0] = now + timedelta(seconds=60)
+        renewed = _renew(client, guest["project_id"], session["capability"])
+
+    assert renewed.status_code == 200, renewed.text
+    assert renewed.json() == {"expires_at": (now + timedelta(seconds=120)).isoformat()}
+
+
+@pytest.mark.parametrize("case", ("expired", "rotated", "other_project", "no_capability", "owner_capability"))
+def test_browser_session_renewal_refuses_anything_but_a_live_session(tmp_path, monkeypatch, now, case):
+    clock = _clocked(monkeypatch, now)
+    with TestClient(create_app(settings(tmp_path))) as client:
+        integrated = create(client)
+        other = create(client, name="Other project", nonce="o" * 32)
+        project_id, capability = integrated["project_id"], _browser_session(client, integrated)["capability"]
+        if case == "expired":
+            clock[0] = now + timedelta(seconds=300)
+        elif case == "rotated":
+            rotated = request(
+                client, "POST", f"/api/integration/v2/projects/{project_id}/capability/rotate", {},
+                nonce="r" * 32, capability=integrated["capability"],
+            )
+            assert rotated.status_code == 200, rotated.text
+        elif case == "other_project":
+            project_id = other["project_id"]
+        elif case == "owner_capability":
+            capability = integrated["capability"]
+        if case == "no_capability":
+            response = client.post("/api/integration/v2/browser/renew", json={"project_id": project_id})
+        else:
+            response = _renew(client, project_id, capability)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Integration project was not found."}
+
+
+def test_v2_browser_renew_obeys_feature_gate(tmp_path):
+    with TestClient(create_app(settings(tmp_path, browser_consume_enabled=False))) as client:
+        response = client.post(
+            "/api/integration/v2/browser/renew", json={"project_id": "p" * 22},
+            headers=project_headers("c" * 43),
+        )
+
+    assert response.status_code == 404

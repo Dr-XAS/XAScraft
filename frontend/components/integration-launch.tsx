@@ -9,6 +9,11 @@ import { AthenaWorkbench } from "./athena-workbench"
 type IntegratedSession = Extract<AthenaSession, { mode: "integration" }>
 type ObjectValue = Record<string, unknown>
 let launchGeneration = 0
+// The backend gives a browser session five minutes and slides that forward on
+// each renewal, so renew two minutes early (background tabs throttle timers to
+// about once a minute) and retry a failed request until the deadline.
+const renewalLead = 120_000
+const renewalRetry = 15_000
 
 function record(value: unknown): ObjectValue | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as ObjectValue : null
@@ -21,6 +26,12 @@ function string(value: unknown, maximum: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maximum
 }
 function integer(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 }
+function renewedExpiry(value: unknown): number | null {
+  const item = record(value)
+  if (!item || !exactKeys(item, ["expires_at"]) || !string(item.expires_at, 64)) return null
+  const expiry = Date.parse(item.expires_at)
+  return Number.isFinite(expiry) ? expiry : null
+}
 
 function sessionFrom(value: unknown, returnTo?: string): IntegratedSession {
   const item = record(value)
@@ -49,7 +60,8 @@ function sessionFrom(value: unknown, returnTo?: string): IntegratedSession {
   }
 
   // The consume contract does not expose the capability expiry. Bound tab storage to
-  // at most five minutes, and to an earlier authoritative guest-project expiry.
+  // the backend's five-minute session lifetime, and to an earlier authoritative
+  // guest-project expiry; renewal moves it forward while the tab stays open.
   const localBound = Date.now() + 300_000
   const projectExpiry = typeof project.expires_at === "string" ? Date.parse(project.expires_at) : localBound
   return {
@@ -62,6 +74,8 @@ function sessionFrom(value: unknown, returnTo?: string): IntegratedSession {
 export function IntegrationLaunch() {
   const [session, setSession] = useState<IntegratedSession | null>(null)
   const [failed, setFailed] = useState(false)
+  const [ended, setEnded] = useState<{ returnTo?: string } | null>(null)
+  const [finalDeadline, setFinalDeadline] = useState<number | null>(null)
   const ownership = useRef<{ generation: number; mounted: boolean } | null>(null)
 
   useEffect(() => {
@@ -119,16 +133,50 @@ export function IntegrationLaunch() {
     if (!session) return
     const deadline = Date.parse(session.expiresAt)
     let timer: number
+    let renewalTimer: number | undefined
+    let current = true
     const expireOrReschedule = () => {
       const remaining = deadline - Date.now()
-      if (remaining <= 0) { clearIntegrationSession(); clearIntegrationReturnSelection(); setSession(null); setFailed(true); return }
+      if (remaining <= 0) { clearIntegrationSession(); clearIntegrationReturnSelection(); setSession(null); setEnded({ returnTo: session.returnTo }); setFailed(true); return }
       timer = window.setTimeout(expireOrReschedule, Math.min(remaining, 2_147_483_647))
     }
+    const retry = () => { if (Date.now() + renewalRetry < deadline) renewalTimer = window.setTimeout(renew, renewalRetry) }
+    const renew = () => {
+      void fetch(backendUrl("/api/integration/v2/browser/renew"), {
+        method: "POST",
+        headers: { "content-type": "application/json", "X-XrayLarch-Project-Capability": session.capability },
+        body: JSON.stringify({ project_id: session.projectId }),
+      }).then(async response => {
+        if (!current) return
+        // A refused renewal is final (expired, revoked, or past its renewable
+        // lifetime); a server or network failure may pass, so try again.
+        if (response.status === 401 || response.status === 404) { setFinalDeadline(deadline); return }
+        const expiry = response.ok ? renewedExpiry(await response.json().catch(() => null)) : null
+        if (!current) return
+        if (expiry === null) { retry(); return }
+        if (expiry <= deadline) { setFinalDeadline(deadline); return }
+        const next = { ...session, expiresAt: new Date(expiry).toISOString() }
+        saveIntegrationSession(next)
+        setSession(next)
+      }).catch(() => { if (current) retry() })
+    }
     expireOrReschedule()
-    return () => window.clearTimeout(timer)
+    renewalTimer = window.setTimeout(renew, Math.max(0, deadline - renewalLead - Date.now()))
+    return () => { current = false; window.clearTimeout(timer); window.clearTimeout(renewalTimer) }
   }, [session])
 
-  if (session) return <AthenaWorkbench session={session} onAuthorizationFailure={() => { clearIntegrationSession(); clearIntegrationReturnSelection(); setSession(null); setFailed(true) }} />
-  if (failed) return <main><h1>Launch again from Dr.XAS</h1><p>This Craft session is missing, expired, or already used.</p></main>
+  if (session) return <>
+    <AthenaWorkbench session={session} onAuthorizationFailure={() => { clearIntegrationSession(); clearIntegrationReturnSelection(); setSession(null); setEnded({ returnTo: session.returnTo }); setFailed(true) }} />
+    {finalDeadline !== null && <div className="ath-warning ath-session-notice" role="status">
+      This Dr.XAS link ends at {new Date(finalDeadline).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Open the project again from Dr.XAS to keep working.
+      {session.returnTo && <a className="ath-button" href={session.returnTo} onClick={clearIntegrationReturnSelection}>Return to Dr.XAS</a>}
+    </div>}
+  </>
+  if (failed) return <main>
+    <h1>Launch again from Dr.XAS</h1>
+    <p>This Craft session is missing, expired, or already used.</p>
+    {ended && <p>Open the project again from Dr.XAS to pick up where you left off.</p>}
+    {ended?.returnTo && <p><a className="ath-button ath-primary" href={ended.returnTo}>Return to Dr.XAS</a></p>}
+  </main>
   return <main><p>Opening Craft…</p></main>
 }

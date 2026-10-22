@@ -25,7 +25,7 @@ function allowedMethods(path: string[]): ReadonlySet<string> | null {
   if (path.some(segment => !segment || segment === "." || segment === "..")) return null
   const joined = path.join("/")
   if (joined === "health") return new Set(["GET"])
-  if (joined === "api/integration/v2/browser/consume") return new Set(["POST"])
+  if (joined === "api/integration/v2/browser/consume" || joined === "api/integration/v2/browser/renew") return new Set(["POST"])
   if (joined === "api/bug-reports") return new Set(["POST"])
   // Artemis (added on master in 99f05038f) has no method-aware route table yet, and
   // master gates it by prefix alone. Keep exactly that rather than guess its routes and
@@ -43,8 +43,9 @@ function allowedMethods(path: string[]): ReadonlySet<string> | null {
   return methods.length ? new Set(methods) : null
 }
 
-function isProjectPath(path: string[]) {
-  return path[0] === "api" && path[1] === "athena" && path[2] === "projects" && path.length >= 4
+function carriesCapability(path: string[]) {
+  return path[0] === "api" && path[1] === "athena" && path[2] === "projects" && path.length >= 4 ||
+    path.join("/") === "api/integration/v2/browser/renew"
 }
 
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
@@ -62,7 +63,7 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
     const value = request.headers.get(header)
     if (value) headers.set(header, value)
   }
-  if (isProjectPath(routePath)) {
+  if (carriesCapability(routePath)) {
     const capability = request.headers.get("x-xraylarch-project-capability")
     if (capability) headers.set("x-xraylarch-project-capability", capability)
   }

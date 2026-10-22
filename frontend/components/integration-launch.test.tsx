@@ -157,16 +157,85 @@ describe("IntegrationLaunch", () => {
     expect(await screen.findByText(/Launch again from Dr\.XAS/i)).toBeInTheDocument()
   })
 
-  it("expires mounted authority at the local deadline", async () => {
+  it("expires mounted authority at the local deadline when renewal is refused", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date("2026-09-16T12:00:00Z"))
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(response))))
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.endsWith("/browser/renew")
+      ? new Response(JSON.stringify({ detail: "Integration project was not found." }), { status: 404 })
+      : new Response(JSON.stringify(response)))))
     render(<IntegrationLaunch />)
     await screen.findByText(/spectrum/i)
     expect(sessionStorage.getItem("xraylarch.integration.session.v2")).not.toBeNull()
     await act(async () => { vi.advanceTimersByTime(300_001) })
     expect(screen.getByText(/Launch again from Dr\.XAS/i)).toBeInTheDocument()
     expect(sessionStorage.getItem("xraylarch.integration.session.v2")).toBeNull()
+    vi.useRealTimers()
+  })
+
+  it("keeps an open editor's authority alive by renewing it before the deadline", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"))
+    const renewals: RequestInit[] = []
+    vi.stubGlobal("fetch", vi.fn((url: string, init: RequestInit) => {
+      if (!url.endsWith("/browser/renew")) return Promise.resolve(new Response(JSON.stringify(response)))
+      renewals.push(init)
+      return Promise.resolve(new Response(JSON.stringify({ expires_at: new Date(Date.now() + 300_000).toISOString() })))
+    }))
+    render(<IntegrationLaunch />)
+    await screen.findByText(/spectrum/i)
+    for (let minute = 0; minute < 20; minute += 1) await act(async () => { vi.advanceTimersByTime(60_000) })
+    expect(screen.getByText(/spectrum/i)).toBeInTheDocument()
+    expect(renewals.length).toBeGreaterThanOrEqual(6)
+    expect(new Headers(renewals[0].headers).get("X-XrayLarch-Project-Capability")).toBe("browser-capability")
+    expect(JSON.parse(renewals[0].body as string)).toEqual({ project_id: "p1" })
+    const saved = JSON.parse(sessionStorage.getItem("xraylarch.integration.session.v2")!)
+    expect(Date.parse(saved.expiresAt)).toBeGreaterThan(Date.now() + 60_000)
+    vi.useRealTimers()
+  })
+
+  it("retries a renewal that failed on the network", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"))
+    let renewals = 0
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (!url.endsWith("/browser/renew")) return Promise.resolve(new Response(JSON.stringify(response)))
+      renewals += 1
+      return renewals === 1 ? Promise.reject(new TypeError("Failed to fetch")) : Promise.resolve(new Response(JSON.stringify({ expires_at: new Date(Date.now() + 300_000).toISOString() })))
+    }))
+    render(<IntegrationLaunch />)
+    await screen.findByText(/spectrum/i)
+    for (let step = 0; step < 7; step += 1) await act(async () => { vi.advanceTimersByTime(60_000) })
+    expect(renewals).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(/spectrum/i)).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it("warns before a session that can no longer be renewed ends, with the way back to Dr.XAS", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"))
+    const deadline = new Date(Date.now() + 300_000).toISOString()
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(
+      url.endsWith("/browser/renew") ? { expires_at: deadline } : response,
+    )))))
+    render(<IntegrationLaunch />)
+    await screen.findByText(/spectrum/i)
+    await act(async () => { vi.advanceTimersByTime(200_000) })
+    expect(screen.getByRole("status")).toHaveTextContent(/This Dr\.XAS link ends at .+ Open the project again from Dr\.XAS/i)
+    expect(screen.getByRole("link", { name: "Return to Dr.XAS" })).toHaveAttribute("href", "/analysis/1")
+    vi.useRealTimers()
+  })
+
+  it("offers the way back to Dr.XAS once the session has ended", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"))
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.endsWith("/browser/renew")
+      ? new Response("{}", { status: 404 })
+      : new Response(JSON.stringify(response)))))
+    render(<IntegrationLaunch />)
+    await screen.findByText(/spectrum/i)
+    await act(async () => { vi.advanceTimersByTime(300_001) })
+    expect(screen.getByText(/Open the project again from Dr\.XAS to pick up where you left off/i)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Return to Dr.XAS" })).toHaveAttribute("href", "/analysis/1")
     vi.useRealTimers()
   })
 
