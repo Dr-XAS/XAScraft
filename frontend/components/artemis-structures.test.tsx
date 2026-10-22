@@ -678,6 +678,7 @@ describe("ArtemisStructures", () => {
     expect(api).toHaveBeenCalledWith("/feff/jobs", expect.objectContaining({ attachment_id: "mp-cif", version: 2 }), expect.any(AbortSignal))
     selectGeneratedPaths("feff0001.dat")
     await click(/Add selected paths/)
+    await waitFor(() => expect(onAddPaths).toHaveBeenCalled())
     expect(onAddPaths.mock.calls[0][0][0].label).toContain("Materials Project mp-aaaaaaft")
     expect(screen.queryByText(/AMCSD undefined/)).not.toBeInTheDocument()
   })
