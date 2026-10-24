@@ -9,7 +9,7 @@ declare module "react-plotly.js" {
     style?: CSSProperties
     onClick?: (event: { points?: Array<{ x?: unknown; y?: unknown }> }) => void
     onRelayout?: (event: Record<string, unknown>) => void
-    onInitialized?: () => void
+    onInitialized?: (figure: unknown, graphDiv: HTMLElement) => void
     onError?: (error: Error) => void
   }>
 

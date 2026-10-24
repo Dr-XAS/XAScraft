@@ -6,7 +6,12 @@ import { downloadArtemisText } from "@/lib/artemis-structures"
 import { AthenaSpectrumViewer } from "./athena-spectrum-viewer"
 import { useSpectrumViewerState } from "./athena-spectrum-viewer-state"
 
-vi.mock("./athena-plot", () => ({ AthenaPlot: () => <div aria-label="Spectrum plot" /> }))
+type PlotRange = [number | null, number | null]
+const plot = vi.hoisted(() => vi.fn((_props: { range: PlotRange; onRangeChange?: (range: PlotRange) => void }) => {}))
+vi.mock("./athena-plot", () => ({ AthenaPlot: (props: { range: PlotRange; onRangeChange?: (range: PlotRange) => void }) => {
+  plot(props)
+  return <div aria-label="Spectrum plot" />
+} }))
 vi.mock("@/lib/artemis-structures", () => ({ downloadArtemisText: vi.fn() }))
 
 const sample: AthenaGroup = {
@@ -29,6 +34,23 @@ function Harness({ viewer = "single", onExport, canExport = true, pending = fals
 }
 
 afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+describe("spectrum viewer range", () => {
+  it("shows the drawn axis in the range fields after the plot is zoomed or reset", () => {
+    render(<Harness />)
+    const minimum = screen.getByLabelText("Plot minimum"), maximum = screen.getByLabelText("Plot maximum")
+    fireEvent.change(minimum, { target: { value: "100.2" } })
+    fireEvent.change(maximum, { target: { value: "100.8" } })
+    expect(plot.mock.calls.at(-1)![0].range).toEqual([100.2, 100.8])
+    act(() => plot.mock.calls.at(-1)![0].onRangeChange?.([100.25, 100.5]))
+    expect(minimum).toHaveValue(100.25)
+    expect(maximum).toHaveValue(100.5)
+    act(() => plot.mock.calls.at(-1)![0].onRangeChange?.([null, null]))
+    expect(plot.mock.calls.at(-1)![0].range).toEqual([null, null])
+    expect(minimum).toHaveValue(100)
+    expect(maximum).toHaveValue(101)
+  })
+})
 
 describe("spectrum viewer export", () => {
   it("opens the current-data export from its header menu and respects permission and pending state", async () => {

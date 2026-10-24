@@ -16,6 +16,8 @@ type Handoff = {
   data: Trace[]
   config: Record<string, unknown>
   onClick?: (event: { points?: Array<{ x?: unknown; y?: unknown }> }) => void
+  onRelayout?: (event: Record<string, unknown>) => void
+  onInitialized?: (figure: unknown, graph: { layout?: { xaxis?: { range?: unknown } } }) => void
   layout: {
     xaxis: { title: { text: string }; showgrid?: boolean; range?: Array<number | null>; autorange?: boolean | "min" | "max" }
     yaxis: { title: { text: string }; showgrid?: boolean }
@@ -415,6 +417,47 @@ describe("AthenaPlot range overrides", () => {
   ] as const)("supports automatic and one-sided bounds: $range", ({ range, axis }) => {
     show({ range: [...range] })
     expect(handoff().layout.xaxis).toMatchObject(axis)
+  })
+
+  it("reports zoom, pan and reset limits back so the range fields show the drawn axis", () => {
+    const onRangeChange = vi.fn()
+    show({ range: [3, 12], onRangeChange })
+    handoff().onRelayout?.({ "xaxis.range[0]": 3.274519837401, "xaxis.range[1]": 8.123456789, "yaxis.range[0]": -2, "yaxis.range[1]": 2 })
+    expect(onRangeChange).toHaveBeenLastCalledWith([3.27452, 8.12346])
+    handoff().onRelayout?.({ "xaxis.range": [8.5, 4.25] })
+    expect(onRangeChange).toHaveBeenLastCalledWith([8.5, 4.25])
+    handoff().onRelayout?.({ "xaxis.autorange": true, "yaxis.autorange": true })
+    expect(onRangeChange).toHaveBeenLastCalledWith([null, null])
+    onRangeChange.mockClear()
+    handoff().onRelayout?.({ "yaxis.range[0]": -1, "yaxis.range[1]": 1 })
+    handoff().onRelayout?.({ autosize: true })
+    handoff().onRelayout?.({ "xaxis.range[0]": "3", "xaxis.range[1]": 12 })
+    expect(onRangeChange).not.toHaveBeenCalled()
+  })
+
+  it("reports the autoscaled R range, because blank R limits mean the default window", () => {
+    const onRangeChange = vi.fn()
+    show({ space: "R", range: [1, 3], onRangeChange })
+    handoff().onInitialized?.({}, { layout: { xaxis: { range: [0, 10.2] } } })
+    handoff().onRelayout?.({ "xaxis.autorange": true })
+    expect(onRangeChange).toHaveBeenLastCalledWith([0, 10.2])
+  })
+
+  it("leaves the spectrum range alone while an analysis is drawn", () => {
+    const onRangeChange = vi.fn()
+    show({ analysisVisible: true, analysis: { kind: "pca", project_version: 1, group_ids: ["Sample"], options: {}, result: { explained_variance_ratio: [0.9, 0.1] } }, onRangeChange })
+    handoff().onRelayout?.({ "xaxis.range[0]": 1, "xaxis.range[1]": 2 })
+    expect(onRangeChange).not.toHaveBeenCalled()
+  })
+
+  it("keeps Plotly's view revision when only the range changes, so a synced zoom keeps its vertical zoom", () => {
+    const view = show({ range: [3, 12] })
+    const revision = handoff().layout.uirevision
+    const sample = group()
+    view.rerender(<AthenaPlot groups={[sample]} active={sample} space="E" energyMode="mu" component="mag" background={false} window={false} offset={0}
+      analysis={null} analysisVisible={false} range={[4, 8]} />)
+    expect(handoff().layout.xaxis).toMatchObject({ range: [4, 8] })
+    expect(handoff().layout.uirevision).toBe(revision)
   })
 
   it("resets Plotly zoom for a new plot scope or individual spectrum while retaining comparison zoom on highlight changes", () => {

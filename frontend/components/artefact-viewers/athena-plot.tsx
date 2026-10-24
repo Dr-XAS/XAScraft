@@ -22,6 +22,8 @@ interface Props {
   onShowGridChange?: (show: boolean) => void; onShowDataPointsChange?: (show: boolean) => void; onOptionsMenuOpen?: () => void
   colorSettings?: PlotColorSettings
   analysis: Analysis | null; analysisVisible: boolean; range: [number | null, number | null]
+  // Receives the horizontal limits after Plotly zooms, pans, resets or autoscales.
+  onRangeChange?: (range: [number | null, number | null]) => void
   // The series-LCF target whose fit is drawn: one observed curve, its fit and residual.
   seriesTarget?: string
   picking?: boolean; onPickX?: (x: number, space: Space) => void
@@ -84,7 +86,7 @@ function backgroundInSplineRange(group: AthenaGroup, energy: number[], backgroun
   return { x: [first.x, ...energy.slice(start, end), last.x], y: [first.y, ...background.slice(start, end), last.y] }
 }
 
-export function AthenaPlot({ groups, active, space, energyMode, background, window: showWindow, component = "mag", components, offset, plotScope = "selected", preEdge = false, postEdge = false, showLegend = true, showGrid = true, showDataPoints = false, onShowGridChange, onShowDataPointsChange, onOptionsMenuOpen, kWeight = null, colorSettings = defaultPlotColors, analysis, analysisVisible, range, picking = false, onPickX, seriesTarget }: Props) {
+export function AthenaPlot({ groups, active, space, energyMode, background, window: showWindow, component = "mag", components, offset, plotScope = "selected", preEdge = false, postEdge = false, showLegend = true, showGrid = true, showDataPoints = false, onShowGridChange, onShowDataPointsChange, onOptionsMenuOpen, kWeight = null, colorSettings = defaultPlotColors, analysis, analysisVisible, range, onRangeChange, picking = false, onPickX, seriesTarget }: Props) {
   const plotRef = useRef<HTMLDivElement>(null)
   const [plotWidth, setPlotWidth] = useState(0)
   const [optionsMenu, setOptionsMenu] = useState<PlotOptionsMenu | null>(null)
@@ -341,7 +343,10 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       yaxis: { title: { text: yTitle, standoff: 15 }, showgrid: showGrid, gridcolor: "#edf0ed", zerolinecolor: "#d8ded8", showline: true, linecolor: "#bdc8c0", ticks: "outside", automargin: true },
       ...(y2Title ? { yaxis2: { title: { text: y2Title, standoff: 15 }, overlaying: "y", tickmode: "auto", side: "right", showgrid: false, automargin: true } } : {}),
       showlegend: showLegend, legend: { orientation: "v", x: 0.99, xanchor: "right", y: 0.99, yanchor: "top", maxheight: 1, bgcolor: "rgba(0,0,0,0)" },
-      hovermode: "closest", uirevision: `${space}-${energyMode}-${componentKey}-${analysisVisible}-${[rangeStart, rangeEnd].join()}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`,
+      // The range stays out of the revision: a new revision drops every GUI edit, so
+      // syncing a box zoom into the range fields would also undo its vertical zoom.
+      // Plotly still applies a typed range, because it differs from the zoomed one.
+      hovermode: "closest", uirevision: `${space}-${energyMode}-${componentKey}-${analysisVisible}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`,
     }
   }, [xTitle, yTitle, y2Title, e0, showGrid, analysisVisible, showLegend, space, energyMode, componentKey, rangeStart, rangeEnd, plotScope, activeId, kWeight])
   const descriptionId = useId()
@@ -375,6 +380,29 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
     if (current.data !== plotData || current.space !== space) return
     if (current.canPick && typeof x === "number" && Number.isFinite(x)) current.onPickX?.(x, space)
   }, [plotData, space])
+  // Report Plotly's zooms, pans, resets and autoscales back, so the range fields
+  // show the axis it draws. Like the picker, the retained listener reads committed state.
+  const graph = useRef<{ layout?: { xaxis?: { range?: unknown } } } | null>(null)
+  const rangeState = useRef({ onRangeChange, analysisVisible, space, data: plotData })
+  useLayoutEffect(() => { rangeState.current = { onRangeChange, analysisVisible, space, data: plotData } }, [onRangeChange, analysisVisible, space, plotData])
+  const onPlotInitialized = useCallback<NonNullable<ComponentProps<typeof Plot>["onInitialized"]>>((_figure, graphDiv) => {
+    graph.current = graphDiv as unknown as typeof graph.current
+  }, [])
+  const onPlotRelayout = useCallback<NonNullable<ComponentProps<typeof Plot>["onRelayout"]>>(event => {
+    const current = rangeState.current
+    if (!current.onRangeChange || current.analysisVisible || current.data !== plotData || current.space !== space) return
+    const finite = (pair: unknown): pair is [number, number] =>
+      Array.isArray(pair) && pair.length === 2 && pair.every(value => typeof value === "number" && Number.isFinite(value))
+    const limits = (pair: [number, number]): [number, number] => [Number(pair[0].toPrecision(6)), Number(pair[1].toPrecision(6))]
+    const zoomed = Array.isArray(event["xaxis.range"]) ? event["xaxis.range"] : [event["xaxis.range[0]"], event["xaxis.range[1]"]]
+    if (finite(zoomed)) current.onRangeChange(limits(zoomed))
+    else if (event["xaxis.autorange"]) {
+      // Blank limits autorange, except in R, where they mean the default window.
+      const drawn = graph.current?.layout?.xaxis?.range
+      if (space !== "R") current.onRangeChange([null, null])
+      else if (finite(drawn)) current.onRangeChange(limits(drawn))
+    }
+  }, [plotData, space])
   if (!hasData) return <><div ref={plotRef} className="ath-no-plot" data-testid="athena-plot" aria-label={`${space}-space spectrum plot`} {...plotInteraction}><span>{space}</span><h3>{noSelection ? "No spectra selected" : noComponents ? "No components selected" : groups.length ? "No data in this plot space" : "Your spectra, in perspective."}<SectionHelp label="Spectrum plot">{noSelection ? "Check data to compare spectra. The Single spectrum viewer shows the highlighted data." : noComponents ? "Select Magnitude, Real, Imaginary, or Phase above to display the spectrum." : groups.length ? "Check the data type and processing parameters, or select another plot space." : "Import a spectrum or load the copper examples to begin."}</SectionHelp></h3></div>{options}</>
-  return <><div ref={plotRef} className={`ath-plot${canPick ? " ath-picking" : ""}`} data-testid="athena-plot" aria-describedby={descriptionId} aria-label={`${space}-space spectrum plot`} {...plotInteraction}><Plot data={plotData} onClick={onPlotClick} layout={layout} config={config} useResizeHandler style={{ width: "100%", height: "100%" }} /><span id={descriptionId} className="ath-sr-only">{description}</span></div>{options}</>
+  return <><div ref={plotRef} className={`ath-plot${canPick ? " ath-picking" : ""}`} data-testid="athena-plot" aria-describedby={descriptionId} aria-label={`${space}-space spectrum plot`} {...plotInteraction}><Plot data={plotData} onClick={onPlotClick} onInitialized={onPlotInitialized} onRelayout={onPlotRelayout} layout={layout} config={config} useResizeHandler style={{ width: "100%", height: "100%" }} /><span id={descriptionId} className="ath-sr-only">{description}</span></div>{options}</>
 }
