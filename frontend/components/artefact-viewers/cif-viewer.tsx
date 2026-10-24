@@ -6,7 +6,7 @@ import type { AtomSpec, GLViewer } from "3dmol"
 import { downloadArtemisText, type ArtemisStructure } from "@/lib/artemis-structures"
 import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 import { buildCifGeometry, CIF_VIEWER_DEFAULT_RADIUS, CIF_VIEWER_MAX_CELL_REPEATS, CIF_VIEWER_MAX_RADIUS, CIF_VIEWER_MIN_RADIUS, type CifVector } from "@/lib/cif-viewer"
-import { clearCifHover, createCifRenderer } from "@/lib/cif-renderer"
+import { clearCifHover, createCifRenderer, viewerLoadError } from "@/lib/cif-renderer"
 import { bindCifAtomPicking, drawCifMeasurement, measurementAngle, measurementDistance } from "@/lib/cif-measurement"
 import { cifAtomStyle, cifElementColor, CIF_BOND_COLOR, CIF_BOND_RADIUS, CIF_SPHERE_RADIUS } from "@/lib/cif-viewer-style"
 import { firstShellAtoms, isShellAtom } from "@/lib/first-shell"
@@ -148,8 +148,8 @@ export function CifViewer({ structure, structureControls, selectedSite, onSiteCh
       instance.setHoverDuration(80)
       viewer.current = instance
       setReady(true)
-    }).catch(() => {
-      if (!disposed) setError("Unable to load the 3D viewer. Check that WebGL is enabled, then retry.")
+    }).catch(error => {
+      if (!disposed) setError(viewerLoadError(error, "Unable to load the 3D viewer. Check that WebGL is enabled, then retry."))
     })
     return () => {
       disposed = true

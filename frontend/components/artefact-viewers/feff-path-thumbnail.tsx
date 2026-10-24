@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { Expand, RotateCcw, X } from "lucide-react"
 import type { GLViewer, Vector2 } from "3dmol"
 import type { ArtemisPathMetadata } from "@/lib/artemis"
-import { createCifRenderer } from "@/lib/cif-renderer"
+import { createCifRenderer, viewerLoadError } from "@/lib/cif-renderer"
 import { buildFeffPathGeometry } from "@/lib/feff-path-geometry"
 import { resolveFeffPathEquivalents } from "@/lib/feff-path-equivalents"
 import { resolveFeffStructureContext } from "@/lib/feff-structure-context"
@@ -176,7 +176,7 @@ function PathPreviewDialog({ entry, theme, savedView, onClose }: { entry: Entry;
       labelOffset.current = new mol.Vector2(16, 16)
       instance.viewer.setHoverDuration(80)
       setReady(true)
-    }).catch(() => { if (!cancelled) setError("Unable to open the 3D preview. Enable WebGL, then retry.") })
+    }).catch(error => { if (!cancelled) setError(viewerLoadError(error, "Unable to open the 3D preview. Enable WebGL, then retry.")) })
     return () => {
       cancelled = true
       if (renderer.current) lastView.current = camera(renderer.current.viewer) ?? lastView.current

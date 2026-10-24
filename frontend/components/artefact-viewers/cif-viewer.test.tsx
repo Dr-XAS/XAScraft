@@ -555,6 +555,13 @@ describe("CifViewer", () => {
     expect(createViewer).toHaveBeenCalledTimes(2)
   })
 
+  it("asks for a reload, not WebGL, when a deploy removed the viewer's code", async () => {
+    createViewer.mockImplementationOnce(() => { throw Object.assign(new Error("Loading chunk 3dmol failed."), { name: "ChunkLoadError" }) })
+    render(<CifViewer structure={structure()} />)
+    expect(await screen.findByRole("alert")).toHaveTextContent("This page is out of date. Reload it to load the 3D viewer.")
+    expect(screen.getByRole("alert")).not.toHaveTextContent("WebGL")
+  })
+
   it("releases the failed renderer and retries a rendering failure", async () => {
     const broken = renderer()
     broken.addModel.mockImplementationOnce(() => { throw new Error("Bad model") })

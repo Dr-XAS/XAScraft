@@ -3,7 +3,7 @@
 import { SectionHelp } from "./section-help"
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react"
 import type { GLViewer, Vector2 } from "3dmol"
-import { createCifRenderer } from "@/lib/cif-renderer"
+import { createCifRenderer, viewerLoadError } from "@/lib/cif-renderer"
 import { downloadViewerDataUrl } from "@/lib/viewer-image-export"
 import { drawFeffScene, feffSceneAtoms, type FeffContextAtom, type FeffScenePath } from "@/lib/feff-scene"
 import { AtomLegend } from "./atom-legend"
@@ -76,7 +76,7 @@ export function FeffPathScene({ paths, activePathId, selectedLeg, context = EMPT
       renderedContext.current = null
       renderer.viewer.setHoverDuration(80)
       setReady(true)
-    }).catch(() => { if (!cancelled) setError("Unable to load the 3D viewer. Enable WebGL, then retry. Path coordinates remain available below.") })
+    }).catch(error => { if (!cancelled) setError(`${viewerLoadError(error, "Unable to load the 3D viewer. Enable WebGL, then retry.")} Path coordinates remain available below.`) })
     return () => {
       cancelled = true
       viewer.current = null

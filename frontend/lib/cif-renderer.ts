@@ -12,6 +12,16 @@ type RendererResources = {
 }
 type ViewerCanvas = HTMLCanvasElement & { _3dmol_viewer?: GLViewer }
 
+/**
+ * A deploy removes the old build's chunks, so 3Dmol fails to load until the
+ * page reloads. WebGL advice would send the scientist the wrong way then.
+ */
+export function viewerLoadError(error: unknown, otherwise: string): string {
+  const chunkMissing = error instanceof Error && (error.name === "ChunkLoadError"
+    || /Failed to fetch dynamically imported module|Importing a module script failed/i.test(error.message))
+  return chunkMissing ? "This page is out of date. Reload it to load the 3D viewer." : otherwise
+}
+
 /** 3Dmol does not reset hover on scene clear or when the pointer leaves its canvas. */
 export function clearCifHover(viewer: GLViewer, clearLabels: () => void = () => viewer.removeAllLabels()) {
   const resources = viewer as unknown as RendererResources

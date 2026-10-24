@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { GLViewer, ViewerSpec } from "3dmol"
-import { clearCifHover, createCifRenderer } from "./cif-renderer"
+import { clearCifHover, createCifRenderer, viewerLoadError } from "./cif-renderer"
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); document.body.replaceChildren() })
 
@@ -107,5 +107,19 @@ describe("CIF renderer lifecycle", () => {
     expect(dispose).not.toThrow()
     expect(fixture.loseContext).toHaveBeenCalledTimes(1)
     expect(fixture.host.children).toHaveLength(0)
+  })
+})
+
+describe("viewerLoadError", () => {
+  const webgl = "Unable to load the 3D viewer. Check that WebGL is enabled, then retry."
+  it("asks for a reload when the viewer's code is gone after a deploy", () => {
+    const outdated = "This page is out of date. Reload it to load the 3D viewer."
+    expect(viewerLoadError(Object.assign(new Error("Loading chunk 812 failed."), { name: "ChunkLoadError" }), webgl)).toBe(outdated)
+    expect(viewerLoadError(new TypeError("Failed to fetch dynamically imported module: /_next/static/chunks/3dmol.js"), webgl)).toBe(outdated)
+    expect(viewerLoadError(new TypeError("Importing a module script failed."), webgl)).toBe(outdated)
+  })
+  it("keeps the caller's advice for any other failure", () => {
+    expect(viewerLoadError(new Error("No WebGL context"), webgl)).toBe(webgl)
+    expect(viewerLoadError("failed", webgl)).toBe(webgl)
   })
 })
