@@ -1,4 +1,4 @@
-import type { AtomSpec, GLViewer } from "3dmol"
+import type { AtomSpec, GLViewer, LabelSpec } from "3dmol"
 
 type Point = { x: number; y: number; z: number }
 export const measurementDistance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -12,9 +12,11 @@ export function measurementAngle(a: Point, b: Point, c: Point): number | null {
   return Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI
 }
 
+const SELECTION_RADIUS = 0.62
+
 function selectionOutline(viewer: GLViewer, center: Point, color: string) {
   const vertexArr: Point[] = [], normalArr: Point[] = [], faceArr: number[] = []
-  const rings = 16, segments = 32, radius = 0.62
+  const rings = 16, segments = 32, radius = SELECTION_RADIUS
   for (let ring = 0; ring <= rings; ring++) {
     const theta = Math.PI * ring / rings
     for (let segment = 0; segment <= segments; segment++) {
@@ -33,32 +35,126 @@ function selectionOutline(viewer: GLViewer, center: Point, color: string) {
   return viewer.addCustom({ vertexArr, normalArr, faceArr, color, opacity: 1, side: 1 })
 }
 
+type Screen = { x: number; y: number }
+type Box = { left: number; top: number; right: number; bottom: number }
+/** A tag in CSS pixels: the side it prefers, and how far its near edge must stay from its anchor. */
+export type MeasurementLabelRequest = { anchor: Screen; width: number; height: number; direction: Screen; clearance: number }
+
+const DIRECTIONS = Array.from({ length: 16 }, (_, index) => ({ x: Math.cos(index * Math.PI / 8), y: Math.sin(index * Math.PI / 8) }))
+const unit = (vector: Screen) => {
+  const length = Math.hypot(vector.x, vector.y)
+  return length > 1e-6 ? { x: vector.x / length, y: vector.y / length } : null
+}
+// How far a candidate must move to clear a placed tag or a selected atom.
+function boxDepth(a: Box, b: Box) {
+  const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+  return x > 0 && y > 0 ? Math.min(x, y) : 0
+}
+function discDepth(box: Box, disc: Screen & { radius: number }) {
+  const dx = Math.max(box.left - disc.x, 0, disc.x - box.right), dy = Math.max(box.top - disc.y, 0, disc.y - box.bottom)
+  return Math.max(0, disc.radius - Math.hypot(dx, dy))
+}
+
+/** Tag centers in request order: each beside its anchor, clear of the tags placed before
+ * it and of the selected atoms, or the least covered spot when nothing nearby is clear.
+ */
+export function layoutMeasurementLabels(requests: MeasurementLabelRequest[], atoms: (Screen & { radius: number })[]) {
+  const placed: Box[] = []
+  return requests.map(request => {
+    const preferred = unit(request.direction) ?? { x: 0, y: -1 }
+    let best = { center: request.anchor, depth: Infinity, cost: Infinity }
+    for (let step = 0; step < 16; step++) {
+      const reach = request.clearance + 3 * step
+      for (const direction of DIRECTIONS) {
+        // Put the tag's near edge `reach` pixels out along this direction.
+        const extent = Math.abs(direction.x) * request.width / 2 + Math.abs(direction.y) * request.height / 2
+        const center = { x: request.anchor.x + direction.x * (reach + extent), y: request.anchor.y + direction.y * (reach + extent) }
+        const box = { left: center.x - request.width / 2 - 1, right: center.x + request.width / 2 + 1, top: center.y - request.height / 2 - 1, bottom: center.y + request.height / 2 + 1 }
+        const depth = placed.reduce((sum, other) => sum + boxDepth(box, other), 0) + atoms.reduce((sum, atom) => sum + discDepth(box, atom), 0)
+        const cost = reach + 10 * Math.acos(Math.max(-1, Math.min(1, direction.x * preferred.x + direction.y * preferred.y)))
+        if (depth < best.depth - 1e-6 || (depth <= best.depth + 1e-6 && cost < best.cost)) best = { center, depth, cost }
+      }
+    }
+    placed.push({ left: best.center.x - request.width / 2, right: best.center.x + request.width / 2, top: best.center.y - request.height / 2, bottom: best.center.y + request.height / 2 })
+    return best.center
+  })
+}
+
 /** Own only measurement objects: hover and the structure keep their own lifetimes. */
 export function drawCifMeasurement(viewer: GLViewer, atoms: Point[]) {
-  const labels: ReturnType<GLViewer["addLabel"]>[] = []
+  type Tag = { label: ReturnType<GLViewer["addLabel"]>; position: Point; rank: number; direction: (screen: Screen[]) => Screen; clearance: (radius: number[]) => number }
+  const tags: Tag[] = []
   const shapes: ReturnType<GLViewer["addSphere"]>[] = []
   const color = "#7c3aed"
-  const label = (text: string, position: Point, alignment = "bottomCenter") => labels.push(viewer.addLabel(text, {
-    position, fontSize: 12, fontColor: "white", backgroundColor: color,
-    backgroundOpacity: 0.95, inFront: true, alignment,
-  }))
+  const tag = (text: string, position: Point, rank: number, direction: Tag["direction"], clearance: Tag["clearance"]) => tags.push({
+    label: viewer.addLabel(text, {
+      position, fontSize: 12, fontColor: "white", backgroundColor: color, backgroundOpacity: 0.95, inFront: true,
+      alignment: "center", screenOffset: { x: 0, y: 0 } as NonNullable<LabelSpec["screenOffset"]>,
+    }), position, rank, direction, clearance,
+  })
+  const toward = (from: Screen, to: Screen) => ({ x: to.x - from.x, y: to.y - from.y })
   atoms.forEach((atom, index) => {
     shapes.push(selectionOutline(viewer, atom, color))
-    label(String(index + 1), { x: atom.x, y: atom.y + 0.55, z: atom.z })
+    // Atom numbers point away from the middle of the selection.
+    tag(String(index + 1), atom, 0, screen => toward({
+      x: screen.reduce((sum, point) => sum + point.x, 0) / screen.length, y: screen.reduce((sum, point) => sum + point.y, 0) / screen.length,
+    }, screen[index]), radius => radius[index] + 2)
     if (index === 0) return
     const previous = atoms[index - 1]
     shapes.push(viewer.addLine({ start: previous, end: atom, color, dashed: true }))
-    label(`${measurementDistance(previous, atom).toFixed(3)} Å`, {
+    // Distances sit off their line, on the side away from the third atom (or above it).
+    tag(`${measurementDistance(previous, atom).toFixed(3)} Å`, {
       x: (previous.x + atom.x) / 2, y: (previous.y + atom.y) / 2, z: (previous.z + atom.z) / 2,
-    }, index === 1 ? "bottomLeft" : "topRight")
+    }, 2, screen => {
+      const start = screen[index - 1], end = screen[index], normal = { x: start.y - end.y, y: end.x - start.x }
+      const other = atoms.length === 3 ? screen[index === 1 ? 2 : 0] : null
+      const side = other ? (other.x - start.x) * normal.x + (other.y - start.y) * normal.y : normal.y || -normal.x
+      return side > 0 ? { x: -normal.x, y: -normal.y } : normal
+    }, () => 3)
   })
   if (atoms.length === 3) {
     const angle = measurementAngle(atoms[0], atoms[1], atoms[2])
-    if (angle !== null) label(`∠ ${angle.toFixed(2)}°`, { x: atoms[1].x, y: atoms[1].y - 0.65, z: atoms[1].z }, "topCenter")
+    // The angle sits inside its arms, past the vertex atom.
+    if (angle !== null) tag(`∠ ${angle.toFixed(2)}°`, atoms[1], 1, screen => {
+      const [a, c] = [toward(screen[1], screen[0]), toward(screen[1], screen[2])].map(arm => unit(arm) ?? { x: 0, y: 0 })
+      return { x: a.x + c.x, y: a.y + c.y }
+    }, radius => radius[1] + 2)
   }
+  // 3Dmol draws tags at a fixed pixel size, so they are laid out on screen. Offsets point up.
+  const layout = () => {
+    const screen: Screen[] = viewer.modelToScreen(atoms)
+    const radius = atoms.map((atom, index) => Math.max(...[[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(([x, y, z]) => {
+      const [edge]: Screen[] = viewer.modelToScreen([{ x: atom.x + SELECTION_RADIUS * x, y: atom.y + SELECTION_RADIUS * y, z: atom.z + SELECTION_RADIUS * z }])
+      return Math.hypot(edge.x - screen[index].x, edge.y - screen[index].y)
+    })))
+    const anchors: Screen[] = viewer.modelToScreen(tags.map(item => item.position))
+    const order = tags.map((_, index) => index).sort((a, b) => tags[a].rank - tags[b].rank)
+    const centers = layoutMeasurementLabels(order.map(index => ({
+      anchor: anchors[index], width: tags[index].label.canvas.width, height: tags[index].label.canvas.height,
+      direction: tags[index].direction(screen), clearance: tags[index].clearance(radius),
+    })), screen.map((point, index) => ({ ...point, radius: radius[index] })))
+    let moved = false
+    order.forEach((index, position) => {
+      const offset = tags[index].label.sprite.material?.screenOffset
+      const x = centers[position].x - anchors[index].x, y = anchors[index].y - centers[position].y
+      if (!offset || (Math.abs(offset.x - x) < 0.5 && Math.abs(offset.y - y) < 0.5)) return
+      offset.x = x
+      offset.y = y
+      moved = true
+    })
+    return moved
+  }
+  layout()
   viewer.render()
+  let frame = 0
+  // Every render reports a view change; only a tag that moved needs another render.
+  viewer.setViewChangeCallback(() => {
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (layout()) viewer.render() })
+  })
   return () => {
-    labels.forEach(item => viewer.removeLabel(item))
+    if (frame) cancelAnimationFrame(frame)
+    viewer.setViewChangeCallback(null)
+    tags.forEach(item => viewer.removeLabel(item.label))
     shapes.forEach(item => viewer.removeShape(item))
     viewer.render()
   }
