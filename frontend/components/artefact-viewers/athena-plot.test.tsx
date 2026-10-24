@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest"
 import type { ComponentProps } from "react"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { AthenaGroup, Parameters } from "@/lib/athena"
@@ -441,6 +441,21 @@ describe("AthenaPlot range overrides", () => {
     handoff().onInitialized?.({}, { layout: { xaxis: { range: [0, 10.2] } } })
     handoff().onRelayout?.({ "xaxis.autorange": true })
     expect(onRangeChange).toHaveBeenLastCalledWith([0, 10.2])
+  })
+
+  it("keeps the autoscaled range beside autorange, so Plotly's zoom buttons start from the drawn axis", () => {
+    const samples = [group()], others = [group("Other")]
+    const plot = (range: [number | null, number | null], groups = samples) => <AthenaPlot groups={groups} active={groups[0]} space="k"
+      energyMode="mu" component="mag" background={false} window={false} offset={0} analysis={null} analysisVisible={false}
+      range={range} onRangeChange={() => {}} />
+    const view = render(plot([3, 12]))
+    handoff().onInitialized?.({}, { layout: { xaxis: { range: [0, 4] } } })
+    act(() => handoff().onRelayout?.({ "xaxis.autorange": true, "yaxis.autorange": true }))
+    view.rerender(plot([null, null]))
+    expect(handoff().layout.xaxis).toMatchObject({ autorange: true, range: [0, 4] })
+    view.rerender(plot([null, null], others))
+    expect(handoff().layout.xaxis).toMatchObject({ autorange: true })
+    expect(handoff().layout.xaxis.range).toBeUndefined()
   })
 
   it("leaves the spectrum range alone while an analysis is drawn", () => {

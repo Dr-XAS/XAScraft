@@ -322,9 +322,14 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
   ]} />
   const rangeStart = range[0] ?? (space === "R" ? DEFAULT_R_PLOT_RANGE[0] : null)
   const rangeEnd = range[1] ?? (space === "R" ? DEFAULT_R_PLOT_RANGE[1] : null)
+  // Plotly keeps a GUI edit only while the layout value stays the same. After its
+  // autoscale is synced, bare autorange would leave its range at the [-1, 6]
+  // placeholder that Zoom in and Zoom out start from, so the drawn range goes with it.
+  const [autoscaled, setAutoscaled] = useState<{ data: typeof plotData; space: Space; range: [number, number] } | null>(null)
+  const autoscaledRange = !analysisVisible && autoscaled?.data === plotData && autoscaled.space === space ? autoscaled.range : null
   const layout = useMemo(() => {
     const xRange = analysisVisible || (rangeStart === null && rangeEnd === null)
-      ? { autorange: true as const }
+      ? { autorange: true as const, ...(autoscaledRange && { range: autoscaledRange }) }
       : rangeStart !== null && rangeEnd !== null
         ? { range: [rangeStart, rangeEnd] }
         : rangeStart !== null
@@ -348,7 +353,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       // Plotly still applies a typed range, because it differs from the zoomed one.
       hovermode: "closest", uirevision: `${space}-${energyMode}-${componentKey}-${analysisVisible}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`,
     }
-  }, [xTitle, yTitle, y2Title, e0, showGrid, analysisVisible, showLegend, space, energyMode, componentKey, rangeStart, rangeEnd, plotScope, activeId, kWeight])
+  }, [xTitle, yTitle, y2Title, e0, showGrid, analysisVisible, showLegend, space, energyMode, componentKey, rangeStart, rangeEnd, autoscaledRange, plotScope, activeId, kWeight])
   const descriptionId = useId()
   const description = useMemo(() => {
     const traces = data.map(trace => {
@@ -399,8 +404,10 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
     else if (event["xaxis.autorange"]) {
       // Blank limits autorange, except in R, where they mean the default window.
       const drawn = graph.current?.layout?.xaxis?.range
-      if (space !== "R") current.onRangeChange([null, null])
-      else if (finite(drawn)) current.onRangeChange(limits(drawn))
+      if (space !== "R") {
+        setAutoscaled(finite(drawn) ? { data: plotData, space, range: [drawn[0], drawn[1]] } : null)
+        current.onRangeChange([null, null])
+      } else if (finite(drawn)) current.onRangeChange(limits(drawn))
     }
   }, [plotData, space])
   if (!hasData) return <><div ref={plotRef} className="ath-no-plot" data-testid="athena-plot" aria-label={`${space}-space spectrum plot`} {...plotInteraction}><span>{space}</span><h3>{noSelection ? "No spectra selected" : noComponents ? "No components selected" : groups.length ? "No data in this plot space" : "Your spectra, in perspective."}<SectionHelp label="Spectrum plot">{noSelection ? "Check data to compare spectra. The Single spectrum viewer shows the highlighted data." : noComponents ? "Select Magnitude, Real, Imaginary, or Phase above to display the spectrum." : groups.length ? "Check the data type and processing parameters, or select another plot space." : "Import a spectrum or load the copper examples to begin."}</SectionHelp></h3></div>{options}</>
