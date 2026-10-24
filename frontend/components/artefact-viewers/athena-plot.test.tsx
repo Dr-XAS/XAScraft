@@ -19,7 +19,7 @@ type Handoff = {
   onRelayout?: (event: Record<string, unknown>) => void
   onInitialized?: (figure: unknown, graph: { layout?: { xaxis?: { range?: unknown } } }) => void
   layout: {
-    xaxis: { title: { text: string }; showgrid?: boolean; range?: Array<number | null>; autorange?: boolean | "min" | "max" }
+    xaxis: { title: { text: string }; showgrid?: boolean; range?: Array<number | null>; autorange?: boolean | "min" | "max"; uirevision?: string }
     yaxis: { title: { text: string }; showgrid?: boolean }
     yaxis2?: { title: { text: string } }
     showlegend: boolean
@@ -473,6 +473,27 @@ describe("AthenaPlot range overrides", () => {
       analysis={null} analysisVisible={false} range={[4, 8]} />)
     expect(handoff().layout.xaxis).toMatchObject({ range: [4, 8] })
     expect(handoff().layout.uirevision).toBe(revision)
+  })
+
+  it("gives the x axis a new revision for new limits, so Plotly applies a one-sided limit after autoscaling", () => {
+    // With the shared revision alone, Plotly kept its autoscaled 0–25 over a typed
+    // minimum, because a one-sided limit leaves autorange set.
+    const sample = group()
+    const plot = (range: [number | null, number | null], space: "E" | "k" = "k") => <AthenaPlot groups={[sample]} active={sample} space={space}
+      energyMode="mu" component="mag" background={false} window={false} offset={0} analysis={null} analysisVisible={false} range={range} />
+    const view = render(plot([null, null]))
+    const revision = handoff().layout.uirevision, automatic = handoff().layout.xaxis.uirevision
+    view.rerender(plot([3, null]))
+    expect(handoff().layout.xaxis).toMatchObject({ range: [3, null], autorange: "max" })
+    const typed = handoff().layout.xaxis.uirevision
+    expect(typed).not.toBe(automatic)
+    view.rerender(plot([6, null]))
+    expect(handoff().layout.xaxis.uirevision).not.toBe(typed)
+    expect(handoff().layout.uirevision).toBe(revision)
+    // A new plot space still resets the x axis.
+    view.rerender(plot([6, null], "E"))
+    expect(handoff().layout.uirevision).not.toBe(revision)
+    expect(handoff().layout.xaxis.uirevision).not.toBe(typed)
   })
 
   it("resets Plotly zoom for a new plot scope or individual spectrum while retaining comparison zoom on highlight changes", () => {

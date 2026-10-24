@@ -336,6 +336,7 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
           ? { range: [rangeStart, null], autorange: "max" as const }
           : { range: [null, rangeEnd], autorange: "min" as const }
     const showE0 = e0 !== null
+    const revision = `${space}-${energyMode}-${componentKey}-${analysisVisible}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`
     return {
       shapes: showE0 ? [{ type: "line", xref: "x", yref: "paper", x0: e0, x1: e0, y0: 0, y1: 1,
         line: { color: "#64748b", width: 1.5, dash: "dot" }, layer: "below" }] : [],
@@ -344,14 +345,15 @@ export function AthenaPlot({ groups, active, space, energyMode, background, wind
       autosize: true, margin: { l: 72, r: y2Title ? 72 : 25, t: 24, b: 60 }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff",
       font: { color: "#586661" },
       hoverlabel: { namelength: -1 },
-      xaxis: { title: { text: xTitle, standoff: 16 }, showgrid: showGrid, gridcolor: "#edf0ed", zerolinecolor: "#d8ded8", showline: true, linecolor: "#bdc8c0", ticks: "outside", ...xRange },
+      xaxis: { title: { text: xTitle, standoff: 16 }, showgrid: showGrid, gridcolor: "#edf0ed", zerolinecolor: "#d8ded8", showline: true, linecolor: "#bdc8c0", ticks: "outside", ...xRange, uirevision: `${revision}-${[rangeStart, rangeEnd].join()}` },
       yaxis: { title: { text: yTitle, standoff: 15 }, showgrid: showGrid, gridcolor: "#edf0ed", zerolinecolor: "#d8ded8", showline: true, linecolor: "#bdc8c0", ticks: "outside", automargin: true },
       ...(y2Title ? { yaxis2: { title: { text: y2Title, standoff: 15 }, overlaying: "y", tickmode: "auto", side: "right", showgrid: false, automargin: true } } : {}),
       showlegend: showLegend, legend: { orientation: "v", x: 0.99, xanchor: "right", y: 0.99, yanchor: "top", maxheight: 1, bgcolor: "rgba(0,0,0,0)" },
-      // The range stays out of the revision: a new revision drops every GUI edit, so
-      // syncing a box zoom into the range fields would also undo its vertical zoom.
-      // Plotly still applies a typed range, because it differs from the zoomed one.
-      hovermode: "closest", uirevision: `${space}-${energyMode}-${componentKey}-${analysisVisible}-${plotScope}-${plotScope === "current" ? activeId ?? "" : ""}-${kWeight ?? "auto"}`,
+      // The range stays out of this revision: a new one drops every GUI edit, so syncing
+      // a box zoom into the range fields would also undo its vertical zoom. The x axis
+      // gets its own revision keyed on the range instead. Without it, Plotly keeps an
+      // autoscaled axis over a one-sided limit, because that limit leaves autorange set.
+      hovermode: "closest", uirevision: revision,
     }
   }, [xTitle, yTitle, y2Title, e0, showGrid, analysisVisible, showLegend, space, energyMode, componentKey, rangeStart, rangeEnd, autoscaledRange, plotScope, activeId, kWeight])
   const descriptionId = useId()
