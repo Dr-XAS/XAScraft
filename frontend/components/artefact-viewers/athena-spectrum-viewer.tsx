@@ -1,7 +1,7 @@
 "use client"
 
 import { SectionHelp } from "../section-help"
-import { useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { isDifferenceGroup, type AthenaGroup, type Analysis } from "@/lib/athena"
 import { downloadArtemisText } from "@/lib/artemis-structures"
 import { viewerLabels } from "@/lib/athena-viewer-order"
@@ -15,7 +15,7 @@ import { spectrumDataCsv } from "./athena-spectrum-export"
 import type { ViewerExportItem } from "./viewer-export-menu"
 import { ViewerKWeightControl } from "./viewer-kweight-control"
 import { ViewerComplexComponents } from "./viewer-complex-components"
-import { ViewerControlField, ViewerControlGroup, ViewerDisplayControls, ViewerToggle } from "./viewer-display-controls"
+import { ViewerControlError, ViewerControlField, ViewerControlGroup, ViewerDisplayControls, ViewerToggle } from "./viewer-display-controls"
 import type { useAthenaPlotWeight } from "./athena-plot-weight"
 import type { useSpectrumViewerState } from "./athena-spectrum-viewer-state"
 
@@ -32,13 +32,15 @@ const plotSpaces = [
   { value: "R", label: "R", description: "Fourier" },
   { value: "q", label: "q", description: "Back transform" },
 ] as const
-function PlotRangeInput({ label, value, automatic, disabled, onChange }: {
+function PlotRangeInput({ label, value, automatic, disabled, errorId, onChange }: {
   label: string; value: number | null; automatic: number | null; disabled: boolean
+  // Set while the limits are out of order; names the message that says so.
+  errorId?: string
   onChange: (value: number | null) => void
 }) {
   const [emptyWhileEditing, setEmptyWhileEditing] = useState(false)
   const displayedValue = value ?? (!emptyWhileEditing ? automatic : null) ?? ""
-  return <input aria-label={label} type="number" step="any" disabled={disabled} value={displayedValue} onChange={event => {
+  return <input aria-label={label} type="number" step="any" disabled={disabled} aria-invalid={errorId ? true : undefined} aria-describedby={errorId} value={displayedValue} onChange={event => {
     setEmptyWhileEditing(event.target.value === "")
     onChange(event.target.value === "" ? null : Number(event.target.value))
   }} onBlur={() => setEmptyWhileEditing(false)} onKeyDown={event => {
@@ -97,6 +99,13 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
   const displayedRange = range.map(value => energyRangeValue(value, draftE0, relativeRange, -1)) as [number | null, number | null]
   const displayedAutomaticRange = automaticRange.map(value => energyRangeValue(value, draftE0, relativeRange, -1)) as [number | null, number | null]
   const absoluteRangeValue = (value: number | null) => energyRangeValue(value, draftE0, relativeRange, 1)
+  // A minimum at or above the maximum would draw a reversed axis. Until the limits are
+  // in order again, the fields say so and the plot keeps the last ordered range.
+  const rangeMinimum = range[0] ?? automaticRange[0], rangeMaximum = range[1] ?? automaticRange[1]
+  const rangeInverted = !showingAnalysis && rangeMinimum !== null && rangeMaximum !== null && rangeMinimum >= rangeMaximum
+  const [orderedRange, setOrderedRange] = useState(range)
+  if (!rangeInverted && orderedRange !== range) setOrderedRange(range)
+  const rangeErrorId = useId()
   const filename = `${viewer === "single" ? active?.label || "spectrum" : "marked-spectra"}-${showingAnalysis ? "analysis" : space}`
   const exportItems: ViewerExportItem[] = showingAnalysis && analysis ? [{
     id: "analysis-json", label: "Analysis data (JSON)",
@@ -133,7 +142,7 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
         {plotScope === "current" && <div className="ath-plot-current-spectrum"><div className="ath-plot-current-spectrum-name" title={active?.label}><span>{showingAnalysis && seriesTarget ? "Fitted target" : "Current spectrum"}</span><strong>{(showingAnalysis && seriesTarget?.label) || (active?.label ?? "None selected")}</strong></div></div>}
         {weightedPlot.loading ? <div className="ath-no-plot" role="status">Updating Fourier transform…</div>
           : weightedPlot.error ? <div className="ath-no-plot" role="alert"><p>{weightedPlot.error}</p><button type="button" onClick={weightedPlot.retry}>Try again</button></div>
-          : <AthenaPlot groups={weightedPlot.groups} active={active} space={space} energyMode={plotEnergyMode} component={component} components={components} plotScope={plotScope} background={background && canShowBackground} preEdge={preEdge && canShowPreEdge} postEdge={postEdge && canShowPostEdge} window={showWindow} showLegend={showLegend} showGrid={showGrid} showDataPoints={showDataPoints} onShowGridChange={setShowGrid} onShowDataPointsChange={setShowDataPoints} onOptionsMenuOpen={onOptionsMenuOpen} colorSettings={plotColors} kWeight={viewerKWeight} offset={offset} analysis={analysis} analysisVisible={showingAnalysis} seriesTarget={seriesTarget?.id} range={range} onRangeChange={setRange} picking={!!onPickX} onPickX={onPickX} />}
+          : <AthenaPlot groups={weightedPlot.groups} active={active} space={space} energyMode={plotEnergyMode} component={component} components={components} plotScope={plotScope} background={background && canShowBackground} preEdge={preEdge && canShowPreEdge} postEdge={postEdge && canShowPostEdge} window={showWindow} showLegend={showLegend} showGrid={showGrid} showDataPoints={showDataPoints} onShowGridChange={setShowGrid} onShowDataPointsChange={setShowDataPoints} onOptionsMenuOpen={onOptionsMenuOpen} colorSettings={plotColors} kWeight={viewerKWeight} offset={offset} analysis={analysis} analysisVisible={showingAnalysis} seriesTarget={seriesTarget?.id} range={rangeInverted ? orderedRange : range} onRangeChange={setRange} picking={!!onPickX} onPickX={onPickX} />}
         <ViewerDisplayControls label="Spectrum plot display options">
           <ViewerControlGroup label="Spectrum display" className="ath-plot-display-controls">
             <ViewerToggle label="Offset plot" checked={offset !== 0} disabled={plotScope === "current"}
@@ -151,7 +160,7 @@ export function AthenaSpectrumViewer({ viewer, state, weightedPlot, active, anal
             <ViewerToggle label="Show legend" help="Show each curve’s name beside the plot. Click a legend entry to hide a curve temporarily; double-click to isolate it." checked={showLegend} onChange={setShowLegend} />
           </ViewerControlGroup>
           <span className="ath-plot-summary">{showingAnalysis ? "Analysis result" : `${selectedGroups.length} ${selectedGroups.length === 1 ? "spectrum" : "spectra"}`}{space === "R" && !showingAnalysis && " · R is not phase corrected"}</span>
-          <ViewerControlGroup label="Spectrum plot range" align="end">{space === "E" && <ViewerToggle label="Relative to E₀" help="Enter the range limits as energy offsets from the current data’s E₀, in eV. The plotted energy axis remains absolute; this changes how the limits are entered." title={draftE0 === null ? "E₀ is unavailable for the current spectrum" : `Use the current spectrum’s E₀ (${draftE0} eV) as zero`} checked={relativeRange} disabled={showingAnalysis || draftE0 === null} onChange={setRangeRelativeToE0} />}<ViewerControlField label="Range" help={`Set the visible horizontal minimum and maximum in ${space === "E" ? "eV" : space === "R" ? "Å" : "Å⁻¹"}. ${space === "R" ? "Clear either bound to restore its default (0–6 Å)." : "Clear either bound to use the full available range."} These limits zoom the plot without trimming data or changing transform ranges.`}><PlotRangeInput label="Plot minimum" value={showingAnalysis ? null : displayedRange[0]} automatic={displayedAutomaticRange[0]} disabled={showingAnalysis || automaticRange[0] === null} onChange={value => setRange([absoluteRangeValue(value), range[1]])} /></ViewerControlField><span>to</span><PlotRangeInput label="Plot maximum" value={showingAnalysis ? null : displayedRange[1]} automatic={displayedAutomaticRange[1]} disabled={showingAnalysis || automaticRange[1] === null} onChange={value => setRange([range[0], absoluteRangeValue(value)])} /></ViewerControlGroup>
+          <ViewerControlGroup label="Spectrum plot range" align="end">{space === "E" && <ViewerToggle label="Relative to E₀" help="Enter the range limits as energy offsets from the current data’s E₀, in eV. The plotted energy axis remains absolute; this changes how the limits are entered." title={draftE0 === null ? "E₀ is unavailable for the current spectrum" : `Use the current spectrum’s E₀ (${draftE0} eV) as zero`} checked={relativeRange} disabled={showingAnalysis || draftE0 === null} onChange={setRangeRelativeToE0} />}<ViewerControlField label="Range" help={`Set the visible horizontal minimum and maximum in ${space === "E" ? "eV" : space === "R" ? "Å" : "Å⁻¹"}. ${space === "R" ? "Clear either bound to restore its default (0–6 Å)." : "Clear either bound to use the full available range."} These limits zoom the plot without trimming data or changing transform ranges.`}><PlotRangeInput label="Plot minimum" value={showingAnalysis ? null : displayedRange[0]} automatic={displayedAutomaticRange[0]} disabled={showingAnalysis || automaticRange[0] === null} errorId={rangeInverted ? rangeErrorId : undefined} onChange={value => setRange([absoluteRangeValue(value), range[1]])} /></ViewerControlField><span>to</span><PlotRangeInput label="Plot maximum" value={showingAnalysis ? null : displayedRange[1]} automatic={displayedAutomaticRange[1]} disabled={showingAnalysis || automaticRange[1] === null} errorId={rangeInverted ? rangeErrorId : undefined} onChange={value => setRange([range[0], absoluteRangeValue(value)])} />{rangeInverted && <ViewerControlError id={rangeErrorId}>Minimum must be less than maximum.</ViewerControlError>}</ViewerControlGroup>
         </ViewerDisplayControls>
       </ResizablePlotCard></ViewerPanel>
 }

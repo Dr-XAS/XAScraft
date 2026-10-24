@@ -60,6 +60,7 @@
 
 .controls select { width: auto; max-width: 100%; }
 .controls input[aria-invalid="true"] { border-color: var(--ath-error-line, #bd6549); }
+.error { color: var(--ath-error-ink, #9d3f2d); white-space: nowrap; }
 .controls input:disabled { opacity: .5; }
 
 .controls button {

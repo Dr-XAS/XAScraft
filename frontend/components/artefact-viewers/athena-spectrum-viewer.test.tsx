@@ -50,6 +50,32 @@ describe("spectrum viewer range", () => {
     expect(minimum).toHaveValue(100)
     expect(maximum).toHaveValue(101)
   })
+
+  it("keeps the last ordered range drawn while the minimum is not below the maximum", () => {
+    render(<Harness />)
+    const minimum = screen.getByLabelText("Plot minimum"), maximum = screen.getByLabelText("Plot maximum")
+    const drawn = () => plot.mock.calls.at(-1)![0].range
+    fireEvent.change(minimum, { target: { value: "100.2" } })
+    fireEvent.change(maximum, { target: { value: "100.8" } })
+    fireEvent.change(minimum, { target: { value: "100.8" } })
+    expect(drawn()).toEqual([100.2, 100.8])
+    expect(minimum).toHaveValue(100.8)
+    expect(minimum).toHaveAttribute("aria-invalid", "true")
+    expect(maximum).toHaveAttribute("aria-invalid", "true")
+    expect(minimum).toHaveAccessibleDescription("Minimum must be less than maximum.")
+    expect(maximum).toHaveAccessibleDescription("Minimum must be less than maximum.")
+    fireEvent.change(minimum, { target: { value: "100.9" } })
+    expect(drawn()).toEqual([100.2, 100.8])
+    fireEvent.change(maximum, { target: { value: "100.95" } })
+    expect(drawn()).toEqual([100.9, 100.95])
+    expect(minimum).not.toHaveAttribute("aria-invalid")
+    expect(screen.queryByText("Minimum must be less than maximum.")).not.toBeInTheDocument()
+    // A blank maximum is the automatic 101, so a minimum past it is inverted too.
+    fireEvent.change(maximum, { target: { value: "" } })
+    fireEvent.change(minimum, { target: { value: "102" } })
+    expect(drawn()).toEqual([100.9, null])
+    expect(screen.getByText("Minimum must be less than maximum.")).toBeInTheDocument()
+  })
 })
 
 describe("spectrum viewer export", () => {

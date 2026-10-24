@@ -48,3 +48,8 @@ export function ViewerControlField({ label, children, className = "", title, hel
 }) {
   return <label className={`${styles.field} ${className}`.trim()} title={title}><span>{label}{(help || title) && <SectionHelp label={typeof label === "string" ? label : "Display setting"}>{help || title}</SectionHelp>}</span>{children}</label>
 }
+
+/** A field's inline error; the field points at it with aria-describedby. */
+export function ViewerControlError({ id, children }: { id: string; children: ReactNode }) {
+  return <span id={id} className={styles.error} role="status">{children}</span>
+}
