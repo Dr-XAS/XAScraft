@@ -287,7 +287,7 @@ profile and conda-containing PATH:
 
 ```cron
 @reboot /usr/bin/env PATH="$HOME/miniconda3/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin" XRAYLARCH_WEB_SIBLING_PROFILE=drxas /local/apps/xraylarch-web/ops/ensure-watcher.sh >> /tmp/xraylarch-web-ensure.log 2>&1
-3-59/5 * * * * /local/drxas-ops/gate-f/xraylarch-web-liveness.sh >> /local/drxas-ops/gate-f/logs/xraylarch-web-liveness.log 2>&1
+3-59/5 * * * * /local/drxas/ops/gate-f/xraylarch-web-liveness.sh >> /local/drxas/ops/gate-f/logs/xraylarch-web-liveness.log 2>&1
 ```
 
 The `3-59/5` job is crash supervision rather than a watcher bootstrap. It probes
@@ -303,7 +303,7 @@ restart-looped. The `@reboot` entry is what guarantees the watcher after a boot.
 > attention. Since the public instance took `3004` the failure mode has inverted
 > and is quieter: a dead frontend on `3006` is now masked by the public instance
 > answering on `3004`, so the pair is no longer supervised at all. The two port
-> literals in `/local/drxas-ops/gate-f/xraylarch-web-liveness.sh` need to become
+> literals in `/local/drxas/ops/gate-f/xraylarch-web-liveness.sh` need to become
 > `3006`. That file is in the Dr.XAS ops tree, which the scope section below
 > places outside this authorization.
 
